@@ -31,17 +31,20 @@ def blocks_as_markdown(
 
     match block:
         case SectionTitleBlock(text):
-            return blocks_as_markdown(blocks, front_matter, f"{result}\n\n## {text}\n")
+            return blocks_as_markdown(
+                blocks, front_matter, f"{result}\n## {text.strip()}\n\n"
+            )
         case ParagraphBlock(text):
-            return blocks_as_markdown(blocks, front_matter, f"{result}\n\n{text}")
+            return blocks_as_markdown(blocks, front_matter, f"{result}{text.strip()}\n")
         case ImageBlock(src, alt):
             return blocks_as_markdown(
-                blocks, front_matter, f"{result}\n\n![{alt}]({src})"
+                blocks, front_matter, f"{result}![{alt}]({src})\n"
             )
         case ImageGroupBlock(images):
             return blocks_as_markdown(
                 blocks,
                 front_matter,
-                f"{result}\n\n"
-                + " ".join(f"![{image.alt}]({image.src})" for image in images),
+                f"{result}"
+                + " ".join(f"![{image.alt}]({image.src})" for image in images)
+                + "\n",
             )
