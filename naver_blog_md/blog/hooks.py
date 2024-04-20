@@ -19,12 +19,12 @@ T = TypeVar("T")
 
 def use_post(blog_id: str, log_no: int):
 
-    def post_url():
-        return f"https://blog.naver.com/PostView.naver?blogId={blog_id}&logNo={log_no}"
-
     @lazy_val
     def root() -> Tag:
-        response = requests.get(post_url())
+        response = requests.get(
+            "https://blog.naver.com/PostView.naver",
+            params={"blogId": blog_id, "logNo": log_no},
+        )
         return BeautifulSoup(response.text, "html.parser")
 
     @lazy_val
