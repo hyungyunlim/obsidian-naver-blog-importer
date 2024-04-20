@@ -11,10 +11,16 @@ Convert NAVER blog posts to markdown files.
 ## Usage
 
 ```python
-from naver_blog_md.blog.hooks import use_post
+import re
 
-_, _, as_markdown = use_post("your_blog_id", your_post_id_in_number)
+from naver_blog_md import use_blog, use_post
 
-print(as_markdown())
+blog_id = "YOUR-BLOG-ID"
 
+(posts,) = use_blog(blog_id)
+
+for post in posts():
+    metadata, as_markdown, _ = use_post(blog_id, post.log_no)
+    print(metadata())
+    print(as_markdown())
 ```
