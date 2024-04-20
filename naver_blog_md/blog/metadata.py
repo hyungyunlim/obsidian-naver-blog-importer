@@ -56,7 +56,7 @@ def pub_date(root: Tag):
 
     return datetime.strptime(
         tag.text.strip() + "+0900", "%Y. %m. %d. %H:%M%z"
-    ).isoformat()
+    )  # FIXME: Timezone is hardcoded
 
 
 def category(root: Tag) -> str:

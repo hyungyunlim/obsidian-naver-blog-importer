@@ -6,12 +6,7 @@ from bs4 import BeautifulSoup, Tag
 from naver_blog_md.blog import components as Components
 from naver_blog_md.blog import metadata as Metadata
 from naver_blog_md.fp.lazy_val import lazy_val
-from naver_blog_md.markdown.models import (
-    Block,
-    ImageBlock,
-    ImageGroupBlock,
-    SectionTitleBlock,
-)
+from naver_blog_md.markdown.models import Block, ImageBlock, ImageGroupBlock
 from naver_blog_md.markdown.render import blocks_as_markdown
 
 T = TypeVar("T")
@@ -25,7 +20,9 @@ def use_post(blog_id: str, log_no: int):
             "https://blog.naver.com/PostView.naver",
             params={"blogId": blog_id, "logNo": log_no},
         )
-        return BeautifulSoup(response.text, "html.parser")
+        return BeautifulSoup(
+            _remove_unicode_special_characters(response.text), "html.parser"
+        )
 
     @lazy_val
     def preview_image():
@@ -40,7 +37,7 @@ def use_post(blog_id: str, log_no: int):
         for component in root().select(".se-main-container .se-component"):
             match component["class"][1]:
                 case "se-sectionTitle":
-                    yield SectionTitleBlock(component.text.strip())
+                    yield Components.section_title_component(component)
                 case "se-image":
                     yield Components.image_component(component)
                 case "se-imageGroup":
@@ -49,6 +46,8 @@ def use_post(blog_id: str, log_no: int):
                     pass
                 case "se-text":
                     yield from Components.text_component(component)
+                case "se-oglink":
+                    pass
                 case unknown:
                     raise ValueError(f"Unknown component type: {unknown}")
 
@@ -56,11 +55,20 @@ def use_post(blog_id: str, log_no: int):
     def as_markdown():
         return blocks_as_markdown(as_blocks(), metadata())
 
-    return metadata, as_blocks, as_markdown
+    return (
+        metadata,
+        as_markdown,
+        as_blocks,
+    )
 
 
 def _first_image_of_blocks(blocks: Iterator[Block]) -> ImageBlock | None:
-    match next(blocks):
+    try:
+        block = next(blocks)
+    except StopIteration:
+        return None
+
+    match block:
         case ImageBlock(src, alt):
             return ImageBlock(src, alt)
         case ImageGroupBlock(images):

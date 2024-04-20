@@ -5,12 +5,17 @@ from naver_blog_md.markdown.models import (
     ImageBlock,
     ImageGroupBlock,
     ParagraphBlock,
+    SectionTitleBlock,
 )
+
+
+def section_title_component(component: Tag) -> Block:
+    return SectionTitleBlock(_text_from_tag(component))
 
 
 def text_component(component: Tag) -> list[Block]:
     return [
-        ParagraphBlock(text=tag.text.strip())
+        ParagraphBlock(text=_text_from_tag(tag))
         for tag in component.select(".se-text-paragraph")
     ]
 
@@ -23,7 +28,7 @@ def image_group_component(component: Tag) -> Block:
         images=[
             ImageBlock(
                 src=_original_image_url(str(img["src"])),
-                alt=caption.text.strip() if caption is not None else "",
+                alt=_text_from_tag(caption) if caption is not None else "",
             )
             for img in images
         ]
@@ -32,15 +37,27 @@ def image_group_component(component: Tag) -> Block:
 
 def image_component(component: Tag) -> Block:
     img = component.select_one("img")
-    assert img is not None, "No image found"
+    video = component.select_one("video")
+
+    match img, video:
+        case Tag(), None:
+            src = _original_image_url(str(img["src"]))
+        case None, Tag():
+            src = _original_image_url(str(video["src"]))
+        case _:
+            assert False, "Image and video are mutually exclusive"
 
     caption = component.select_one(".se-caption")
 
     return ImageBlock(
-        src=_original_image_url(str(img["src"])),
-        alt=caption.text.strip() if caption is not None else "",
+        src=src,
+        alt=_text_from_tag(caption) if caption is not None else "",
     )
 
 
 def _original_image_url(url: str):
     return url.split("?")[0].replace("postfiles", "blogfiles")
+
+
+def _text_from_tag(tag: Tag):
+    return tag.get_text(strip=True).strip()
