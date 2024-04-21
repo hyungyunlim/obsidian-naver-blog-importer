@@ -1,6 +1,6 @@
 import re
 from math import ceil
-from typing import Iterator, TypeVar, Unpack
+from typing import Iterator, Unpack
 
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -12,8 +12,7 @@ from naver_blog_md.fp.lazy_val import lazy_val
 from naver_blog_md.markdown.context import MarkdownRenderContext
 from naver_blog_md.markdown.models import Block, ImageBlock, ImageGroupBlock
 from naver_blog_md.markdown.render import blocks_as_markdown
-
-T = TypeVar("T")
+from naver_blog_md.multiprocess.pool import use_map
 
 
 def use_post(blog_id: str, log_no: int):
@@ -82,18 +81,26 @@ def _first_image_of_blocks(blocks: Iterator[Block]) -> ImageBlock | None:
 
 def use_blog(blog_id: str):
     @lazy_val
-    def posts() -> Iterator[PostItem]:
-        response = _post_title_list_async(blog_id)
+    def posts() -> list[PostItem]:
+        response = _post_title_list(blog_id)
 
         total_count, count_per_page = response.total_count, response.count_per_page
 
-        for current_page in range(1, ceil(total_count / count_per_page) + 1):
-            yield from _post_title_list_async(blog_id, current_page).post_list
+        map = use_map(8)  # FIXME: Make this configurable
+
+        return [
+            item
+            for items in map(
+                lambda page_number: _post_title_list(blog_id, page_number).post_list,
+                range(1, ceil(total_count / count_per_page) + 1),
+            )
+            for item in items
+        ]
 
     return (posts,)
 
 
-def _post_title_list_async(
+def _post_title_list(
     blog_id: str, current_page: int = 1, category_no: int = 0, count_per_page: int = 5
 ):
     response = requests.get(
