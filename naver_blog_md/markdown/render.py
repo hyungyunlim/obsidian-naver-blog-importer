@@ -22,16 +22,7 @@ def blocks_as_markdown(
 ) -> str:
 
     if front_matter is not None and result == "":
-        result = (
-            "---\n"
-            + yaml.safe_dump(
-                front_matter,
-                default_flow_style=False,
-                allow_unicode=True,
-                default_style=None,
-            )
-            + "---\n\n"
-        )
+        result = _front_matter_as_yaml(front_matter, **context)
 
     map = use_map(context["num_workers"])
 
@@ -47,14 +38,7 @@ def _block_as_markdown(
     block: Block,
     **context: Unpack[MarkdownRenderContext],
 ) -> str:
-    if "image_context" not in context:
-        default_context = with_default()
-        assert "image_context" in default_context
-        image_context = default_context["image_context"]
-    else:
-        image_context = context["image_context"]
-
-    processed_image_src = use_image_processor(image_context)
+    processed_image_src = _use_image_processor_with_fallback(**context)
 
     match block:
         case SectionTitleBlock(text):
@@ -77,3 +61,34 @@ def _block_as_markdown(
                 )
                 + "\n\n"
             )
+
+
+def _front_matter_as_yaml(
+    front_matter: dict[Any, Any],
+    **context: Unpack[MarkdownRenderContext],
+) -> str:
+    if "image" in front_matter and "url" in front_matter["image"]:
+        image_processor = _use_image_processor_with_fallback(**context)
+        front_matter["image"]["url"] = image_processor(front_matter["image"]["url"])
+
+    return (
+        "---\n"
+        + yaml.safe_dump(
+            front_matter,
+            default_flow_style=False,
+            allow_unicode=True,
+            default_style=None,
+        )
+        + "---\n\n"
+    )
+
+
+def _use_image_processor_with_fallback(**context: Unpack[MarkdownRenderContext]):
+    if "image_context" not in context:
+        default_context = with_default()
+        assert "image_context" in default_context
+        image_context = default_context["image_context"]
+    else:
+        image_context = context["image_context"]
+
+    return use_image_processor(image_context)
