@@ -27,7 +27,7 @@ def image_group_component(component: Tag) -> Block:
     return ImageGroupBlock(
         images=[
             ImageBlock(
-                src=_original_image_url(str(img["src"])),
+                src=str(img["src"]),
                 alt=_text_from_tag(caption) if caption is not None else "",
             )
             for img in images
@@ -41,9 +41,9 @@ def image_component(component: Tag) -> Block:
 
     match img, video:
         case Tag(), None:
-            src = _original_image_url(str(img["src"]))
+            src = str(img["src"])
         case None, Tag():
-            src = _original_image_url(str(video["src"]))
+            src = str(video["src"])
         case _:
             assert False, "Image and video are mutually exclusive"
 
@@ -53,10 +53,6 @@ def image_component(component: Tag) -> Block:
         src=src,
         alt=_text_from_tag(caption) if caption is not None else "",
     )
-
-
-def _original_image_url(url: str):
-    return url.split("?")[0].replace("postfiles", "blogfiles")
 
 
 def _text_from_tag(tag: Tag):

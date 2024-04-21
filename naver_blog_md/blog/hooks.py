@@ -1,6 +1,6 @@
 import re
 from math import ceil
-from typing import Iterator, TypeVar
+from typing import Iterator, TypeVar, Unpack
 
 import requests
 from bs4 import BeautifulSoup, Tag
@@ -9,6 +9,7 @@ from naver_blog_md.blog import components as Components
 from naver_blog_md.blog import metadata as Metadata
 from naver_blog_md.blog.models import PostItem, PostListResponse
 from naver_blog_md.fp.lazy_val import lazy_val
+from naver_blog_md.markdown.context import MarkdownRenderContext
 from naver_blog_md.markdown.models import Block, ImageBlock, ImageGroupBlock
 from naver_blog_md.markdown.render import blocks_as_markdown
 
@@ -54,9 +55,8 @@ def use_post(blog_id: str, log_no: int):
                 case unknown:
                     raise ValueError(f"Unknown component type: {unknown}")
 
-    @lazy_val
-    def as_markdown():
-        return blocks_as_markdown(as_blocks(), metadata())
+    def as_markdown(**context: Unpack[MarkdownRenderContext]):
+        return blocks_as_markdown(as_blocks(), metadata(), **context)
 
     return (
         metadata,
