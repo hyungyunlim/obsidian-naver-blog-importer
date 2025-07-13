@@ -1,0 +1,11 @@
+{
+	"id": "naver-blog-importer",
+	"name": "Naver Blog Importer",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Import posts from Naver Blog directly into Obsidian with AI-generated tags and excerpts",
+	"author": "Claude AI",
+	"authorUrl": "",
+	"fundingUrl": "",
+	"isDesktopOnly": false
+}
