@@ -16082,7 +16082,7 @@ var NaverBlogFetcher = class {
   }
 };
 
-// main.ts
+// src/utils/i18n.ts
 var I18n = class {
   constructor(app) {
     this.app = app;
@@ -16362,6 +16362,8 @@ var I18n = class {
     };
   }
 };
+
+// src/types/settings.ts
 var DEFAULT_SETTINGS = {
   aiProvider: "openai",
   openaiApiKey: "",
@@ -16381,6 +16383,8 @@ var DEFAULT_SETTINGS = {
   postImportLimit: 0
   // 0 means no limit
 };
+
+// main.ts
 var NaverBlogPlugin = class extends import_obsidian2.Plugin {
   constructor() {
     super(...arguments);

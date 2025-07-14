@@ -38,6 +38,11 @@ const context = await esbuild.context({
 	sourcemap: prod ? false : 'inline',
 	treeShaking: true,
 	outfile: 'main.js',
+	loader: {
+		'.ts': 'ts'
+	},
+	resolveExtensions: ['.ts', '.js'],
+	tsconfig: './tsconfig.json'
 });
 
 if (prod) {
