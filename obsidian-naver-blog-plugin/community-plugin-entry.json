@@ -1,0 +1,7 @@
+{
+  "id": "naver-blog-importer",
+  "name": "Naver Blog Importer",
+  "author": "hyungyunlim",
+  "description": "Import posts from Naver Blog with AI-powered features, subscription management, and comprehensive content parsing",
+  "repo": "hyungyunlim/obsidian-naver-blog-importer"
+}
