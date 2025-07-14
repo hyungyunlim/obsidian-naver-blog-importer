@@ -786,16 +786,21 @@ export class NaverBlogFetcher {
                     const caption = $el.find('.se-caption').text().trim();
                     
                     if (imgElement.length > 0) {
-                        // Try multiple image source attributes - comprehensive approach
-                        let imgSrc = imgElement.attr('data-lazy-src') || 
+                        // First, try to find original image URL from Naver link data
+                        let imgSrc = this.extractOriginalImageUrl($el, imgElement);
+                        
+                        // Fallback to standard image source attributes if original URL not found
+                        if (!imgSrc) {
+                            imgSrc = imgElement.attr('data-lazy-src') || 
                                    imgElement.attr('src') || 
                                    imgElement.attr('data-src') ||
                                    imgElement.attr('data-original') ||
                                    imgElement.attr('data-image-src') ||
                                    imgElement.attr('data-url') ||
                                    imgElement.attr('data-original-src');
+                        }
                         
-                        // Also try to find image URL in script tags or data attributes
+                        // Additional fallback: scan all data attributes for image URLs
                         if (!imgSrc) {
                             const dataAttrs = imgElement[0]?.attributes;
                             if (dataAttrs) {
@@ -1495,41 +1500,136 @@ export class NaverBlogFetcher {
         return true;
     }
 
-    private enhanceImageUrl(imgSrc: string): string {
-        // Enhance Naver blog image URLs to get larger resolution
-        let enhancedUrl = imgSrc;
+    private extractOriginalImageUrl($el: any, imgElement: any): string | null {
+        // Try to extract original image URL from Naver blog's data-linkdata attribute
+        const imageLink = $el.find('a.__se_image_link, a.se-module-image-link');
         
-        // For postfiles.pstatic.net images, try to get larger size
-        if (enhancedUrl.includes('postfiles.pstatic.net')) {
-            // Replace small size parameters with larger ones
-            enhancedUrl = enhancedUrl
-                .replace(/\?type=w\d+/i, '?type=w1200')  // Replace with w1200 (1200px width)
-                .replace(/\?type=w\d+_blur/i, '?type=w1200')  // Remove blur and set larger size
-                .replace(/&type=w\d+/i, '&type=w1200');
-            
-            // If no type parameter exists, add one for larger size
-            if (!enhancedUrl.includes('type=') && !enhancedUrl.includes('?')) {
-                enhancedUrl += '?type=w1200';
-            } else if (!enhancedUrl.includes('type=') && enhancedUrl.includes('?')) {
-                enhancedUrl += '&type=w1200';
+        if (imageLink.length > 0) {
+            const linkData = imageLink.attr('data-linkdata');
+            if (linkData) {
+                try {
+                    const data = JSON.parse(linkData);
+                    if (data.src) {
+                        console.log(`Found original image URL in linkdata: ${data.src}`);
+                        return data.src;
+                    }
+                } catch (e) {
+                    console.log('Failed to parse linkdata JSON:', e);
+                }
             }
         }
         
-        // For other Naver CDN images, try to remove size restrictions
-        if (enhancedUrl.includes('pstatic.net')) {
-            // Remove common size limitation parameters
+        // Also check script tags for image data (newer Naver blogs)
+        const scriptElement = $el.find('script.__se_module_data, script[data-module-v2]');
+        if (scriptElement.length > 0) {
+            const scriptContent = scriptElement.attr('data-module-v2') || scriptElement.html();
+            if (scriptContent) {
+                try {
+                    const data = JSON.parse(scriptContent);
+                    if (data.data && data.data.src) {
+                        console.log(`Found original image URL in script data: ${data.data.src}`);
+                        return data.data.src;
+                    }
+                    if (data.data && data.data.imageInfo && data.data.imageInfo.src) {
+                        console.log(`Found original image URL in imageInfo: ${data.data.imageInfo.src}`);
+                        return data.data.imageInfo.src;
+                    }
+                } catch (e) {
+                    console.log('Failed to parse script data JSON:', e);
+                }
+            }
+        }
+        
+        // Check for Naver's image data in surrounding elements
+        const parentComponent = $el.closest('.se-component');
+        if (parentComponent.length > 0) {
+            // Look for data attributes in parent component
+            const dataAttrs = parentComponent[0]?.attributes;
+            if (dataAttrs) {
+                for (let i = 0; i < dataAttrs.length; i++) {
+                    const attr = dataAttrs[i];
+                    if (attr.name.includes('data-') && attr.value.includes('https://postfiles.pstatic.net')) {
+                        try {
+                            // Try to extract URL from JSON-like data attributes
+                            const matches = attr.value.match(/https:\/\/postfiles\.pstatic\.net[^"'\s}]+/g);
+                            if (matches && matches.length > 0) {
+                                // Find the largest/original image URL (usually without size params or with longer path)
+                                const originalUrl = matches.reduce((best: string, current: string) => {
+                                    // Prefer URLs without size parameters or with longer paths (more likely to be original)
+                                    if (!current.includes('type=w') && current.includes('.jpg')) {
+                                        return current;
+                                    }
+                                    return current.length > best.length ? current : best;
+                                }, matches[0]);
+                                
+                                console.log(`Found original image URL in data attribute: ${originalUrl}`);
+                                return originalUrl;
+                            }
+                        } catch (e) {
+                            // Continue to next attribute
+                        }
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }
+
+    private enhanceImageUrl(imgSrc: string): string {
+        // Try to get original/highest quality image from Naver CDN
+        let enhancedUrl = imgSrc;
+        
+        // For postfiles.pstatic.net images, try to get original without size restrictions
+        if (enhancedUrl.includes('postfiles.pstatic.net')) {
+            // Remove ALL size parameters to get original image
             enhancedUrl = enhancedUrl
-                .replace(/\/w\d+\//g, '/w1200/')  // Replace width in path
-                .replace(/\/h\d+\//g, '/h800/')   // Replace height in path
-                .replace(/\?w=\d+/i, '?w=1200')   // Replace width parameter
-                .replace(/&w=\d+/i, '&w=1200')
-                .replace(/\?h=\d+/i, '?h=800')    // Replace height parameter
-                .replace(/&h=\d+/i, '&h=800');
+                .replace(/\?type=w\d+[^&]*/i, '')      // Remove type=w parameters completely
+                .replace(/&type=w\d+[^&]*/i, '')
+                .replace(/\?type=w\d+_blur[^&]*/i, '') // Remove blur parameters
+                .replace(/&type=w\d+_blur[^&]*/i, '')
+                .replace(/\?w=\d+[^&]*/i, '')          // Remove w= parameters
+                .replace(/&w=\d+[^&]*/i, '')
+                .replace(/\?h=\d+[^&]*/i, '')          // Remove h= parameters
+                .replace(/&h=\d+[^&]*/i, '')
+                .replace(/\?resize=\d+[^&]*/i, '')     // Remove resize parameters
+                .replace(/&resize=\d+[^&]*/i, '');
+            
+            // Clean up any remaining query parameter artifacts
+            enhancedUrl = enhancedUrl
+                .replace(/\?&/, '?')                   // Fix malformed query params
+                .replace(/&&/, '&')
+                .replace(/\?$/, '')                    // Remove trailing question mark
+                .replace(/&$/, '');                    // Remove trailing ampersand
+            
+            console.log(`Attempting to get original image: ${imgSrc} -> ${enhancedUrl}`);
+        }
+        
+        // For other Naver CDN images, try to remove size restrictions
+        else if (enhancedUrl.includes('pstatic.net')) {
+            // Remove common size limitation parameters to get original
+            enhancedUrl = enhancedUrl
+                .replace(/\/w\d+\//g, '/')             // Remove width in path
+                .replace(/\/h\d+\//g, '/')             // Remove height in path
+                .replace(/\/thumb\d+\//g, '/')         // Remove thumbnail indicators
+                .replace(/\/small\//g, '/')            // Remove small size indicators
+                .replace(/\/medium\//g, '/')           // Remove medium size indicators
+                .replace(/\?w=\d+/i, '')               // Remove width parameter
+                .replace(/&w=\d+/i, '')
+                .replace(/\?h=\d+/i, '')               // Remove height parameter
+                .replace(/&h=\d+/i, '')
+                .replace(/\?quality=\d+/i, '')         // Remove quality reduction
+                .replace(/&quality=\d+/i, '');
+                
+            // Clean up path artifacts
+            enhancedUrl = enhancedUrl.replace(/\/+/g, '/').replace('://', '://');
+            
+            console.log(`Cleaned Naver CDN URL: ${imgSrc} -> ${enhancedUrl}`);
         }
         
         // Log the enhancement for debugging
         if (enhancedUrl !== imgSrc) {
-            console.log(`Enhanced image URL: ${imgSrc} -> ${enhancedUrl}`);
+            console.log(`Enhanced to get original image: ${imgSrc} -> ${enhancedUrl}`);
         }
         
         return enhancedUrl;

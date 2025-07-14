@@ -15326,7 +15326,10 @@ var NaverBlogFetcher = class {
           const imgElement = $el.find("img");
           const caption = $el.find(".se-caption").text().trim();
           if (imgElement.length > 0) {
-            let imgSrc = imgElement.attr("data-lazy-src") || imgElement.attr("src") || imgElement.attr("data-src") || imgElement.attr("data-original") || imgElement.attr("data-image-src") || imgElement.attr("data-url") || imgElement.attr("data-original-src");
+            let imgSrc = this.extractOriginalImageUrl($el, imgElement);
+            if (!imgSrc) {
+              imgSrc = imgElement.attr("data-lazy-src") || imgElement.attr("src") || imgElement.attr("data-src") || imgElement.attr("data-original") || imgElement.attr("data-image-src") || imgElement.attr("data-url") || imgElement.attr("data-original-src");
+            }
             if (!imgSrc) {
               const dataAttrs = (_a5 = imgElement[0]) == null ? void 0 : _a5.attributes;
               if (dataAttrs) {
@@ -15343,6 +15346,7 @@ var NaverBlogFetcher = class {
             }
             if (imgSrc) {
               if (this.shouldIncludeImage(imgSrc, caption)) {
+                imgSrc = this.enhanceImageUrl(imgSrc);
                 const altText = caption || imgElement.attr("alt") || imgElement.attr("title") || "Blog Image";
                 content += `![${altText}](${imgSrc})
 `;
@@ -15608,7 +15612,74 @@ var NaverBlogFetcher = class {
     return content;
   }
   cleanContent(content) {
-    return content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/[ \u00A0]{2,}/g, " ").replace(/\u00A0/g, " ").replace(/\t/g, " ").split("\n").map((line) => line.trim()).filter((line) => line.length > 0).join("\n");
+    let cleanedContent = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/[ \u00A0]{2,}/g, " ").replace(/\u00A0/g, " ").replace(/\t/g, " ");
+    const lines = cleanedContent.split("\n");
+    const cleanedLines = [];
+    let skipMetadata = true;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (skipMetadata) {
+        const metadataPatterns = [
+          /^[가-힣\s]+\s+뉴스$/,
+          // "사이클링 뉴스"
+          /^\d{4}\s+[가-힣\s:]+\.$/,
+          // "2025 투르 드 프랑스 스테이지 9: ..."
+          /^[가-힣]+$/,
+          // "아다미" (단일 한글 단어)
+          /^・$/,
+          // "・" 구분자
+          /^\d+시간?\s*전$/,
+          // "6시간 전"
+          /^URL\s*복사$/,
+          // "URL 복사"
+          /^이웃추가$/,
+          // "이웃추가"
+          /^본문\s*기타\s*기능$/,
+          // "본문 기타 기능"
+          /^공유하기$/,
+          // "공유하기"
+          /^신고하기$/,
+          // "신고하기"
+          /^글-[가-힣]+$/,
+          // "글-장영한"
+          /^[가-힣]+님의\s*블로그$/,
+          // "xxx님의 블로그"
+          /^구독하기$/,
+          // "구독하기"
+          /^좋아요$/,
+          // "좋아요"
+          /^댓글$/,
+          // "댓글"
+          /^스크랩$/,
+          // "스크랩"
+          /^전체보기$/,
+          // "전체보기"
+          /^카테고리\s*이동$/,
+          // "카테고리 이동"
+          /^\d+\.\d+\.\d+\.\s*\d{2}:\d{2}$/,
+          // "2025.1.15. 14:30" 형태의 날짜
+          /^작성자\s*[가-힣]+$/,
+          // "작성자 홍길동"
+          /^[\d,]+\s*조회$/,
+          // "1,234 조회"
+          /^태그\s*#[가-힣\s#]+$/
+          // "태그 #사이클링 #뉴스"
+        ];
+        const isMetadata = metadataPatterns.some((pattern) => pattern.test(line));
+        const isShortLine = line.length > 0 && line.length <= 2;
+        if (line.length > 0 && (isMetadata || isShortLine)) {
+          console.log(`Removing metadata line: "${line}"`);
+          continue;
+        }
+        if (line.length > 10) {
+          skipMetadata = false;
+        }
+      }
+      if (line.length > 0 || !skipMetadata) {
+        cleanedLines.push(line);
+      }
+    }
+    return cleanedLines.filter((line) => line.length > 0).join("\n");
   }
   parseDate(dateText) {
     try {
@@ -15865,6 +15936,85 @@ var NaverBlogFetcher = class {
       return false;
     }
     return true;
+  }
+  extractOriginalImageUrl($el, imgElement) {
+    var _a5;
+    const imageLink = $el.find("a.__se_image_link, a.se-module-image-link");
+    if (imageLink.length > 0) {
+      const linkData = imageLink.attr("data-linkdata");
+      if (linkData) {
+        try {
+          const data2 = JSON.parse(linkData);
+          if (data2.src) {
+            console.log(`Found original image URL in linkdata: ${data2.src}`);
+            return data2.src;
+          }
+        } catch (e) {
+          console.log("Failed to parse linkdata JSON:", e);
+        }
+      }
+    }
+    const scriptElement = $el.find("script.__se_module_data, script[data-module-v2]");
+    if (scriptElement.length > 0) {
+      const scriptContent = scriptElement.attr("data-module-v2") || scriptElement.html();
+      if (scriptContent) {
+        try {
+          const data2 = JSON.parse(scriptContent);
+          if (data2.data && data2.data.src) {
+            console.log(`Found original image URL in script data: ${data2.data.src}`);
+            return data2.data.src;
+          }
+          if (data2.data && data2.data.imageInfo && data2.data.imageInfo.src) {
+            console.log(`Found original image URL in imageInfo: ${data2.data.imageInfo.src}`);
+            return data2.data.imageInfo.src;
+          }
+        } catch (e) {
+          console.log("Failed to parse script data JSON:", e);
+        }
+      }
+    }
+    const parentComponent = $el.closest(".se-component");
+    if (parentComponent.length > 0) {
+      const dataAttrs = (_a5 = parentComponent[0]) == null ? void 0 : _a5.attributes;
+      if (dataAttrs) {
+        for (let i = 0; i < dataAttrs.length; i++) {
+          const attr2 = dataAttrs[i];
+          if (attr2.name.includes("data-") && attr2.value.includes("https://postfiles.pstatic.net")) {
+            try {
+              const matches = attr2.value.match(/https:\/\/postfiles\.pstatic\.net[^"'\s}]+/g);
+              if (matches && matches.length > 0) {
+                const originalUrl = matches.reduce((best, current) => {
+                  if (!current.includes("type=w") && current.includes(".jpg")) {
+                    return current;
+                  }
+                  return current.length > best.length ? current : best;
+                }, matches[0]);
+                console.log(`Found original image URL in data attribute: ${originalUrl}`);
+                return originalUrl;
+              }
+            } catch (e) {
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+  enhanceImageUrl(imgSrc) {
+    let enhancedUrl = imgSrc;
+    if (enhancedUrl.includes("postfiles.pstatic.net")) {
+      enhancedUrl = enhancedUrl.replace(/\?type=w\d+[^&]*/i, "").replace(/&type=w\d+[^&]*/i, "").replace(/\?type=w\d+_blur[^&]*/i, "").replace(/&type=w\d+_blur[^&]*/i, "").replace(/\?w=\d+[^&]*/i, "").replace(/&w=\d+[^&]*/i, "").replace(/\?h=\d+[^&]*/i, "").replace(/&h=\d+[^&]*/i, "").replace(/\?resize=\d+[^&]*/i, "").replace(/&resize=\d+[^&]*/i, "");
+      enhancedUrl = enhancedUrl.replace(/\?&/, "?").replace(/&&/, "&").replace(/\?$/, "").replace(/&$/, "");
+      console.log(`Attempting to get original image: ${imgSrc} -> ${enhancedUrl}`);
+    } else if (enhancedUrl.includes("pstatic.net")) {
+      enhancedUrl = enhancedUrl.replace(/\/w\d+\//g, "/").replace(/\/h\d+\//g, "/").replace(/\/thumb\d+\//g, "/").replace(/\/small\//g, "/").replace(/\/medium\//g, "/").replace(/\?w=\d+/i, "").replace(/&w=\d+/i, "").replace(/\?h=\d+/i, "").replace(/&h=\d+/i, "").replace(/\?quality=\d+/i, "").replace(/&quality=\d+/i, "");
+      enhancedUrl = enhancedUrl.replace(/\/+/g, "/").replace("://", "://");
+      console.log(`Cleaned Naver CDN URL: ${imgSrc} -> ${enhancedUrl}`);
+    }
+    if (enhancedUrl !== imgSrc) {
+      console.log(`Enhanced to get original image: ${imgSrc} -> ${enhancedUrl}`);
+    }
+    return enhancedUrl;
   }
   delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
