@@ -814,6 +814,9 @@ export class NaverBlogFetcher {
                         if (imgSrc) {
                             // Filter out profile and UI images
                             if (this.shouldIncludeImage(imgSrc, caption)) {
+                                // Enhance image URL to get larger resolution
+                                imgSrc = this.enhanceImageUrl(imgSrc);
+                                
                                 // Create markdown image with caption
                                 const altText = caption || imgElement.attr('alt') || imgElement.attr('title') || 'Blog Image';
                                 content += `![${altText}](${imgSrc})\n`;
@@ -1100,14 +1103,74 @@ export class NaverBlogFetcher {
     }
 
     private cleanContent(content: string): string {
-        return content
+        let cleanedContent = content
             .replace(/\r\n/g, '\n') // Normalize line endings
             .replace(/\r/g, '\n') // Normalize line endings
             .replace(/[ \u00A0]{2,}/g, ' ') // Replace multiple spaces and non-breaking spaces
             .replace(/\u00A0/g, ' ') // Replace non-breaking spaces with regular spaces
-            .replace(/\t/g, ' ') // Replace tabs with spaces
-            .split('\n') // Split into lines for processing
-            .map(line => line.trim()) // Trim each line
+            .replace(/\t/g, ' '); // Replace tabs with spaces
+
+        // Remove blog metadata patterns from the beginning of content
+        const lines = cleanedContent.split('\n');
+        const cleanedLines: string[] = [];
+        let skipMetadata = true;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // Skip metadata patterns at the beginning
+            if (skipMetadata) {
+                // Common blog metadata patterns to remove
+                const metadataPatterns = [
+                    /^[가-힣\s]+\s+뉴스$/,                    // "사이클링 뉴스"
+                    /^\d{4}\s+[가-힣\s:]+\.$/,              // "2025 투르 드 프랑스 스테이지 9: ..."
+                    /^[가-힣]+$/,                           // "아다미" (단일 한글 단어)
+                    /^・$/,                                // "・" 구분자
+                    /^\d+시간?\s*전$/,                      // "6시간 전"
+                    /^URL\s*복사$/,                        // "URL 복사"
+                    /^이웃추가$/,                          // "이웃추가"
+                    /^본문\s*기타\s*기능$/,                 // "본문 기타 기능"
+                    /^공유하기$/,                          // "공유하기"
+                    /^신고하기$/,                          // "신고하기"
+                    /^글-[가-힣]+$/,                       // "글-장영한"
+                    /^[가-힣]+님의\s*블로그$/,               // "xxx님의 블로그"
+                    /^구독하기$/,                          // "구독하기"
+                    /^좋아요$/,                            // "좋아요"
+                    /^댓글$/,                              // "댓글"
+                    /^스크랩$/,                            // "스크랩"
+                    /^전체보기$/,                          // "전체보기"
+                    /^카테고리\s*이동$/,                    // "카테고리 이동"
+                    /^\d+\.\d+\.\d+\.\s*\d{2}:\d{2}$/,     // "2025.1.15. 14:30" 형태의 날짜
+                    /^작성자\s*[가-힣]+$/,                  // "작성자 홍길동"
+                    /^[\d,]+\s*조회$/,                     // "1,234 조회"
+                    /^태그\s*#[가-힣\s#]+$/                // "태그 #사이클링 #뉴스"
+                ];
+
+                // Check if the line matches any metadata pattern
+                const isMetadata = metadataPatterns.some(pattern => pattern.test(line));
+                
+                // Also skip very short lines that are likely metadata
+                const isShortLine = line.length > 0 && line.length <= 2;
+                
+                // Skip if it's metadata or very short, but don't skip empty lines
+                if (line.length > 0 && (isMetadata || isShortLine)) {
+                    console.log(`Removing metadata line: "${line}"`);
+                    continue;
+                }
+                
+                // If we hit a substantial content line (more than 10 characters), stop skipping
+                if (line.length > 10) {
+                    skipMetadata = false;
+                }
+            }
+            
+            // Add the line if it's not empty or if we're past the metadata section
+            if (line.length > 0 || !skipMetadata) {
+                cleanedLines.push(line);
+            }
+        }
+
+        return cleanedLines
             .filter(line => line.length > 0) // Remove empty lines
             .join('\n'); // Join with single line breaks only
     }
@@ -1430,6 +1493,46 @@ export class NaverBlogFetcher {
         }
         
         return true;
+    }
+
+    private enhanceImageUrl(imgSrc: string): string {
+        // Enhance Naver blog image URLs to get larger resolution
+        let enhancedUrl = imgSrc;
+        
+        // For postfiles.pstatic.net images, try to get larger size
+        if (enhancedUrl.includes('postfiles.pstatic.net')) {
+            // Replace small size parameters with larger ones
+            enhancedUrl = enhancedUrl
+                .replace(/\?type=w\d+/i, '?type=w1200')  // Replace with w1200 (1200px width)
+                .replace(/\?type=w\d+_blur/i, '?type=w1200')  // Remove blur and set larger size
+                .replace(/&type=w\d+/i, '&type=w1200');
+            
+            // If no type parameter exists, add one for larger size
+            if (!enhancedUrl.includes('type=') && !enhancedUrl.includes('?')) {
+                enhancedUrl += '?type=w1200';
+            } else if (!enhancedUrl.includes('type=') && enhancedUrl.includes('?')) {
+                enhancedUrl += '&type=w1200';
+            }
+        }
+        
+        // For other Naver CDN images, try to remove size restrictions
+        if (enhancedUrl.includes('pstatic.net')) {
+            // Remove common size limitation parameters
+            enhancedUrl = enhancedUrl
+                .replace(/\/w\d+\//g, '/w1200/')  // Replace width in path
+                .replace(/\/h\d+\//g, '/h800/')   // Replace height in path
+                .replace(/\?w=\d+/i, '?w=1200')   // Replace width parameter
+                .replace(/&w=\d+/i, '&w=1200')
+                .replace(/\?h=\d+/i, '?h=800')    // Replace height parameter
+                .replace(/&h=\d+/i, '&h=800');
+        }
+        
+        // Log the enhancement for debugging
+        if (enhancedUrl !== imgSrc) {
+            console.log(`Enhanced image URL: ${imgSrc} -> ${enhancedUrl}`);
+        }
+        
+        return enhancedUrl;
     }
 
     private delay(ms: number): Promise<void> {
