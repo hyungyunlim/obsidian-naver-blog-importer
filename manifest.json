@@ -1,0 +1,11 @@
+{
+	"id": "naver-blog-importer",
+	"name": "Naver Blog Importer",
+	"version": "1.2.0",
+	"minAppVersion": "0.15.0",
+	"description": "Import posts from Naver Blog with AI-powered features, subscription management, and comprehensive content parsing",
+	"author": "hyungyunlim",
+	"authorUrl": "https://github.com/hyungyunlim",
+	"fundingUrl": "",
+	"isDesktopOnly": false
+}
