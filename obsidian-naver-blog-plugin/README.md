@@ -1,127 +1,170 @@
 # Naver Blog Importer for Obsidian
 
-네이버 블로그의 글들을 Obsidian으로 직접 가져올 수 있는 플러그인입니다.
+Import posts from Naver Blog directly into your Obsidian vault with AI-powered enhancements.
 
-## 주요 기능
+![Obsidian Downloads](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23483699&label=downloads&query=%24%5B%22naver-blog-importer%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json)
 
-- **네이버 블로그 자동 가져오기**: 블로그 ID만 입력하면 모든 글을 자동으로 가져옵니다
-- **구독 관리**: 여러 블로그를 구독하여 자동으로 새 글을 동기화합니다
-  - 블로그별 개별 글 개수 설정
-  - 수동 개별 블로그 동기화
-  - 시작시 자동 동기화
-- **AI 기반 기능** (선택사항):
-  - OpenAI를 사용한 태그 자동 생성
-  - 글 요약(excerpt) 자동 생성
-  - AI 레이아웃 정리 및 형식 개선
-- **고급 기능**:
-  - 이미지 다운로드 및 로컬 저장
-  - 중복 글 체크 및 필터링
-  - 단일 글 가져오기
-- **다양한 컴포넌트 지원**: 텍스트, 이미지, 인용구, 코드 블록, 리스트 등을 올바른 순서로 파싱
-- **커스텀 프론트매터**: Obsidian에 최적화된 메타데이터 형식으로 저장됩니다
+## Features
 
-## 설치 방법
+- **🚀 Bulk Blog Import**: Import all posts from a Naver Blog with just the blog ID
+- **📂 Subscription Management**: Subscribe to multiple blogs and sync new posts automatically
+  - Individual post count settings per blog
+  - Manual sync for individual blogs
+  - Auto-sync on startup
+- **🤖 AI-Powered Features** (Optional):
+  - Automatic tag generation using OpenAI, Anthropic, or Google APIs
+  - AI-generated post excerpts
+  - Smart layout formatting and content enhancement
+- **🔧 Advanced Features**:
+  - Local image download and storage
+  - Duplicate post detection and filtering
+  - Single post import by URL
+- **📝 Comprehensive Parsing**: Supports text, images, quotes, code blocks, lists, and more in proper order
+- **⚡ Optimized Metadata**: Obsidian-friendly frontmatter with rich metadata
+- **🌐 Multilingual**: Full Korean and English language support
 
-### 수동 설치
+## Installation
 
-1. 이 저장소를 클론하거나 다운로드합니다
-2. `npm install`로 의존성을 설치합니다
-3. `npm run build`로 빌드합니다
-4. 생성된 `main.js`, `styles.css`, `manifest.json` 파일을 Obsidian vault의 `.obsidian/plugins/naver-blog-importer/` 폴더에 복사합니다
-5. Obsidian을 재시작하고 설정에서 플러그인을 활성화합니다
+### From Obsidian Community Plugins
 
-### 개발 모드
+1. Open Obsidian Settings
+2. Go to Community Plugins and disable Safe Mode
+3. Click Browse and search for "Naver Blog Importer"
+4. Install and enable the plugin
 
-```bash
-# 의존성 설치
-npm install
+### Manual Installation
 
-# 개발 모드 실행 (파일 변경시 자동 빌드)
-npm run dev
+1. Download the latest release from GitHub
+2. Extract `main.js`, `manifest.json`, and `styles.css` to your vault's `.obsidian/plugins/naver-blog-importer/` folder
+3. Restart Obsidian and enable the plugin in Settings
 
-# 프로덕션 빌드
-npm run build
-```
+## Quick Start
 
-## 사용 방법
+### 1. Configure AI Provider (Optional)
 
-### 1. 설정
+1. Go to Settings → Community Plugins → Naver Blog Importer
+2. Choose your AI provider (OpenAI, Anthropic, Google, or Ollama)
+3. Enter your API key for AI-powered features
+4. Configure folder settings for posts and images
 
-1. Obsidian 설정 → 커뮤니티 플러그인 → Naver Blog Importer 설정으로 이동
-2. OpenAI API 키를 입력합니다 (AI 태그/요약 기능을 사용하려면 필수)
-3. 글을 저장할 기본 폴더를 설정합니다 (기본값: "Naver Blog Posts")
-4. AI 태그 생성 및 요약 생성 기능을 활성화/비활성화할 수 있습니다
+### 2. Import Posts
 
-### 2. 블로그 가져오기
+**Method 1: Bulk Import**
+1. Click the download ribbon icon or use Command Palette
+2. Select "Import All Posts from Blog"
+3. Enter Naver Blog ID (e.g., "yonofbooks")
+4. Click "Import All Posts"
 
-1. 방법 1: 리본의 다운로드 아이콘 클릭
-2. 방법 2: 명령 팔레트(Ctrl/Cmd + P)에서 "Import from Naver Blog" 검색
-3. 네이버 블로그 ID를 입력합니다 (예: "yonofbooks")
-4. "Import Posts" 버튼을 클릭합니다
+**Method 2: Single Post Import**
+1. Use Command Palette → "Import Single Post by URL"
+2. Enter blog ID and post URL or LogNo
+3. Click "Import Post"
 
-### 3. 결과
+**Method 3: Subscription Management**
+1. Use Command Palette → "Sync Subscribed Blogs"
+2. Add blog IDs to your subscription list
+3. Auto-sync new posts on startup
 
-각 블로그 글은 다음과 같은 형식으로 저장됩니다:
+### 3. Output Format
+
+Each blog post is saved as a markdown file with rich metadata:
 
 ```markdown
 ---
-title: "블로그 글 제목"
-filename: "2024-01-01-블로그-글-제목"
+title: "Blog Post Title"
 date: 2024-01-01
-share: true
-categories: [IT, 개발, 생활]
-tags: ["AI생성태그1", "AI생성태그2", "AI생성태그3"]
-excerpt: "AI가 생성한 글 요약..."
-source: "네이버 블로그"
+tags: ["AI-generated", "tag2", "tag3"]
+excerpt: "AI-generated summary of the post..."
+source: "Naver Blog"
+url: "https://blog.naver.com/blogid/123456789"
 logNo: "123456789"
+categories: ["Category1", "Category2"]
 ---
 
-블로그 글 내용...
+# Blog Post Title
+
+Post content with properly formatted images, quotes, and code blocks...
 ```
 
-## 지원하는 컴포넌트
+## Supported Content Types
 
-- ✅ **텍스트**: 일반 텍스트 내용
-- ✅ **제목**: 소제목 (## 형식으로 변환)
-- ✅ **인용구**: > 형식으로 변환
-- ✅ **이미지**: 이미지 URL과 캡션 포함
-- ✅ **코드 블록**: ``` 형식으로 변환
-- ✅ **구분선**: --- 형식으로 변환
-- ⚠️ **비디오**: 플레이스홀더로 표시
-- ⚠️ **임베드 콘텐츠**: 플레이스홀더로 표시
-- ⚠️ **표**: 플레이스홀더로 표시
+- ✅ **Text**: Regular text content with proper formatting
+- ✅ **Headings**: Subheadings converted to `##` format
+- ✅ **Quotes**: Block quotes converted to `>` format
+- ✅ **Images**: High-quality images with captions and local download
+- ✅ **Code Blocks**: Code snippets converted to ``` format
+- ✅ **Dividers**: Horizontal rules converted to `---` format
+- ⚠️ **Videos**: Displayed as placeholders with source links
+- ⚠️ **Embedded Content**: Displayed as placeholders with descriptions
+- ⚠️ **Tables**: Displayed as placeholders (future enhancement)
 
-## API 키 설정
+## AI Providers & API Keys
 
-OpenAI API 키는 다음 사이트에서 발급받을 수 있습니다:
-- [OpenAI API Keys](https://platform.openai.com/api-keys)
+The plugin supports multiple AI providers for enhanced functionality:
 
-AI 기능을 사용하지 않으려면 API 키 없이도 기본적인 가져오기 기능을 사용할 수 있습니다.
+- **OpenAI**: [Get API Key](https://platform.openai.com/api-keys)
+- **Anthropic**: [Get API Key](https://console.anthropic.com/)
+- **Google Gemini**: [Get API Key](https://aistudio.google.com/app/apikey)
+- **Ollama**: Local AI server (no API key required)
 
-## 주의사항
+AI features are optional - basic blog import works without any API keys.
 
-- 네이버 블로그의 구조 변경에 따라 일부 글이 제대로 가져와지지 않을 수 있습니다
-- 대량의 글을 가져올 때는 서버에 부하를 주지 않기 위해 자동으로 지연 시간이 추가됩니다
-- OpenAI API 사용시 토큰 사용량에 따라 비용이 발생할 수 있습니다
+## Configuration
 
-## 라이선스
+### AI Settings
+- **Provider**: Choose between OpenAI, Anthropic, Google, or Ollama
+- **Model**: Select specific model (auto-refreshed from APIs)
+- **Features**: Enable/disable AI tags and excerpts
 
-MIT License
+### Folder Settings
+- **Default Folder**: Where imported posts are saved
+- **Image Folder**: Where downloaded images are stored
 
-## 기여하기
+### Advanced Options
+- **Duplicate Check**: Skip posts that already exist
+- **Image Download**: Download and store images locally
+- **Subscription Management**: Auto-sync multiple blogs
 
-버그 리포트나 기능 제안은 GitHub Issues를 통해 해주세요.
+## Troubleshooting
 
-## 업데이트 로그
+### Common Issues
+
+1. **Import Failed**: Check network connection and blog accessibility
+2. **AI Features Not Working**: Verify API key and provider settings
+3. **Images Not Loading**: Enable image download in settings
+4. **Language Issues**: Change Obsidian language in settings
+
+### Performance Tips
+
+- Use subscription management for regular updates
+- Enable duplicate checking to avoid re-importing
+- Configure appropriate folder structure for organization
+
+## Contributing
+
+Bug reports and feature requests are welcome via [GitHub Issues](https://github.com/hyungyunlim/obsidian-naver-blog-importer/issues).
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Changelog
+
+### v1.2.0 (Latest)
+- **🤖 Enhanced AI Integration**: Support for OpenAI, Anthropic, Google, and Ollama
+- **🌐 Real-time Model Fetching**: Automatic model list updates from APIs
+- **🎯 Smart Token Management**: Adaptive limits for different model types
+- **🔄 Retry Logic**: Automatic retry for failed API calls
+- **📱 Progress Notifications**: Real-time status updates for AI operations
+- **🌍 Improved Localization**: Better language detection and switching
 
 ### v1.0.1
-- **이미지 위치 정렬 수정**: 이미지가 글 마지막에 몰리던 문제 해결
-- **구독 UI 개선**: 블로그별 개별 글 개수 설정 가능
-- **개별 동기화**: 각 블로그를 개별적으로 동기화할 수 있는 기능 추가
-- **사용성 개선**: 더 나은 사용자 인터페이스와 피드백
+- **🖼️ Fixed Image Positioning**: Images now appear in correct order
+- **📂 Enhanced Subscription UI**: Individual post count settings per blog
+- **🔄 Individual Sync**: Manual sync for specific blogs
+- **🎨 UI Improvements**: Better user interface and feedback
 
 ### v1.0.0
-- 초기 릴리스
-- 네이버 블로그 가져오기 기본 기능
-- AI 태그 및 요약 생성 기능
-- 다양한 블로그 컴포넌트 지원
+- **🎉 Initial Release**: Core blog import functionality
+- **🤖 AI Features**: Tag and excerpt generation
+- **📝 Content Parsing**: Support for various blog components
