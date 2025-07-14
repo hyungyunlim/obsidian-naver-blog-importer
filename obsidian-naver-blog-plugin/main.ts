@@ -48,6 +48,8 @@ interface Translations {
 		enable_duplicate_check_desc: string;
 		enable_image_download: string;
 		enable_image_download_desc: string;
+		post_import_limit: string;
+		post_import_limit_desc: string;
 		subscribed_blogs: string;
 		add_blog_id: string;
 		add_blog_id_desc: string;
@@ -81,6 +83,7 @@ interface Translations {
 		image_download_complete: string;
 		generating_ai_tags: string;
 		generating_ai_excerpt: string;
+		post_limit_exceeded: string;
 	};
 	modals: {
 		import_single_post: {
@@ -225,6 +228,8 @@ class I18n {
 				enable_duplicate_check_desc: 'Skip importing posts that already exist (based on logNo)',
 				enable_image_download: 'Enable Image Download',
 				enable_image_download_desc: 'Download images locally and update links',
+				post_import_limit: 'Post Import Limit',
+				post_import_limit_desc: 'Maximum number of posts to import at once (0 = unlimited)',
 				subscribed_blogs: 'Subscribed Blogs',
 				add_blog_id: 'Add Blog ID',
 				add_blog_id_desc: 'Enter a new blog ID and click the add button',
@@ -257,7 +262,8 @@ class I18n {
 				downloading_images: 'Downloading images...',
 				image_download_complete: 'Image download complete: {{count}} images',
 				generating_ai_tags: 'Generating AI tags...',
-				generating_ai_excerpt: 'Generating AI excerpt...'
+				generating_ai_excerpt: 'Generating AI excerpt...',
+				post_limit_exceeded: 'Maximum limit is 1000 posts. Value adjusted to 1000.'
 			},
 			modals: {
 				import_single_post: {
@@ -340,6 +346,8 @@ class I18n {
 				enable_duplicate_check_desc: '이미 존재하는 포스트 가져오기 건너뛰기 (logNo 기준)',
 				enable_image_download: '이미지 다운로드 활성화',
 				enable_image_download_desc: '이미지를 로컬에 다운로드하고 링크를 업데이트합니다',
+				post_import_limit: '포스트 가져오기 제한',
+				post_import_limit_desc: '한 번에 가져올 포스트의 최대 개수 (0 = 무제한)',
 				subscribed_blogs: '구독 블로그',
 				add_blog_id: '블로그 ID 추가',
 				add_blog_id_desc: '새 블로그 ID를 입력하고 추가 버튼을 클릭하세요',
@@ -372,7 +380,8 @@ class I18n {
 				downloading_images: '이미지 다운로드 중...',
 				image_download_complete: '이미지 다운로드 완료: {{count}}개',
 				generating_ai_tags: 'AI 태그 생성 중...',
-				generating_ai_excerpt: 'AI 요약 생성 중...'
+				generating_ai_excerpt: 'AI 요약 생성 중...',
+				post_limit_exceeded: '최대 제한은 1000개 포스트입니다. 값이 1000으로 조정되었습니다.'
 			},
 			modals: {
 				import_single_post: {
@@ -442,6 +451,7 @@ interface NaverBlogSettings {
 	subscribedBlogs: string[];
 	subscriptionCount: number;
 	blogSubscriptions: BlogSubscription[];
+	postImportLimit: number;
 }
 
 const DEFAULT_SETTINGS: NaverBlogSettings = {
@@ -459,7 +469,8 @@ const DEFAULT_SETTINGS: NaverBlogSettings = {
 	enableImageDownload: false,
 	subscribedBlogs: [],
 	subscriptionCount: 10,
-	blogSubscriptions: []
+	blogSubscriptions: [],
+	postImportLimit: 0 // 0 means no limit
 }
 
 interface ProcessedBlogPost extends NaverBlogPost {
@@ -575,6 +586,13 @@ export default class NaverBlogPlugin extends Plugin {
 		if (!this.settings.imageFolder || this.settings.imageFolder.trim() === '') {
 			this.settings.imageFolder = DEFAULT_SETTINGS.imageFolder;
 		}
+		// Validate postImportLimit
+		if (this.settings.postImportLimit < 0) {
+			this.settings.postImportLimit = DEFAULT_SETTINGS.postImportLimit;
+		}
+		if (this.settings.postImportLimit > 1000) {
+			this.settings.postImportLimit = 1000; // Cap at 1000 posts
+		}
 		await this.saveData(this.settings);
 	}
 
@@ -583,8 +601,11 @@ export default class NaverBlogPlugin extends Plugin {
 		try {
 			fetchNotice = new Notice('Fetching blog posts...', 0); // Persistent notice
 			
+			// Use settings value if maxPosts is not provided and settings value is > 0
+			const effectiveMaxPosts = maxPosts || (this.settings.postImportLimit > 0 ? this.settings.postImportLimit : undefined);
+			
 			const fetcher = new NaverBlogFetcher(blogId);
-			const posts = await fetcher.fetchPosts(maxPosts);
+			const posts = await fetcher.fetchPosts(effectiveMaxPosts);
 			
 			// Hide the persistent notice
 			if (fetchNotice) {
@@ -2286,6 +2307,27 @@ class NaverBlogSettingTab extends PluginSettingTab {
 					this.plugin.settings.enableImageDownload = value;
 					await this.plugin.saveSettings();
 					this.display(); // Refresh to show/hide image folder setting
+				}));
+
+		new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.post_import_limit'))
+			.setDesc(this.plugin.i18n.t('settings.post_import_limit_desc'))
+			.addText(text => text
+				.setPlaceholder('0')
+				.setValue(this.plugin.settings.postImportLimit.toString())
+				.onChange(async (value) => {
+					let numValue = parseInt(value) || 0;
+					// Validate input
+					if (numValue < 0) {
+						numValue = 0;
+						text.setValue('0');
+					} else if (numValue > 1000) {
+						numValue = 1000;
+						text.setValue('1000');
+						new Notice(this.plugin.i18n.t('notices.post_limit_exceeded'));
+					}
+					this.plugin.settings.postImportLimit = numValue;
+					await this.plugin.saveSettings();
 				}));
 
 		if (this.plugin.settings.enableImageDownload) {

@@ -14688,7 +14688,7 @@ var NaverBlogFetcher = class {
   }
   async fetchPosts(maxPosts) {
     try {
-      let posts = await this.getPostList();
+      let posts = await this.getPostList(maxPosts);
       if (posts.length === 0) {
         console.log("No posts found, trying with test logNo values...");
         const testLogNos = ["220883239733", "223435041536", "223434985552", "223434866456"];
@@ -14753,14 +14753,15 @@ var NaverBlogFetcher = class {
       throw new Error(`Failed to fetch posts from blog: ${this.blogId}`);
     }
   }
-  async getPostList() {
+  async getPostList(maxPosts) {
     const posts = [];
     try {
       console.log(`Fetching posts from blog: ${this.blogId}`);
       let currentPage = 1;
       let hasMore = true;
-      const maxPages = 5;
-      while (hasMore && currentPage <= maxPages && posts.length < 100) {
+      const maxPages = maxPosts ? Math.min(Math.ceil(maxPosts / 30), 10) : 20;
+      const postLimit = maxPosts || 1e3;
+      while (hasMore && currentPage <= maxPages && posts.length < postLimit) {
         console.log(`Fetching page ${currentPage}...`);
         const urlsToTry = [
           `https://blog.naver.com/PostList.naver?blogId=${this.blogId}&currentPage=${currentPage}`,
@@ -15324,12 +15325,15 @@ var NaverBlogFetcher = class {
               }
             });
             if (quoteParts.length > 0) {
-              content += quoteParts.join("\n") + "\n";
+              content += "\n" + quoteParts.join("\n") + "\n";
               const citeText = citeElement.length > 0 ? citeElement.text().trim() : "No Site";
               if (citeText && citeText !== "No Site") {
                 content += `
 \uCD9C\uCC98: ${citeText}
+
 `;
+              } else {
+                content += "\n";
               }
             }
           }
@@ -15544,13 +15548,17 @@ var NaverBlogFetcher = class {
           break;
         case "se-quotation":
           if (data2.quote) {
-            content += `> ${data2.quote}
+            content += `
+> ${data2.quote}
 `;
             const cite = data2.cite || "No Site";
             if (cite && cite !== "No Site") {
               content += `
 \uCD9C\uCC98: ${cite}
+
 `;
+            } else {
+              content += "\n";
             }
           }
           break;
@@ -15716,7 +15724,23 @@ var NaverBlogFetcher = class {
         cleanedLines.push(line);
       }
     }
-    return cleanedLines.filter((line) => line.length > 0).join("\n");
+    const finalLines = [];
+    for (let i = 0; i < cleanedLines.length; i++) {
+      const line = cleanedLines[i];
+      const prevLine = i > 0 ? cleanedLines[i - 1] : "";
+      const nextLine = i < cleanedLines.length - 1 ? cleanedLines[i + 1] : "";
+      if (line.length === 0) {
+        const isAroundQuote = prevLine.startsWith(">") || nextLine.startsWith(">") || prevLine.startsWith("\uCD9C\uCC98:") || nextLine.startsWith("\uCD9C\uCC98:");
+        const isAroundHeading = prevLine.startsWith("#") || nextLine.startsWith("#");
+        const isAroundImage = prevLine.startsWith("![") || nextLine.startsWith("![");
+        if (isAroundQuote || isAroundHeading || isAroundImage) {
+          finalLines.push(line);
+        }
+      } else {
+        finalLines.push(line);
+      }
+    }
+    return finalLines.join("\n");
   }
   parseDate(dateText) {
     try {
@@ -16138,6 +16162,8 @@ var I18n = class {
         enable_duplicate_check_desc: "Skip importing posts that already exist (based on logNo)",
         enable_image_download: "Enable Image Download",
         enable_image_download_desc: "Download images locally and update links",
+        post_import_limit: "Post Import Limit",
+        post_import_limit_desc: "Maximum number of posts to import at once (0 = unlimited)",
         subscribed_blogs: "Subscribed Blogs",
         add_blog_id: "Add Blog ID",
         add_blog_id_desc: "Enter a new blog ID and click the add button",
@@ -16170,7 +16196,8 @@ var I18n = class {
         downloading_images: "Downloading images...",
         image_download_complete: "Image download complete: {{count}} images",
         generating_ai_tags: "Generating AI tags...",
-        generating_ai_excerpt: "Generating AI excerpt..."
+        generating_ai_excerpt: "Generating AI excerpt...",
+        post_limit_exceeded: "Maximum limit is 1000 posts. Value adjusted to 1000."
       },
       modals: {
         import_single_post: {
@@ -16252,6 +16279,8 @@ var I18n = class {
         enable_duplicate_check_desc: "\uC774\uBBF8 \uC874\uC7AC\uD558\uB294 \uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30 \uAC74\uB108\uB6F0\uAE30 (logNo \uAE30\uC900)",
         enable_image_download: "\uC774\uBBF8\uC9C0 \uB2E4\uC6B4\uB85C\uB4DC \uD65C\uC131\uD654",
         enable_image_download_desc: "\uC774\uBBF8\uC9C0\uB97C \uB85C\uCEEC\uC5D0 \uB2E4\uC6B4\uB85C\uB4DC\uD558\uACE0 \uB9C1\uD06C\uB97C \uC5C5\uB370\uC774\uD2B8\uD569\uB2C8\uB2E4",
+        post_import_limit: "\uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30 \uC81C\uD55C",
+        post_import_limit_desc: "\uD55C \uBC88\uC5D0 \uAC00\uC838\uC62C \uD3EC\uC2A4\uD2B8\uC758 \uCD5C\uB300 \uAC1C\uC218 (0 = \uBB34\uC81C\uD55C)",
         subscribed_blogs: "\uAD6C\uB3C5 \uBE14\uB85C\uADF8",
         add_blog_id: "\uBE14\uB85C\uADF8 ID \uCD94\uAC00",
         add_blog_id_desc: "\uC0C8 \uBE14\uB85C\uADF8 ID\uB97C \uC785\uB825\uD558\uACE0 \uCD94\uAC00 \uBC84\uD2BC\uC744 \uD074\uB9AD\uD558\uC138\uC694",
@@ -16284,7 +16313,8 @@ var I18n = class {
         downloading_images: "\uC774\uBBF8\uC9C0 \uB2E4\uC6B4\uB85C\uB4DC \uC911...",
         image_download_complete: "\uC774\uBBF8\uC9C0 \uB2E4\uC6B4\uB85C\uB4DC \uC644\uB8CC: {{count}}\uAC1C",
         generating_ai_tags: "AI \uD0DC\uADF8 \uC0DD\uC131 \uC911...",
-        generating_ai_excerpt: "AI \uC694\uC57D \uC0DD\uC131 \uC911..."
+        generating_ai_excerpt: "AI \uC694\uC57D \uC0DD\uC131 \uC911...",
+        post_limit_exceeded: "\uCD5C\uB300 \uC81C\uD55C\uC740 1000\uAC1C \uD3EC\uC2A4\uD2B8\uC785\uB2C8\uB2E4. \uAC12\uC774 1000\uC73C\uB85C \uC870\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4."
       },
       modals: {
         import_single_post: {
@@ -16347,7 +16377,9 @@ var DEFAULT_SETTINGS = {
   enableImageDownload: false,
   subscribedBlogs: [],
   subscriptionCount: 10,
-  blogSubscriptions: []
+  blogSubscriptions: [],
+  postImportLimit: 0
+  // 0 means no limit
 };
 var NaverBlogPlugin = class extends import_obsidian2.Plugin {
   constructor() {
@@ -16429,14 +16461,21 @@ var NaverBlogPlugin = class extends import_obsidian2.Plugin {
     if (!this.settings.imageFolder || this.settings.imageFolder.trim() === "") {
       this.settings.imageFolder = DEFAULT_SETTINGS.imageFolder;
     }
+    if (this.settings.postImportLimit < 0) {
+      this.settings.postImportLimit = DEFAULT_SETTINGS.postImportLimit;
+    }
+    if (this.settings.postImportLimit > 1e3) {
+      this.settings.postImportLimit = 1e3;
+    }
     await this.saveData(this.settings);
   }
   async fetchNaverBlogPosts(blogId, maxPosts) {
     let fetchNotice = null;
     try {
       fetchNotice = new import_obsidian2.Notice("Fetching blog posts...", 0);
+      const effectiveMaxPosts = maxPosts || (this.settings.postImportLimit > 0 ? this.settings.postImportLimit : void 0);
       const fetcher = new NaverBlogFetcher(blogId);
-      const posts = await fetcher.fetchPosts(maxPosts);
+      const posts = await fetcher.fetchPosts(effectiveMaxPosts);
       if (fetchNotice) {
         fetchNotice.hide();
         fetchNotice = null;
@@ -17681,6 +17720,19 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
       this.plugin.settings.enableImageDownload = value;
       await this.plugin.saveSettings();
       this.display();
+    }));
+    new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.post_import_limit")).setDesc(this.plugin.i18n.t("settings.post_import_limit_desc")).addText((text3) => text3.setPlaceholder("0").setValue(this.plugin.settings.postImportLimit.toString()).onChange(async (value) => {
+      let numValue = parseInt(value) || 0;
+      if (numValue < 0) {
+        numValue = 0;
+        text3.setValue("0");
+      } else if (numValue > 1e3) {
+        numValue = 1e3;
+        text3.setValue("1000");
+        new import_obsidian2.Notice(this.plugin.i18n.t("notices.post_limit_exceeded"));
+      }
+      this.plugin.settings.postImportLimit = numValue;
+      await this.plugin.saveSettings();
     }));
     if (this.plugin.settings.enableImageDownload) {
       new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.image_folder")).setDesc(this.plugin.i18n.t("settings.image_folder_desc")).addText((text3) => {

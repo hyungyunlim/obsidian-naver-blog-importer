@@ -32,6 +32,8 @@
     "enable_duplicate_check_desc": "Skip importing posts that already exist (based on logNo)",
     "enable_image_download": "Enable Image Download",
     "enable_image_download_desc": "Download images locally and update links",
+    "post_import_limit": "Post Import Limit",
+    "post_import_limit_desc": "Maximum number of posts to import at once (0 = unlimited)",
     "subscribed_blogs": "Subscribed Blogs",
     "add_blog_id": "Add Blog ID",
     "add_blog_id_desc": "Enter a new blog ID and click the add button",
@@ -64,7 +66,8 @@
     "downloading_images": "Downloading images...",
     "image_download_complete": "Image download complete: {{count}} images",
     "generating_ai_tags": "Generating AI tags...",
-    "generating_ai_excerpt": "Generating AI excerpt..."
+    "generating_ai_excerpt": "Generating AI excerpt...",
+    "post_limit_exceeded": "Maximum limit is 1000 posts. Value adjusted to 1000."
   },
   "modals": {
     "import_single_post": {

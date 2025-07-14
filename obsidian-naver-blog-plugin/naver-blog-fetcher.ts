@@ -39,7 +39,7 @@ export class NaverBlogFetcher {
     async fetchPosts(maxPosts?: number): Promise<NaverBlogPost[]> {
         try {
             // Get blog post list
-            let posts = await this.getPostList();
+            let posts = await this.getPostList(maxPosts);
             
             // If no posts found, try with some test logNo values for debugging
             if (posts.length === 0) {
@@ -123,7 +123,7 @@ export class NaverBlogFetcher {
         }
     }
 
-    private async getPostList(): Promise<Omit<NaverBlogPost, 'content'>[]> {
+    private async getPostList(maxPosts?: number): Promise<Omit<NaverBlogPost, 'content'>[]> {
         const posts: Omit<NaverBlogPost, 'content'>[] = [];
 
         try {
@@ -132,9 +132,10 @@ export class NaverBlogFetcher {
             // Try multiple pages to get more posts
             let currentPage = 1;
             let hasMore = true;
-            const maxPages = 5; // Limit to prevent infinite loops
+            const maxPages = maxPosts ? Math.min(Math.ceil(maxPosts / 30), 10) : 20; // Limit pages based on maxPosts, default to 20 pages (600 posts max)
+            const postLimit = maxPosts || 1000; // Default to 1000 if no limit specified
             
-            while (hasMore && currentPage <= maxPages && posts.length < 100) { // Increased from 50 to 100
+            while (hasMore && currentPage <= maxPages && posts.length < postLimit) {
                 console.log(`Fetching page ${currentPage}...`);
                 
                 // Try different URL patterns for pagination
@@ -787,11 +788,13 @@ export class NaverBlogFetcher {
                         });
                         
                         if (quoteParts.length > 0) {
-                            content += quoteParts.join('\n') + '\n';
+                            content += '\n' + quoteParts.join('\n') + '\n';
                             
                             const citeText = citeElement.length > 0 ? citeElement.text().trim() : 'No Site';
                             if (citeText && citeText !== 'No Site') {
-                                content += `\n출처: ${citeText}\n`;
+                                content += `\n출처: ${citeText}\n\n`;
+                            } else {
+                                content += '\n';
                             }
                         }
                     }
@@ -1047,10 +1050,12 @@ export class NaverBlogFetcher {
                     break;
                 case 'se-quotation':
                     if (data.quote) {
-                        content += `> ${data.quote}\n`;
+                        content += `\n> ${data.quote}\n`;
                         const cite = data.cite || 'No Site';
                         if (cite && cite !== 'No Site') {
-                            content += `\n출처: ${cite}\n`;
+                            content += `\n출처: ${cite}\n\n`;
+                        } else {
+                            content += '\n';
                         }
                     }
                     break;
@@ -1206,9 +1211,35 @@ export class NaverBlogFetcher {
             }
         }
 
-        return cleanedLines
-            .filter(line => line.length > 0) // Remove empty lines
-            .join('\n'); // Join with single line breaks only
+        // Process lines to preserve intentional spacing around quotes and other elements
+        const finalLines: string[] = [];
+        for (let i = 0; i < cleanedLines.length; i++) {
+            const line = cleanedLines[i];
+            const prevLine = i > 0 ? cleanedLines[i - 1] : '';
+            const nextLine = i < cleanedLines.length - 1 ? cleanedLines[i + 1] : '';
+            
+            // If this is an empty line
+            if (line.length === 0) {
+                // Preserve empty lines around quotes
+                const isAroundQuote = prevLine.startsWith('>') || nextLine.startsWith('>') || 
+                                      prevLine.startsWith('출처:') || nextLine.startsWith('출처:');
+                
+                // Preserve empty lines around headings
+                const isAroundHeading = prevLine.startsWith('#') || nextLine.startsWith('#');
+                
+                // Preserve empty lines around images
+                const isAroundImage = prevLine.startsWith('![') || nextLine.startsWith('![');
+                
+                if (isAroundQuote || isAroundHeading || isAroundImage) {
+                    finalLines.push(line);
+                }
+                // Otherwise, skip the empty line
+            } else {
+                finalLines.push(line);
+            }
+        }
+        
+        return finalLines.join('\n');
     }
 
     private parseDate(dateText: string): string {
