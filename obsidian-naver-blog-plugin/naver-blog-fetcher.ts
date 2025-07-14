@@ -17,7 +17,26 @@ export class NaverBlogFetcher {
         this.blogId = blogId;
     }
 
-    async fetchPosts(): Promise<NaverBlogPost[]> {
+    // Test method for specific post URL
+    async fetchSinglePost(logNo: string): Promise<NaverBlogPost> {
+        try {
+            console.log(`Testing single post: ${logNo}`);
+            const parsed = await this.fetchPostContent(logNo);
+            
+            return {
+                title: parsed.title,
+                date: parsed.date,
+                logNo: logNo,
+                url: `https://blog.naver.com/${this.blogId}/${logNo}`,
+                thumbnail: undefined,
+                content: parsed.content
+            };
+        } catch (error) {
+            throw new Error(`Failed to fetch single post ${logNo}: ${error.message}`);
+        }
+    }
+
+    async fetchPosts(maxPosts?: number): Promise<NaverBlogPost[]> {
         try {
             // Get blog post list
             let posts = await this.getPostList();
@@ -26,7 +45,7 @@ export class NaverBlogFetcher {
             if (posts.length === 0) {
                 console.log('No posts found, trying with test logNo values...');
                 // Try some common logNo patterns for testing
-                const testLogNos = ['223435041536', '223434985552', '223434866456'];
+                const testLogNos = ['220883239733', '223435041536', '223434985552', '223434866456'];
                 for (const logNo of testLogNos) {
                     try {
                         const parsed = await this.fetchPostContent(logNo);
@@ -47,11 +66,21 @@ export class NaverBlogFetcher {
                 }
             }
             
+            // Limit posts if maxPosts is specified
+            if (maxPosts && posts.length > maxPosts) {
+                posts = posts.slice(0, maxPosts);
+            }
+
             // Fetch content for each post
             const postsWithContent: NaverBlogPost[] = [];
+            const totalPosts = posts.length;
             
-            for (const post of posts) { // Process all posts
+            for (let i = 0; i < posts.length; i++) {
+                const post = posts[i];
+                const progress = `(${i + 1}/${totalPosts})`;
+                
                 try {
+                    console.log(`Fetching post content ${progress}: ${post.logNo}`);
                     const parsed = await this.fetchPostContent(post.logNo);
                     postsWithContent.push({
                         title: parsed.title !== 'Untitled' ? parsed.title : post.title,
@@ -62,12 +91,28 @@ export class NaverBlogFetcher {
                         content: parsed.content
                     });
                     
+                    console.log(`✓ Successfully fetched ${progress}: ${parsed.title || post.logNo}`);
+                    
                     // Add delay to be respectful to the server
                     await this.delay(1000);
                 } catch (error) {
-                    console.error(`Failed to fetch content for post ${post.logNo}:`, error);
-                    // Skip failed posts but continue processing others
-                    continue;
+                    console.error(`✗ Failed to fetch content for post ${post.logNo} ${progress}:`, error);
+                    
+                    // Create error post for failed fetch
+                    const errorContent = this.createErrorContent(post, error);
+                    postsWithContent.push({
+                        title: `[오류] ${post.title || post.logNo}`,
+                        date: post.date || new Date().toISOString().split('T')[0],
+                        logNo: post.logNo,
+                        url: post.url,
+                        thumbnail: post.thumbnail,
+                        content: errorContent
+                    });
+                    
+                    console.log(`📝 Created error log for post ${post.logNo} ${progress}`);
+                    
+                    // Add delay to be respectful to the server
+                    await this.delay(500);
                 }
             }
             
@@ -378,23 +423,58 @@ export class NaverBlogFetcher {
             let title = '';
             let date = '';
 
-            // Extract title from various selectors
+            // Extract title from various selectors - improved with more specific selectors
             const titleSelectors = [
+                // Most specific Naver blog title selectors first
                 '.se-title-text',
+                '.se_title',
+                '.se-title .se-text',
+                '.se-module-text h1',
+                '.se-module-text h2',
+                
+                // Meta tag titles
+                'meta[property="og:title"]',
+                'meta[name="title"]',
+                
+                // General blog title selectors
                 '.blog-title',
                 '.post-title',
                 '.title_text',
                 '.blog_title',
                 'h1.title',
                 'h2.title',
-                '.se-title .se-text'
+                'h1',
+                'h2',
+                
+                // Title from head tag
+                'title'
             ];
 
             for (const selector of titleSelectors) {
                 const titleElement = $(selector);
                 if (titleElement.length > 0) {
-                    title = titleElement.text().trim();
-                    if (title) break;
+                    if (selector.startsWith('meta')) {
+                        // For meta tags, get content attribute
+                        title = titleElement.attr('content')?.trim() || '';
+                    } else {
+                        title = titleElement.text().trim();
+                    }
+                    
+                    if (title) {
+                        // Clean up title - remove Naver blog suffix patterns
+                        title = title.replace(/\s*:\s*네이버\s*블로그\s*$/, '');
+                        title = title.replace(/\s*\|\s*네이버\s*블로그\s*$/, '');
+                        title = title.replace(/\s*-\s*네이버\s*블로그\s*$/, '');
+                        
+                        // Remove [ ] brackets if present
+                        if (title.includes('[') && title.includes(']')) {
+                            title = title.replace(/^\[([^\]]+)\]/, '$1').trim();
+                            title = title.replace(/\[([^\]]+)\]$/, '$1').trim();
+                        }
+                        
+                        console.log(`Found title with selector ${selector}: "${title}"`);
+                        if (title && title !== 'Untitled') break;
+                    }
                 }
             }
 
@@ -559,14 +639,17 @@ export class NaverBlogFetcher {
                 });
             }
 
-            // Try different selectors for content
+            // Try different selectors for content - prioritize container selectors
             const contentSelectors = [
                 '.se-main-container',
-                '.se-component',
                 '.post-content',
                 '.blog-content',
                 '#post-content',
-                '.post_ct'
+                '.post_ct',
+                '.post-view',
+                '.post_area',
+                '.blog_content',
+                'body' // fallback to parse all se-components in document order
             ];
 
             for (const selector of contentSelectors) {
@@ -583,6 +666,11 @@ export class NaverBlogFetcher {
             if (!content.trim()) {
                 content = this.extractContentFromScripts(html);
             }
+            
+            // Additional fallback: try to find images anywhere in the HTML
+            // if (content.trim()) {
+            //     content = this.extractAdditionalImages(html, content);
+            // }
 
             // Clean up the content
             content = this.cleanContent(content);
@@ -600,36 +688,66 @@ export class NaverBlogFetcher {
     private extractTextFromElement(element: any, $: any): string {
         let content = '';
         
-        element.each((_: any, el: any) => {
+        // Process components in document order to maintain text-image flow
+        const allComponents = $('.se-component').toArray();
+        
+        allComponents.forEach((el: any) => {
             const $el = $(el);
             
             // Handle different component types
             if ($el.hasClass('se-component')) {
                 if ($el.hasClass('se-text')) {
-                    // Text component - improved paragraph handling
+                    // Text component - improved paragraph and list handling
                     const textModule = $el.find('.se-module-text');
                     if (textModule.length > 0) {
-                        // Process each paragraph separately
-                        textModule.find('p').each((_: any, p: any) => {
-                            const $p = $(p);
-                            const paragraphText = $p.text().trim();
-                            if (paragraphText && !paragraphText.startsWith('#')) { // Skip hashtags
-                                content += paragraphText + '\n';
-                            }
-                        });
+                        // Check for lists first (ul/ol) - improved detection
+                        const lists = textModule.find('ul, ol');
+                        console.log(`Found ${lists.length} lists in text module`);
                         
-                        // If no <p> tags found, get the whole text
-                        if (textModule.find('p').length === 0) {
-                            const textContent = textModule.text().trim();
-                            if (textContent && !textContent.startsWith('#')) {
-                                // Split by line breaks and create paragraphs
-                                const lines = textContent.split(/\n+/);
-                                lines.forEach((line: any) => {
-                                    const trimmedLine = line.trim();
-                                    if (trimmedLine && !trimmedLine.startsWith('#')) {
-                                        content += trimmedLine + '\n';
+                        if (lists.length > 0) {
+                            lists.each((_: any, list: any) => {
+                                const $list = $(list);
+                                const isOrdered = list.tagName.toLowerCase() === 'ol';
+                                const listItems = $list.find('li');
+                                console.log(`Processing ${isOrdered ? 'ordered' : 'unordered'} list with ${listItems.length} items`);
+                                
+                                listItems.each((index: any, li: any) => {
+                                    const $li = $(li);
+                                    const listItemText = $li.text().trim();
+                                    if (listItemText && !listItemText.startsWith('#')) {
+                                        if (isOrdered) {
+                                            content += `${index + 1}. ${listItemText}\n`;
+                                        } else {
+                                            content += `- ${listItemText}\n`;
+                                        }
+                                        console.log(`Added list item: ${listItemText.substring(0, 50)}...`);
                                     }
                                 });
+                                content += '\n'; // Add space after list
+                            });
+                        } else {
+                            // Process regular paragraphs if no lists found
+                            textModule.find('p').each((_: any, p: any) => {
+                                const $p = $(p);
+                                const paragraphText = $p.text().trim();
+                                if (paragraphText && !paragraphText.startsWith('#')) { // Skip hashtags
+                                    content += paragraphText + '\n';
+                                }
+                            });
+                            
+                            // If no <p> tags found, get the whole text
+                            if (textModule.find('p').length === 0) {
+                                const textContent = textModule.text().trim();
+                                if (textContent && !textContent.startsWith('#')) {
+                                    // Split by line breaks and create paragraphs
+                                    const lines = textContent.split(/\n+/);
+                                    lines.forEach((line: any) => {
+                                        const trimmedLine = line.trim();
+                                        if (trimmedLine && !trimmedLine.startsWith('#')) {
+                                            content += trimmedLine + '\n';
+                                        }
+                                    });
+                                }
                             }
                         }
                     }
@@ -663,29 +781,104 @@ export class NaverBlogFetcher {
                         }
                     }
                 } else if ($el.hasClass('se-image')) {
-                    // Image component - with actual image support
+                    // Image component - with comprehensive image source detection
                     const imgElement = $el.find('img');
                     const caption = $el.find('.se-caption').text().trim();
                     
                     if (imgElement.length > 0) {
-                        const imgSrc = imgElement.attr('data-lazy-src') || 
-                                     imgElement.attr('src') || 
-                                     imgElement.attr('data-src');
+                        // Try multiple image source attributes - comprehensive approach
+                        let imgSrc = imgElement.attr('data-lazy-src') || 
+                                   imgElement.attr('src') || 
+                                   imgElement.attr('data-src') ||
+                                   imgElement.attr('data-original') ||
+                                   imgElement.attr('data-image-src') ||
+                                   imgElement.attr('data-url') ||
+                                   imgElement.attr('data-original-src');
+                        
+                        // Also try to find image URL in script tags or data attributes
+                        if (!imgSrc) {
+                            const dataAttrs = imgElement[0]?.attributes;
+                            if (dataAttrs) {
+                                for (let i = 0; i < dataAttrs.length; i++) {
+                                    const attr = dataAttrs[i];
+                                    if (attr.name.includes('src') || attr.name.includes('url')) {
+                                        if (attr.value && (attr.value.startsWith('http') || attr.value.startsWith('//'))) {
+                                            imgSrc = attr.value;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         
                         if (imgSrc) {
-                            // Create markdown image with caption
-                            const altText = caption || 'Blog Image';
-                            content += `![${altText}](${imgSrc})\n`;
-                            if (caption) {
-                                content += `*${caption}*\n`;
+                            // Filter out profile and UI images
+                            if (this.shouldIncludeImage(imgSrc, caption)) {
+                                // Create markdown image with caption
+                                const altText = caption || imgElement.attr('alt') || imgElement.attr('title') || 'Blog Image';
+                                content += `![${altText}](${imgSrc})\n`;
+                                if (caption) {
+                                    content += `*${caption}*\n`;
+                                }
+                                console.log(`Found image: ${imgSrc}`);
+                            } else {
+                                console.log(`Filtered out UI/profile image: ${imgSrc}`);
                             }
                         } else {
                             // Fallback to placeholder
                             content += caption ? `[이미지: ${caption}]\n` : `[이미지]\n`;
+                            console.log(`No image source found for element:`, imgElement.html());
                         }
                     } else {
-                        // No img element found
-                        content += caption ? `[이미지: ${caption}]\n` : `[이미지]\n`;
+                        // Check for background-image styles, inline styles, or other image containers
+                        let bgImageSrc = null;
+                        
+                        // Check background-image in style attribute
+                        const bgImageMatch = $el.attr('style')?.match(/background-image:\s*url\(['"]?([^'"]+)['"]?\)/);
+                        if (bgImageMatch) {
+                            bgImageSrc = bgImageMatch[1];
+                        }
+                        
+                        // Check for nested elements that might contain images
+                        if (!bgImageSrc) {
+                            $el.find('*').each((_: any, nestedEl: any) => {
+                                const $nested = $(nestedEl);
+                                const nestedStyle = $nested.attr('style');
+                                if (nestedStyle) {
+                                    const nestedBgMatch = nestedStyle.match(/background-image:\s*url\(['"]?([^'"]+)['"]?\)/);
+                                    if (nestedBgMatch) {
+                                        bgImageSrc = nestedBgMatch[1];
+                                        return false; // Break the loop
+                                    }
+                                }
+                                
+                                // Also check data attributes on nested elements
+                                const dataAttrs = nestedEl.attributes;
+                                if (dataAttrs) {
+                                    for (let i = 0; i < dataAttrs.length; i++) {
+                                        const attr = dataAttrs[i];
+                                        if ((attr.name.includes('src') || attr.name.includes('url')) && 
+                                            attr.value && (attr.value.startsWith('http') || attr.value.startsWith('//'))) {
+                                            bgImageSrc = attr.value;
+                                            return false;
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        
+                        if (bgImageSrc) {
+                            const altText = caption || 'Blog Image';
+                            content += `![${altText}](${bgImageSrc})\n`;
+                            if (caption) {
+                                content += `*${caption}*\n`;
+                            }
+                            console.log(`Found background image: ${bgImageSrc}`);
+                        } else {
+                            // No img element found
+                            content += caption ? `[이미지: ${caption}]\n` : `[이미지]\n`;
+                            console.log(`No image source found in se-image component`);
+                        }
                     }
                 } else if ($el.hasClass('se-code')) {
                     // Code component - improved like Python script
@@ -702,7 +895,7 @@ export class NaverBlogFetcher {
                                 codeContent = codeContent.slice(0, -1);
                             }
                             if (codeContent.trim()) {
-                                codeParts.push(`\`\`\`\n${codeContent.trim()}\n\`\`\``);
+                                codeParts.push("```\n" + codeContent.trim() + "\n```");
                             }
                         });
                         if (codeParts.length > 0) {
@@ -739,8 +932,6 @@ export class NaverBlogFetcher {
                         } else {
                             content += '[자료]\n';
                         }
-                    } else {
-                        content += '[자료]\n';
                     }
                 } else if ($el.hasClass('se-video')) {
                     // Video component
@@ -756,30 +947,6 @@ export class NaverBlogFetcher {
                     const textContent = $el.text().trim();
                     if (textContent && textContent.length > 10 && !textContent.startsWith('#')) {
                         // Try to maintain paragraph structure
-                        const paragraphs = textContent.split(/\n\s*\n/);
-                        paragraphs.forEach((paragraph: any) => {
-                            const trimmed = paragraph.trim();
-                            if (trimmed && !trimmed.startsWith('#')) {
-                                content += trimmed + '\n';
-                            }
-                        });
-                    }
-                }
-            } else {
-                // For non-component elements, extract text with paragraph handling
-                const textContent = $el.text().trim();
-                if (textContent && textContent.length > 10 && !textContent.startsWith('#')) {
-                    // Check if this is likely a paragraph container
-                    const childParagraphs = $el.find('p');
-                    if (childParagraphs.length > 0) {
-                        childParagraphs.each((_: any, p: any) => {
-                            const paragraphText = $(p).text().trim();
-                            if (paragraphText && !paragraphText.startsWith('#')) {
-                                content += paragraphText + '\n';
-                            }
-                        });
-                    } else {
-                        // Split long text into paragraphs
                         const paragraphs = textContent.split(/\n\s*\n/);
                         paragraphs.forEach((paragraph: any) => {
                             const trimmed = paragraph.trim();
@@ -865,16 +1032,26 @@ export class NaverBlogFetcher {
                     }
                     break;
                 case 'se-image':
-                    // Image - with actual image support
-                    if (data.src) {
-                        const altText = data.caption || data.alt || 'Blog Image';
-                        content += `![${altText}](${data.src})\n`;
+                    // Image - with comprehensive image source detection
+                    const imageUrl = data.src || data.url || data.imageUrl || data.imageInfo?.url;
+                    if (imageUrl) {
+                        const altText = data.caption || data.alt || data.title || 'Blog Image';
+                        content += `![${altText}](${imageUrl})\n`;
                         if (data.caption) {
                             content += `*${data.caption}*\n`;
                         }
                     } else {
-                        // Fallback to placeholder
-                        content += data.caption ? `[이미지: ${data.caption}]\n` : `[이미지]\n`;
+                        // Check nested image data
+                        if (data.imageInfo && data.imageInfo.src) {
+                            const altText = data.caption || data.imageInfo.alt || 'Blog Image';
+                            content += `![${altText}](${data.imageInfo.src})\n`;
+                            if (data.caption) {
+                                content += `*${data.caption}*\n`;
+                            }
+                        } else {
+                            // Fallback to placeholder
+                            content += data.caption ? `[이미지: ${data.caption}]\n` : `[이미지]\n`;
+                        }
                     }
                     break;
                 case 'se-code':
@@ -1046,6 +1223,213 @@ export class NaverBlogFetcher {
         } catch (error) {
             return new Date().toISOString().split('T')[0];
         }
+    }
+
+    private extractAdditionalImages(html: string, existingContent: string): string {
+        try {
+            console.log('Scanning for additional images in HTML...');
+            const $ = cheerio.load(html);
+            let additionalImages: string[] = [];
+            
+            // Find all img elements that might not have been caught - but filter content images only
+            $('img').each((_, img) => {
+                const $img = $(img);
+                const imgSrc = $img.attr('data-lazy-src') || 
+                             $img.attr('src') || 
+                             $img.attr('data-src') ||
+                             $img.attr('data-original') ||
+                             $img.attr('data-image-src') ||
+                             $img.attr('data-url');
+                
+                if (imgSrc && (imgSrc.startsWith('http') || imgSrc.startsWith('//'))) {
+                    // Check if this image is already in the content
+                    if (!existingContent.includes(imgSrc)) {
+                        // Only add if it's likely a content image, not UI element
+                        if (this.isContentImage($img, imgSrc)) {
+                            const alt = $img.attr('alt') || $img.attr('title') || 'Additional Image';
+                            additionalImages.push(`![${alt}](${imgSrc})`);
+                            console.log(`Found additional content image: ${imgSrc}`);
+                        } else {
+                            console.log(`Skipping UI/editor image: ${imgSrc}`);
+                        }
+                    }
+                }
+            });
+            
+            // Find images in style attributes
+            $('*[style*="background-image"]').each((_, el) => {
+                const style = $(el).attr('style');
+                if (style) {
+                    const bgMatch = style.match(/background-image:\s*url\(['"]?([^'"]+)['"]?\)/);
+                    if (bgMatch && bgMatch[1]) {
+                        const imgSrc = bgMatch[1];
+                        if ((imgSrc.startsWith('http') || imgSrc.startsWith('//')) && !existingContent.includes(imgSrc)) {
+                            // Filter out background images using same logic as content images
+                            if (this.shouldIncludeImage(imgSrc, 'Background Image')) {
+                                additionalImages.push(`![Background Image](${imgSrc})`);
+                                console.log(`Found additional background image: ${imgSrc}`);
+                            } else {
+                                console.log(`Filtered out background image: ${imgSrc}`);
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Append additional images to content if found
+            if (additionalImages.length > 0) {
+                console.log(`Adding ${additionalImages.length} additional images to content`);
+                return existingContent + '\n\n' + additionalImages.join('\n\n') + '\n';
+            }
+            
+            return existingContent;
+        } catch (error) {
+            console.error('Error extracting additional images:', error);
+            return existingContent;
+        }
+    }
+
+    private createErrorContent(post: Omit<NaverBlogPost, 'content'>, error: any): string {
+        const timestamp = new Date().toISOString();
+        const errorMessage = error?.message || 'Unknown error';
+        
+        return `# ⚠️ 콘텐츠 가져오기 실패
+
+## 포스트 정보
+- **LogNo**: ${post.logNo}
+- **URL**: [${post.url}](${post.url})
+- **제목**: ${post.title || '제목 없음'}
+- **날짜**: ${post.date || '날짜 없음'}
+- **썸네일**: ${post.thumbnail || '썸네일 없음'}
+
+## 오류 정보
+- **오류 시간**: ${timestamp}
+- **오류 메시지**: ${errorMessage}
+
+## 문제 해결 방법
+1. 네이버 블로그에서 직접 포스트를 확인해보세요
+2. 포스트가 비공개 또는 삭제되었을 수 있습니다
+3. 네트워크 연결 상태를 확인해보세요
+4. 나중에 다시 시도해보세요
+
+---
+*이 파일은 자동으로 생성된 오류 로그입니다.*`;
+    }
+
+    private shouldIncludeImage(imgSrc: string, caption?: string): boolean {
+        // Filter out profile and UI images specifically in content extraction
+        
+        // Skip ssl.pstatic.net profile images
+        if (imgSrc.includes('ssl.pstatic.net/static/blog/profile/')) {
+            return false;
+        }
+        
+        // Skip obvious UI patterns
+        const uiPatterns = [
+            /se-sticker/i,
+            /se-emoticon/i,
+            /editor/i,
+            /\.gif$/i,
+            /icon/i,
+            /logo/i,
+            /button/i,
+            /thumb/i,
+            /loading/i,
+            /spinner/i,
+            /1x1/,
+            /spacer/i,
+            /profile/i,
+            /defaultimg/i,
+            /bg_/i,
+            /background/i,
+            /_bg/i
+        ];
+        
+        for (const pattern of uiPatterns) {
+            if (pattern.test(imgSrc)) {
+                return false;
+            }
+        }
+        
+        // Check caption for UI indicators
+        if (caption) {
+            const uiCaptions = [
+                /profile/i,
+                /background/i,
+                /프로필/i,
+                /배경/i,
+                /아이콘/i,
+                /icon/i
+            ];
+            
+            for (const pattern of uiCaptions) {
+                if (pattern.test(caption)) {
+                    return false;
+                }
+            }
+        }
+        
+        return true;
+    }
+
+    private isContentImage($img: any, imgSrc: string): boolean {
+        // Check if image is likely a content image vs UI element
+        
+        // Skip ssl.pstatic.net profile images - same as shouldIncludeImage
+        if (imgSrc.includes('ssl.pstatic.net/static/blog/profile/')) {
+            return false;
+        }
+        
+        // Skip obvious UI patterns
+        const uiPatterns = [
+            /se-sticker/i,
+            /se-emoticon/i,
+            /editor/i,
+            /\.gif$/i,
+            /icon/i,
+            /logo/i,
+            /button/i,
+            /thumb/i,
+            /loading/i,
+            /spinner/i,
+            /1x1/,
+            /spacer/i,
+            /profile/i,
+            /defaultimg/i,
+            /bg_/i,
+            /background/i,
+            /_bg/i
+        ];
+        
+        for (const pattern of uiPatterns) {
+            if (pattern.test(imgSrc)) {
+                return false;
+            }
+        }
+        
+        // Check parent elements - content images are usually in content containers
+        const $parent = $img.closest('.se-component, .se-text, .se-image, .post-content, .blog-content');
+        if ($parent.length === 0) {
+            // If not in a content container, likely a UI element
+            return false;
+        }
+        
+        // Check image size attributes - very small images are likely UI elements
+        const width = parseInt($img.attr('width') || '0');
+        const height = parseInt($img.attr('height') || '0');
+        
+        if ((width > 0 && width < 50) || (height > 0 && height < 50)) {
+            return false;
+        }
+        
+        // Check CSS classes for UI indicators
+        const className = $img.attr('class') || '';
+        const uiClasses = ['icon', 'logo', 'button', 'ui', 'editor', 'control'];
+        if (uiClasses.some(cls => className.toLowerCase().includes(cls))) {
+            return false;
+        }
+        
+        return true;
     }
 
     private delay(ms: number): Promise<void> {

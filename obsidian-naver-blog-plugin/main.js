@@ -10351,7 +10351,7 @@ var OpenElementStack = class {
   get currentTmplContentOrNode() {
     return this._isInTemplate() ? this.treeAdapter.getTemplateContent(this.current) : this.current;
   }
-  constructor(document, treeAdapter, handler) {
+  constructor(document2, treeAdapter, handler) {
     this.treeAdapter = treeAdapter;
     this.handler = handler;
     this.items = [];
@@ -10359,7 +10359,7 @@ var OpenElementStack = class {
     this.stackTop = -1;
     this.tmplCount = 0;
     this.currentTagId = TAG_ID.UNKNOWN;
-    this.current = document;
+    this.current = document2;
   }
   //Index of element
   _indexOf(element) {
@@ -10793,8 +10793,8 @@ var defaultTreeAdapter = {
   getTemplateContent(templateElement) {
     return templateElement.content;
   },
-  setDocumentType(document, name, publicId, systemId) {
-    const doctypeNode = document.childNodes.find((node) => node.nodeName === "#documentType");
+  setDocumentType(document2, name, publicId, systemId) {
+    const doctypeNode = document2.childNodes.find((node) => node.nodeName === "#documentType");
     if (doctypeNode) {
       doctypeNode.name = name;
       doctypeNode.publicId = publicId;
@@ -10807,14 +10807,14 @@ var defaultTreeAdapter = {
         systemId,
         parentNode: null
       };
-      defaultTreeAdapter.appendChild(document, node);
+      defaultTreeAdapter.appendChild(document2, node);
     }
   },
-  setDocumentMode(document, mode) {
-    document.mode = mode;
+  setDocumentMode(document2, mode) {
+    document2.mode = mode;
   },
-  getDocumentMode(document) {
-    return document.mode;
+  getDocumentMode(document2) {
+    return document2.mode;
   },
   detachNode(node) {
     if (node.parentNode) {
@@ -11294,7 +11294,7 @@ var defaultParserOptions = {
   onParseError: null
 };
 var Parser2 = class {
-  constructor(options, document, fragmentContext = null, scriptHandler = null) {
+  constructor(options, document2, fragmentContext = null, scriptHandler = null) {
     this.fragmentContext = fragmentContext;
     this.scriptHandler = scriptHandler;
     this.currentToken = null;
@@ -11319,7 +11319,7 @@ var Parser2 = class {
     if (this.onParseError) {
       this.options.sourceCodeLocationInfo = true;
     }
-    this.document = document !== null && document !== void 0 ? document : this.treeAdapter.createDocument();
+    this.document = document2 !== null && document2 !== void 0 ? document2 : this.treeAdapter.createDocument();
     this.tokenizer = new Tokenizer2(this.options, this);
     this.activeFormattingElements = new FormattingElementList(this.treeAdapter);
     this.fragmentContextID = fragmentContext ? getTagID(this.treeAdapter.getTagName(fragmentContext)) : TAG_ID.UNKNOWN;
@@ -14510,24 +14510,24 @@ var adapter = {
   getTemplateContent(templateElement) {
     return templateElement.children[0];
   },
-  setDocumentType(document, name, publicId, systemId) {
+  setDocumentType(document2, name, publicId, systemId) {
     const data2 = serializeDoctypeContent(name, publicId, systemId);
-    let doctypeNode = document.children.find((node) => isDirective(node) && node.name === "!doctype");
+    let doctypeNode = document2.children.find((node) => isDirective(node) && node.name === "!doctype");
     if (doctypeNode) {
       doctypeNode.data = data2 !== null && data2 !== void 0 ? data2 : null;
     } else {
       doctypeNode = new ProcessingInstruction("!doctype", data2);
-      adapter.appendChild(document, doctypeNode);
+      adapter.appendChild(document2, doctypeNode);
     }
     doctypeNode["x-name"] = name;
     doctypeNode["x-publicId"] = publicId;
     doctypeNode["x-systemId"] = systemId;
   },
-  setDocumentMode(document, mode) {
-    document["x-mode"] = mode;
+  setDocumentMode(document2, mode) {
+    document2["x-mode"] = mode;
   },
-  getDocumentMode(document) {
-    return document["x-mode"];
+  getDocumentMode(document2) {
+    return document2["x-mode"];
   },
   detachNode(node) {
     if (node.parent) {
@@ -14669,12 +14669,29 @@ var NaverBlogFetcher = class {
   constructor(blogId) {
     this.blogId = blogId;
   }
-  async fetchPosts() {
+  // Test method for specific post URL
+  async fetchSinglePost(logNo) {
+    try {
+      console.log(`Testing single post: ${logNo}`);
+      const parsed = await this.fetchPostContent(logNo);
+      return {
+        title: parsed.title,
+        date: parsed.date,
+        logNo,
+        url: `https://blog.naver.com/${this.blogId}/${logNo}`,
+        thumbnail: void 0,
+        content: parsed.content
+      };
+    } catch (error) {
+      throw new Error(`Failed to fetch single post ${logNo}: ${error.message}`);
+    }
+  }
+  async fetchPosts(maxPosts) {
     try {
       let posts = await this.getPostList();
       if (posts.length === 0) {
         console.log("No posts found, trying with test logNo values...");
-        const testLogNos = ["223435041536", "223434985552", "223434866456"];
+        const testLogNos = ["220883239733", "223435041536", "223434985552", "223434866456"];
         for (const logNo of testLogNos) {
           try {
             const parsed = await this.fetchPostContent(logNo);
@@ -14694,9 +14711,16 @@ var NaverBlogFetcher = class {
           }
         }
       }
+      if (maxPosts && posts.length > maxPosts) {
+        posts = posts.slice(0, maxPosts);
+      }
       const postsWithContent = [];
-      for (const post of posts) {
+      const totalPosts = posts.length;
+      for (let i = 0; i < posts.length; i++) {
+        const post = posts[i];
+        const progress = `(${i + 1}/${totalPosts})`;
         try {
+          console.log(`Fetching post content ${progress}: ${post.logNo}`);
           const parsed = await this.fetchPostContent(post.logNo);
           postsWithContent.push({
             title: parsed.title !== "Untitled" ? parsed.title : post.title,
@@ -14706,10 +14730,21 @@ var NaverBlogFetcher = class {
             thumbnail: post.thumbnail,
             content: parsed.content
           });
+          console.log(`\u2713 Successfully fetched ${progress}: ${parsed.title || post.logNo}`);
           await this.delay(1e3);
         } catch (error) {
-          console.error(`Failed to fetch content for post ${post.logNo}:`, error);
-          continue;
+          console.error(`\u2717 Failed to fetch content for post ${post.logNo} ${progress}:`, error);
+          const errorContent = this.createErrorContent(post, error);
+          postsWithContent.push({
+            title: `[\uC624\uB958] ${post.title || post.logNo}`,
+            date: post.date || new Date().toISOString().split("T")[0],
+            logNo: post.logNo,
+            url: post.url,
+            thumbnail: post.thumbnail,
+            content: errorContent
+          });
+          console.log(`\u{1F4DD} Created error log for post ${post.logNo} ${progress}`);
+          await this.delay(500);
         }
       }
       return postsWithContent;
@@ -14976,27 +15011,54 @@ var NaverBlogFetcher = class {
     }
   }
   parsePostContent(html3) {
+    var _a5;
     try {
       const $2 = load(html3);
       let content = "";
       let title = "";
       let date = "";
       const titleSelectors = [
+        // Most specific Naver blog title selectors first
         ".se-title-text",
+        ".se_title",
+        ".se-title .se-text",
+        ".se-module-text h1",
+        ".se-module-text h2",
+        // Meta tag titles
+        'meta[property="og:title"]',
+        'meta[name="title"]',
+        // General blog title selectors
         ".blog-title",
         ".post-title",
         ".title_text",
         ".blog_title",
         "h1.title",
         "h2.title",
-        ".se-title .se-text"
+        "h1",
+        "h2",
+        // Title from head tag
+        "title"
       ];
       for (const selector of titleSelectors) {
         const titleElement = $2(selector);
         if (titleElement.length > 0) {
-          title = titleElement.text().trim();
-          if (title)
-            break;
+          if (selector.startsWith("meta")) {
+            title = ((_a5 = titleElement.attr("content")) == null ? void 0 : _a5.trim()) || "";
+          } else {
+            title = titleElement.text().trim();
+          }
+          if (title) {
+            title = title.replace(/\s*:\s*네이버\s*블로그\s*$/, "");
+            title = title.replace(/\s*\|\s*네이버\s*블로그\s*$/, "");
+            title = title.replace(/\s*-\s*네이버\s*블로그\s*$/, "");
+            if (title.includes("[") && title.includes("]")) {
+              title = title.replace(/^\[([^\]]+)\]/, "$1").trim();
+              title = title.replace(/\[([^\]]+)\]$/, "$1").trim();
+            }
+            console.log(`Found title with selector ${selector}: "${title}"`);
+            if (title && title !== "Untitled")
+              break;
+          }
         }
       }
       console.log("Searching for date in meta tags...");
@@ -15144,11 +15206,15 @@ var NaverBlogFetcher = class {
       }
       const contentSelectors = [
         ".se-main-container",
-        ".se-component",
         ".post-content",
         ".blog-content",
         "#post-content",
-        ".post_ct"
+        ".post_ct",
+        ".post-view",
+        ".post_area",
+        ".blog_content",
+        "body"
+        // fallback to parse all se-components in document order
       ];
       for (const selector of contentSelectors) {
         const element = $2(selector);
@@ -15174,29 +15240,57 @@ var NaverBlogFetcher = class {
   }
   extractTextFromElement(element, $2) {
     let content = "";
-    element.each((_, el) => {
+    const allComponents = $2(".se-component").toArray();
+    allComponents.forEach((el) => {
+      var _a5, _b;
       const $el = $2(el);
       if ($el.hasClass("se-component")) {
         if ($el.hasClass("se-text")) {
           const textModule = $el.find(".se-module-text");
           if (textModule.length > 0) {
-            textModule.find("p").each((_2, p) => {
-              const $p = $2(p);
-              const paragraphText = $p.text().trim();
-              if (paragraphText && !paragraphText.startsWith("#")) {
-                content += paragraphText + "\n";
-              }
-            });
-            if (textModule.find("p").length === 0) {
-              const textContent2 = textModule.text().trim();
-              if (textContent2 && !textContent2.startsWith("#")) {
-                const lines = textContent2.split(/\n+/);
-                lines.forEach((line) => {
-                  const trimmedLine = line.trim();
-                  if (trimmedLine && !trimmedLine.startsWith("#")) {
-                    content += trimmedLine + "\n";
+            const lists = textModule.find("ul, ol");
+            console.log(`Found ${lists.length} lists in text module`);
+            if (lists.length > 0) {
+              lists.each((_, list) => {
+                const $list = $2(list);
+                const isOrdered = list.tagName.toLowerCase() === "ol";
+                const listItems = $list.find("li");
+                console.log(`Processing ${isOrdered ? "ordered" : "unordered"} list with ${listItems.length} items`);
+                listItems.each((index2, li) => {
+                  const $li = $2(li);
+                  const listItemText = $li.text().trim();
+                  if (listItemText && !listItemText.startsWith("#")) {
+                    if (isOrdered) {
+                      content += `${index2 + 1}. ${listItemText}
+`;
+                    } else {
+                      content += `- ${listItemText}
+`;
+                    }
+                    console.log(`Added list item: ${listItemText.substring(0, 50)}...`);
                   }
                 });
+                content += "\n";
+              });
+            } else {
+              textModule.find("p").each((_, p) => {
+                const $p = $2(p);
+                const paragraphText = $p.text().trim();
+                if (paragraphText && !paragraphText.startsWith("#")) {
+                  content += paragraphText + "\n";
+                }
+              });
+              if (textModule.find("p").length === 0) {
+                const textContent2 = textModule.text().trim();
+                if (textContent2 && !textContent2.startsWith("#")) {
+                  const lines = textContent2.split(/\n+/);
+                  lines.forEach((line) => {
+                    const trimmedLine = line.trim();
+                    if (trimmedLine && !trimmedLine.startsWith("#")) {
+                      content += trimmedLine + "\n";
+                    }
+                  });
+                }
               }
             }
           }
@@ -15212,7 +15306,7 @@ var NaverBlogFetcher = class {
           const citeElement = $el.find(".se-cite");
           if (quoteElements.length > 0) {
             const quoteParts = [];
-            quoteElements.each((_2, quote) => {
+            quoteElements.each((_, quote) => {
               const quoteText = $2(quote).text().trim();
               if (quoteText) {
                 quoteParts.push(`> ${quoteText}`);
@@ -15232,30 +15326,90 @@ var NaverBlogFetcher = class {
           const imgElement = $el.find("img");
           const caption = $el.find(".se-caption").text().trim();
           if (imgElement.length > 0) {
-            const imgSrc = imgElement.attr("data-lazy-src") || imgElement.attr("src") || imgElement.attr("data-src");
+            let imgSrc = imgElement.attr("data-lazy-src") || imgElement.attr("src") || imgElement.attr("data-src") || imgElement.attr("data-original") || imgElement.attr("data-image-src") || imgElement.attr("data-url") || imgElement.attr("data-original-src");
+            if (!imgSrc) {
+              const dataAttrs = (_a5 = imgElement[0]) == null ? void 0 : _a5.attributes;
+              if (dataAttrs) {
+                for (let i = 0; i < dataAttrs.length; i++) {
+                  const attr2 = dataAttrs[i];
+                  if (attr2.name.includes("src") || attr2.name.includes("url")) {
+                    if (attr2.value && (attr2.value.startsWith("http") || attr2.value.startsWith("//"))) {
+                      imgSrc = attr2.value;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
             if (imgSrc) {
-              const altText = caption || "Blog Image";
-              content += `![${altText}](${imgSrc})
+              if (this.shouldIncludeImage(imgSrc, caption)) {
+                const altText = caption || imgElement.attr("alt") || imgElement.attr("title") || "Blog Image";
+                content += `![${altText}](${imgSrc})
 `;
-              if (caption) {
-                content += `*${caption}*
+                if (caption) {
+                  content += `*${caption}*
 `;
+                }
+                console.log(`Found image: ${imgSrc}`);
+              } else {
+                console.log(`Filtered out UI/profile image: ${imgSrc}`);
               }
             } else {
               content += caption ? `[\uC774\uBBF8\uC9C0: ${caption}]
 ` : `[\uC774\uBBF8\uC9C0]
 `;
+              console.log(`No image source found for element:`, imgElement.html());
             }
           } else {
-            content += caption ? `[\uC774\uBBF8\uC9C0: ${caption}]
+            let bgImageSrc = null;
+            const bgImageMatch = (_b = $el.attr("style")) == null ? void 0 : _b.match(/background-image:\s*url\(['"]?([^'"]+)['"]?\)/);
+            if (bgImageMatch) {
+              bgImageSrc = bgImageMatch[1];
+            }
+            if (!bgImageSrc) {
+              $el.find("*").each((_, nestedEl) => {
+                const $nested = $2(nestedEl);
+                const nestedStyle = $nested.attr("style");
+                if (nestedStyle) {
+                  const nestedBgMatch = nestedStyle.match(/background-image:\s*url\(['"]?([^'"]+)['"]?\)/);
+                  if (nestedBgMatch) {
+                    bgImageSrc = nestedBgMatch[1];
+                    return false;
+                  }
+                }
+                const dataAttrs = nestedEl.attributes;
+                if (dataAttrs) {
+                  for (let i = 0; i < dataAttrs.length; i++) {
+                    const attr2 = dataAttrs[i];
+                    if ((attr2.name.includes("src") || attr2.name.includes("url")) && attr2.value && (attr2.value.startsWith("http") || attr2.value.startsWith("//"))) {
+                      bgImageSrc = attr2.value;
+                      return false;
+                    }
+                  }
+                }
+              });
+            }
+            if (bgImageSrc) {
+              const altText = caption || "Blog Image";
+              content += `![${altText}](${bgImageSrc})
+`;
+              if (caption) {
+                content += `*${caption}*
+`;
+              }
+              console.log(`Found background image: ${bgImageSrc}`);
+            } else {
+              content += caption ? `[\uC774\uBBF8\uC9C0: ${caption}]
 ` : `[\uC774\uBBF8\uC9C0]
 `;
+              console.log(`No image source found in se-image component`);
+            }
           }
         } else if ($el.hasClass("se-code")) {
           const codeElements = $el.find(".se-code-source");
           if (codeElements.length > 0) {
             const codeParts = [];
-            codeElements.each((_2, code) => {
+            codeElements.each((_, code) => {
               let codeContent = $2(code).text();
               if (codeContent.startsWith("\n")) {
                 codeContent = codeContent.substring(1);
@@ -15264,9 +15418,7 @@ var NaverBlogFetcher = class {
                 codeContent = codeContent.slice(0, -1);
               }
               if (codeContent.trim()) {
-                codeParts.push(`\`\`\`
-${codeContent.trim()}
-\`\`\``);
+                codeParts.push("```\n" + codeContent.trim() + "\n```");
               }
             });
             if (codeParts.length > 0) {
@@ -15279,7 +15431,7 @@ ${codeContent.trim()}
           const materialElements = $el.find("a.se-module-material");
           if (materialElements.length > 0) {
             const materialParts = [];
-            materialElements.each((_2, material) => {
+            materialElements.each((_, material) => {
               const $material = $2(material);
               const linkData = $material.attr("data-linkdata");
               if (linkData) {
@@ -15301,8 +15453,6 @@ ${codeContent.trim()}
             } else {
               content += "[\uC790\uB8CC]\n";
             }
-          } else {
-            content += "[\uC790\uB8CC]\n";
           }
         } else if ($el.hasClass("se-video")) {
           content += "[\uBE44\uB514\uC624]\n";
@@ -15313,27 +15463,6 @@ ${codeContent.trim()}
         } else {
           const textContent2 = $el.text().trim();
           if (textContent2 && textContent2.length > 10 && !textContent2.startsWith("#")) {
-            const paragraphs = textContent2.split(/\n\s*\n/);
-            paragraphs.forEach((paragraph) => {
-              const trimmed = paragraph.trim();
-              if (trimmed && !trimmed.startsWith("#")) {
-                content += trimmed + "\n";
-              }
-            });
-          }
-        }
-      } else {
-        const textContent2 = $el.text().trim();
-        if (textContent2 && textContent2.length > 10 && !textContent2.startsWith("#")) {
-          const childParagraphs = $el.find("p");
-          if (childParagraphs.length > 0) {
-            childParagraphs.each((_2, p) => {
-              const paragraphText = $2(p).text().trim();
-              if (paragraphText && !paragraphText.startsWith("#")) {
-                content += paragraphText + "\n";
-              }
-            });
-          } else {
             const paragraphs = textContent2.split(/\n\s*\n/);
             paragraphs.forEach((paragraph) => {
               const trimmed = paragraph.trim();
@@ -15371,6 +15500,7 @@ ${codeContent.trim()}
     }
   }
   extractContentFromComponents(components) {
+    var _a5;
     let content = "";
     for (const component of components) {
       const type = component.componentType;
@@ -15410,18 +15540,29 @@ ${codeContent.trim()}
           }
           break;
         case "se-image":
-          if (data2.src) {
-            const altText = data2.caption || data2.alt || "Blog Image";
-            content += `![${altText}](${data2.src})
+          const imageUrl = data2.src || data2.url || data2.imageUrl || ((_a5 = data2.imageInfo) == null ? void 0 : _a5.url);
+          if (imageUrl) {
+            const altText = data2.caption || data2.alt || data2.title || "Blog Image";
+            content += `![${altText}](${imageUrl})
 `;
             if (data2.caption) {
               content += `*${data2.caption}*
 `;
             }
           } else {
-            content += data2.caption ? `[\uC774\uBBF8\uC9C0: ${data2.caption}]
+            if (data2.imageInfo && data2.imageInfo.src) {
+              const altText = data2.caption || data2.imageInfo.alt || "Blog Image";
+              content += `![${altText}](${data2.imageInfo.src})
+`;
+              if (data2.caption) {
+                content += `*${data2.caption}*
+`;
+              }
+            } else {
+              content += data2.caption ? `[\uC774\uBBF8\uC9C0: ${data2.caption}]
 ` : `[\uC774\uBBF8\uC9C0]
 `;
+            }
           }
           break;
         case "se-code":
@@ -15564,6 +15705,167 @@ ${codeContent.trim()}
       return new Date().toISOString().split("T")[0];
     }
   }
+  extractAdditionalImages(html3, existingContent) {
+    try {
+      console.log("Scanning for additional images in HTML...");
+      const $2 = load(html3);
+      let additionalImages = [];
+      $2("img").each((_, img) => {
+        const $img = $2(img);
+        const imgSrc = $img.attr("data-lazy-src") || $img.attr("src") || $img.attr("data-src") || $img.attr("data-original") || $img.attr("data-image-src") || $img.attr("data-url");
+        if (imgSrc && (imgSrc.startsWith("http") || imgSrc.startsWith("//"))) {
+          if (!existingContent.includes(imgSrc)) {
+            if (this.isContentImage($img, imgSrc)) {
+              const alt = $img.attr("alt") || $img.attr("title") || "Additional Image";
+              additionalImages.push(`![${alt}](${imgSrc})`);
+              console.log(`Found additional content image: ${imgSrc}`);
+            } else {
+              console.log(`Skipping UI/editor image: ${imgSrc}`);
+            }
+          }
+        }
+      });
+      $2('*[style*="background-image"]').each((_, el) => {
+        const style = $2(el).attr("style");
+        if (style) {
+          const bgMatch = style.match(/background-image:\s*url\(['"]?([^'"]+)['"]?\)/);
+          if (bgMatch && bgMatch[1]) {
+            const imgSrc = bgMatch[1];
+            if ((imgSrc.startsWith("http") || imgSrc.startsWith("//")) && !existingContent.includes(imgSrc)) {
+              if (this.shouldIncludeImage(imgSrc, "Background Image")) {
+                additionalImages.push(`![Background Image](${imgSrc})`);
+                console.log(`Found additional background image: ${imgSrc}`);
+              } else {
+                console.log(`Filtered out background image: ${imgSrc}`);
+              }
+            }
+          }
+        }
+      });
+      if (additionalImages.length > 0) {
+        console.log(`Adding ${additionalImages.length} additional images to content`);
+        return existingContent + "\n\n" + additionalImages.join("\n\n") + "\n";
+      }
+      return existingContent;
+    } catch (error) {
+      console.error("Error extracting additional images:", error);
+      return existingContent;
+    }
+  }
+  createErrorContent(post, error) {
+    const timestamp = new Date().toISOString();
+    const errorMessage = (error == null ? void 0 : error.message) || "Unknown error";
+    return `# \u26A0\uFE0F \uCF58\uD150\uCE20 \uAC00\uC838\uC624\uAE30 \uC2E4\uD328
+
+## \uD3EC\uC2A4\uD2B8 \uC815\uBCF4
+- **LogNo**: ${post.logNo}
+- **URL**: [${post.url}](${post.url})
+- **\uC81C\uBAA9**: ${post.title || "\uC81C\uBAA9 \uC5C6\uC74C"}
+- **\uB0A0\uC9DC**: ${post.date || "\uB0A0\uC9DC \uC5C6\uC74C"}
+- **\uC378\uB124\uC77C**: ${post.thumbnail || "\uC378\uB124\uC77C \uC5C6\uC74C"}
+
+## \uC624\uB958 \uC815\uBCF4
+- **\uC624\uB958 \uC2DC\uAC04**: ${timestamp}
+- **\uC624\uB958 \uBA54\uC2DC\uC9C0**: ${errorMessage}
+
+## \uBB38\uC81C \uD574\uACB0 \uBC29\uBC95
+1. \uB124\uC774\uBC84 \uBE14\uB85C\uADF8\uC5D0\uC11C \uC9C1\uC811 \uD3EC\uC2A4\uD2B8\uB97C \uD655\uC778\uD574\uBCF4\uC138\uC694
+2. \uD3EC\uC2A4\uD2B8\uAC00 \uBE44\uACF5\uAC1C \uB610\uB294 \uC0AD\uC81C\uB418\uC5C8\uC744 \uC218 \uC788\uC2B5\uB2C8\uB2E4
+3. \uB124\uD2B8\uC6CC\uD06C \uC5F0\uACB0 \uC0C1\uD0DC\uB97C \uD655\uC778\uD574\uBCF4\uC138\uC694
+4. \uB098\uC911\uC5D0 \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uBCF4\uC138\uC694
+
+---
+*\uC774 \uD30C\uC77C\uC740 \uC790\uB3D9\uC73C\uB85C \uC0DD\uC131\uB41C \uC624\uB958 \uB85C\uADF8\uC785\uB2C8\uB2E4.*`;
+  }
+  shouldIncludeImage(imgSrc, caption) {
+    if (imgSrc.includes("ssl.pstatic.net/static/blog/profile/")) {
+      return false;
+    }
+    const uiPatterns = [
+      /se-sticker/i,
+      /se-emoticon/i,
+      /editor/i,
+      /\.gif$/i,
+      /icon/i,
+      /logo/i,
+      /button/i,
+      /thumb/i,
+      /loading/i,
+      /spinner/i,
+      /1x1/,
+      /spacer/i,
+      /profile/i,
+      /defaultimg/i,
+      /bg_/i,
+      /background/i,
+      /_bg/i
+    ];
+    for (const pattern of uiPatterns) {
+      if (pattern.test(imgSrc)) {
+        return false;
+      }
+    }
+    if (caption) {
+      const uiCaptions = [
+        /profile/i,
+        /background/i,
+        /프로필/i,
+        /배경/i,
+        /아이콘/i,
+        /icon/i
+      ];
+      for (const pattern of uiCaptions) {
+        if (pattern.test(caption)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  isContentImage($img, imgSrc) {
+    if (imgSrc.includes("ssl.pstatic.net/static/blog/profile/")) {
+      return false;
+    }
+    const uiPatterns = [
+      /se-sticker/i,
+      /se-emoticon/i,
+      /editor/i,
+      /\.gif$/i,
+      /icon/i,
+      /logo/i,
+      /button/i,
+      /thumb/i,
+      /loading/i,
+      /spinner/i,
+      /1x1/,
+      /spacer/i,
+      /profile/i,
+      /defaultimg/i,
+      /bg_/i,
+      /background/i,
+      /_bg/i
+    ];
+    for (const pattern of uiPatterns) {
+      if (pattern.test(imgSrc)) {
+        return false;
+      }
+    }
+    const $parent = $img.closest(".se-component, .se-text, .se-image, .post-content, .blog-content");
+    if ($parent.length === 0) {
+      return false;
+    }
+    const width = parseInt($img.attr("width") || "0");
+    const height = parseInt($img.attr("height") || "0");
+    if (width > 0 && width < 50 || height > 0 && height < 50) {
+      return false;
+    }
+    const className = $img.attr("class") || "";
+    const uiClasses = ["icon", "logo", "button", "ui", "editor", "control"];
+    if (uiClasses.some((cls) => className.toLowerCase().includes(cls))) {
+      return false;
+    }
+    return true;
+  }
   delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
@@ -15573,8 +15875,14 @@ ${codeContent.trim()}
 var DEFAULT_SETTINGS = {
   openaiApiKey: "",
   defaultFolder: "Naver Blog Posts",
+  imageFolder: "Naver Blog Posts/attachments",
   enableAiTags: true,
-  enableAiExcerpt: true
+  enableAiExcerpt: true,
+  enableDuplicateCheck: true,
+  enableImageDownload: false,
+  subscribedBlogs: [],
+  subscriptionCount: 10,
+  blogSubscriptions: []
 };
 var NaverBlogPlugin = class extends import_obsidian2.Plugin {
   async onload() {
@@ -15589,6 +15897,44 @@ var NaverBlogPlugin = class extends import_obsidian2.Plugin {
         new NaverBlogImportModal(this.app, this).open();
       }
     });
+    this.addCommand({
+      id: "subscribe-naver-blog",
+      name: "Subscribe to Naver Blog",
+      callback: () => {
+        new NaverBlogSubscribeModal(this.app, this).open();
+      }
+    });
+    this.addCommand({
+      id: "import-single-post",
+      name: "Import Single Naver Blog Post",
+      callback: () => {
+        new NaverBlogSinglePostModal(this.app, this).open();
+      }
+    });
+    this.addCommand({
+      id: "rewrite-current-note",
+      name: "AI Fix Layout and Format (Preserve Content 100%)",
+      callback: async () => {
+        if (!this.settings.openaiApiKey || this.settings.openaiApiKey.trim() === "") {
+          new import_obsidian2.Notice("\u274C OpenAI API Key required for AI formatting", 8e3);
+          new import_obsidian2.Notice("\u{1F4A1} Please set your API key in plugin settings", 5e3);
+          return;
+        }
+        const activeFile = this.app.workspace.getActiveFile();
+        if (!activeFile) {
+          new import_obsidian2.Notice("No active file selected for formatting");
+          return;
+        }
+        if (!activeFile.path.endsWith(".md")) {
+          new import_obsidian2.Notice("Please select a markdown file");
+          return;
+        }
+        await this.rewriteCurrentNote(activeFile);
+      }
+    });
+    if (this.settings.subscribedBlogs.length > 0) {
+      setTimeout(() => this.syncSubscribedBlogs(), 5e3);
+    }
     this.addSettingTab(new NaverBlogSettingTab(this.app, this));
   }
   onunload() {
@@ -15599,19 +15945,37 @@ var NaverBlogPlugin = class extends import_obsidian2.Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
   }
-  async fetchNaverBlogPosts(blogId) {
+  async fetchNaverBlogPosts(blogId, maxPosts) {
+    let fetchNotice = null;
     try {
-      new import_obsidian2.Notice("Fetching blog posts...");
+      fetchNotice = new import_obsidian2.Notice("Fetching blog posts...", 0);
       const fetcher = new NaverBlogFetcher(blogId);
-      const posts = await fetcher.fetchPosts();
-      new import_obsidian2.Notice(`Found ${posts.length} posts. Processing...`);
-      const processedPosts = posts.map((post) => ({
+      const posts = await fetcher.fetchPosts(maxPosts);
+      if (fetchNotice) {
+        fetchNotice.hide();
+        fetchNotice = null;
+      }
+      let filteredPosts = posts;
+      if (this.settings.enableDuplicateCheck) {
+        const existingLogNos = await this.getExistingLogNos();
+        filteredPosts = posts.filter((post) => !existingLogNos.has(post.logNo));
+        new import_obsidian2.Notice(`Found ${posts.length} posts, ${filteredPosts.length} new posts after duplicate check`, 4e3);
+      } else {
+        new import_obsidian2.Notice(`Found ${posts.length} posts`, 4e3);
+      }
+      new import_obsidian2.Notice(`Processing ${filteredPosts.length} posts...`, 3e3);
+      const processedPosts = filteredPosts.map((post) => ({
         ...post,
+        title: post.title.replace(/^\[.*?\]\s*/, "").replace(/\s*\[.*?\]$/, "").trim(),
+        // Remove [] brackets from title start/end
         tags: [],
         excerpt: ""
       }));
       return processedPosts;
     } catch (error) {
+      if (fetchNotice) {
+        fetchNotice.hide();
+      }
       console.error("Error fetching blog posts:", error);
       new import_obsidian2.Notice("Failed to fetch blog posts. Please check the blog ID.");
       return [];
@@ -15726,7 +16090,11 @@ var NaverBlogPlugin = class extends import_obsidian2.Plugin {
       if (this.settings.enableAiExcerpt) {
         post.excerpt = await this.generateAIExcerpt(post.title, post.content);
       }
-      const filename = this.sanitizeFilename(`${post.date}-${post.title}.md`);
+      let processedContent = post.content;
+      if (this.settings.enableImageDownload) {
+        processedContent = await this.downloadAndProcessImages(post.content, post.logNo);
+      }
+      const filename = this.sanitizeFilename(`${post.title}.md`);
       const folder = this.settings.defaultFolder;
       if (!await this.app.vault.adapter.exists(folder)) {
         await this.app.vault.createFolder(folder);
@@ -15734,7 +16102,11 @@ var NaverBlogPlugin = class extends import_obsidian2.Plugin {
       const filepath = `${folder}/${filename}`;
       const frontmatter = this.createFrontmatter(post);
       const fullContent = `${frontmatter}
-${post.content}`;
+${processedContent}`;
+      if (await this.app.vault.adapter.exists(filepath)) {
+        console.log(`File already exists: ${filename}`);
+        return;
+      }
       await this.app.vault.create(filepath, fullContent);
       new import_obsidian2.Notice(`Created: ${filename}`);
     } catch (error) {
@@ -15754,11 +16126,452 @@ categories: [IT, \uAC1C\uBC1C, \uC0DD\uD65C]
 tags: [${tags}]
 excerpt: ${excerpt}
 source: "\uB124\uC774\uBC84 \uBE14\uB85C\uADF8"
+url: "${post.url}"
 logNo: "${post.logNo}"
 ---`;
   }
+  async downloadAndProcessImages(content, logNo) {
+    var _a5;
+    if (!this.settings.enableImageDownload) {
+      return content;
+    }
+    try {
+      const attachmentsFolder = this.settings.imageFolder;
+      if (!await this.app.vault.adapter.exists(attachmentsFolder)) {
+        await this.app.vault.createFolder(attachmentsFolder);
+      }
+      const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+      let processedContent = content;
+      let match;
+      let imageCount = 0;
+      const allMatches = [...content.matchAll(new RegExp(imageRegex.source, "g"))];
+      const filteredMatches = allMatches.filter(([_, altText, imageUrl]) => {
+        return this.shouldDownloadImage(imageUrl, altText);
+      });
+      const totalImages = filteredMatches.length;
+      if (totalImages > 0) {
+        console.log(`Found ${totalImages} valid images to download for post ${logNo} (filtered from ${allMatches.length})`);
+      }
+      for (let i = 0; i < filteredMatches.length; i++) {
+        const [fullMatch, altText, imageUrl] = filteredMatches[i];
+        if (imageUrl.startsWith("attachments/") || imageUrl.startsWith("./") || imageUrl.startsWith("../")) {
+          continue;
+        }
+        try {
+          let directUrl = this.convertToDirectImageUrl(imageUrl);
+          const imageProgress = `(${imageCount + 1}/${totalImages})`;
+          console.log(`Processing image ${imageProgress}: ${imageUrl} -> ${directUrl}`);
+          new import_obsidian2.Notice(`Downloading image ${imageProgress} for post ${logNo}`, 2e3);
+          const response = await (0, import_obsidian2.requestUrl)({
+            url: directUrl,
+            method: "GET",
+            headers: {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+          });
+          if (response.status === 200 && response.arrayBuffer) {
+            const originalUrlParts = imageUrl.split("/");
+            let filename = originalUrlParts[originalUrlParts.length - 1];
+            filename = filename.split("?")[0];
+            try {
+              filename = decodeURIComponent(filename);
+            } catch (e) {
+              console.log("Could not decode filename, using as-is");
+            }
+            if (filename.length > 100 || !filename.includes(".")) {
+              const extension = ((_a5 = filename.match(/\.(jpg|jpeg|png|gif|webp)$/i)) == null ? void 0 : _a5[1]) || "jpg";
+              filename = `image_${Date.now()}.${extension}`;
+            }
+            filename = `${logNo}_${imageCount}_${filename}`;
+            filename = this.sanitizeFilename(filename);
+            console.log(`Generated filename: ${filename}`);
+            const imagePath = `${attachmentsFolder}/${filename}`;
+            try {
+              await this.app.vault.adapter.writeBinary(imagePath, response.arrayBuffer);
+              const fileExists = await this.app.vault.adapter.exists(imagePath);
+              console.log(`File saved successfully: ${fileExists} at ${imagePath}`);
+              if (!fileExists) {
+                throw new Error("File was not saved properly");
+              }
+            } catch (saveError) {
+              console.error(`Failed to save image file: ${saveError}`);
+              throw saveError;
+            }
+            const defaultFolderPath = this.settings.defaultFolder;
+            const imageFolderPath = this.settings.imageFolder;
+            let relativePath = "";
+            if (imageFolderPath.startsWith(defaultFolderPath)) {
+              relativePath = imageFolderPath.substring(defaultFolderPath.length + 1);
+              if (relativePath) {
+                relativePath = relativePath + "/";
+              }
+            } else {
+              const defaultParts = defaultFolderPath.split("/");
+              const imageParts = imageFolderPath.split("/");
+              let commonIndex = 0;
+              while (commonIndex < defaultParts.length && commonIndex < imageParts.length && defaultParts[commonIndex] === imageParts[commonIndex]) {
+                commonIndex++;
+              }
+              const upLevels = defaultParts.length - commonIndex;
+              const upPath = "../".repeat(upLevels);
+              const downPath = imageParts.slice(commonIndex).join("/");
+              relativePath = upPath + (downPath ? downPath + "/" : "");
+            }
+            const localImagePath = `${relativePath}${filename}`;
+            const newImageMd = `![${altText}](${localImagePath})`;
+            const cleanOriginalUrl = imageUrl.split("?")[0];
+            processedContent = processedContent.replace(fullMatch, newImageMd);
+            console.log(`Updated markdown: ${fullMatch} -> ${newImageMd}`);
+            imageCount++;
+            console.log(`\u2713 Downloaded image ${imageProgress}: ${filename}`);
+          } else {
+            console.log(`\u2717 Failed to download image ${imageProgress}: ${directUrl} (Status: ${response.status})`);
+            console.log(`Response headers:`, response.headers);
+          }
+        } catch (imageError) {
+          const imageProgress = `(${imageCount + 1}/${totalImages})`;
+          let directUrl = this.convertToDirectImageUrl(imageUrl);
+          console.error(`\u2717 Error downloading image ${imageProgress} ${imageUrl}:`, imageError);
+          console.log(`Direct URL attempted: ${directUrl}`);
+          if (imageUrl.includes("postfiles.pstatic.net")) {
+            console.log(`Trying alternative method for postfiles.pstatic.net...`);
+            try {
+              const altResponse = await (0, import_obsidian2.requestUrl)({
+                url: imageUrl,
+                // Use original URL
+                method: "GET",
+                headers: {
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                  "Referer": "https://blog.naver.com/"
+                }
+              });
+              if (altResponse.status === 200 && altResponse.arrayBuffer) {
+                console.log(`\u2713 Alternative download successful for ${imageUrl}`);
+                const urlParts = imageUrl.split("/");
+                let filename = urlParts[urlParts.length - 1];
+                filename = filename.split("?")[0];
+                if (!filename.includes(".")) {
+                  filename += ".jpg";
+                }
+                filename = `${logNo}_${imageCount}_${filename}`;
+                filename = this.sanitizeFilename(filename);
+                const imagePath = `${attachmentsFolder}/${filename}`;
+                await this.app.vault.adapter.writeBinary(imagePath, altResponse.arrayBuffer);
+                const defaultFolderPath = this.settings.defaultFolder;
+                const imageFolderPath = this.settings.imageFolder;
+                let relativePath = "";
+                if (imageFolderPath.startsWith(defaultFolderPath)) {
+                  relativePath = imageFolderPath.substring(defaultFolderPath.length + 1);
+                  if (relativePath) {
+                    relativePath = relativePath + "/";
+                  }
+                } else {
+                  const defaultParts = defaultFolderPath.split("/");
+                  const imageParts = imageFolderPath.split("/");
+                  let commonIndex = 0;
+                  while (commonIndex < defaultParts.length && commonIndex < imageParts.length && defaultParts[commonIndex] === imageParts[commonIndex]) {
+                    commonIndex++;
+                  }
+                  const upLevels = defaultParts.length - commonIndex;
+                  const upPath = "../".repeat(upLevels);
+                  const downPath = imageParts.slice(commonIndex).join("/");
+                  relativePath = upPath + (downPath ? downPath + "/" : "");
+                }
+                const localImagePath = `${relativePath}${filename}`;
+                const newImageMd = `![${altText}](${localImagePath})`;
+                processedContent = processedContent.replace(fullMatch, newImageMd);
+                imageCount++;
+                console.log(`\u2713 Downloaded image via alternative method ${imageProgress}: ${filename}`);
+              }
+            } catch (altError) {
+              console.error(`Alternative download also failed:`, altError);
+            }
+          }
+        }
+      }
+      return processedContent;
+    } catch (error) {
+      console.error("Error processing images:", error);
+      return content;
+    }
+  }
+  async rewriteCurrentNote(file) {
+    try {
+      new import_obsidian2.Notice("\u{1F916} AI layout fixing in progress...", 5e3);
+      const content = await this.app.vault.read(file);
+      const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+      let frontmatter = "";
+      let body = content;
+      if (frontmatterMatch) {
+        frontmatter = frontmatterMatch[1];
+        body = frontmatterMatch[2];
+      }
+      const cleanBody = body.replace(/!\[([^\]]*)\]\([^)]*\)/g, "[\uC774\uBBF8\uC9C0: $1]").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/[#*`]/g, "").trim();
+      if (!cleanBody || cleanBody.length < 50) {
+        new import_obsidian2.Notice("Content too short for AI formatting (minimum 50 characters)");
+        return;
+      }
+      const fixedContent = await this.callOpenAIForLayoutFix(cleanBody);
+      if (!fixedContent) {
+        new import_obsidian2.Notice("\u274C AI formatting failed. Please try again.");
+        return;
+      }
+      let newContent = "";
+      if (frontmatter) {
+        newContent = `---
+${frontmatter}
+---
+
+${fixedContent}`;
+      } else {
+        newContent = fixedContent;
+      }
+      await this.app.vault.modify(file, newContent);
+      new import_obsidian2.Notice("\u2705 Layout and formatting fixed by AI!", 5e3);
+    } catch (error) {
+      console.error("AI layout fix error:", error);
+      if (error.message.includes("401")) {
+        new import_obsidian2.Notice("\u274C Invalid OpenAI API Key", 8e3);
+        new import_obsidian2.Notice("\u{1F4A1} Please check your API key in plugin settings", 5e3);
+      } else if (error.message.includes("quota")) {
+        new import_obsidian2.Notice("\u274C OpenAI API quota exceeded", 8e3);
+        new import_obsidian2.Notice("\u{1F4A1} Please check your OpenAI billing settings", 5e3);
+      } else if (error.message.includes("network")) {
+        new import_obsidian2.Notice("\u274C Network error - please check your connection", 5e3);
+      } else {
+        new import_obsidian2.Notice(`\u274C AI formatting failed: ${error.message}`, 8e3);
+      }
+    }
+  }
+  async callOpenAIForLayoutFix(content) {
+    var _a5, _b, _c, _d, _e, _f;
+    try {
+      const response = await (0, import_obsidian2.requestUrl)({
+        url: "https://api.openai.com/v1/chat/completions",
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.settings.openaiApiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          // Using gpt-4o for better cost efficiency
+          messages: [
+            {
+              role: "user",
+              content: `\uB2E4\uC74C\uC740 \uB124\uC774\uBC84 \uBE14\uB85C\uADF8\uC5D0\uC11C HTML \uD30C\uC2F1\uC73C\uB85C \uAC00\uC838\uC628 \uD14D\uC2A4\uD2B8\uC785\uB2C8\uB2E4. HTML \uD30C\uC2F1 \uACFC\uC815\uC5D0\uC11C \uB808\uC774\uC544\uC6C3\uC774 \uAE68\uC9C0\uACE0 \uD615\uC2DD\uC774 \uB9DD\uAC00\uC9C4 \uBD80\uBD84\uC744 \uC218\uC815\uD574\uC8FC\uC138\uC694.
+
+\u26A0\uFE0F **\uC911\uC694**: \uC6D0\uBB38\uC758 \uB0B4\uC6A9\uC740 100% \uADF8\uB300\uB85C \uC720\uC9C0\uD558\uACE0, \uC624\uC9C1 \uB9C8\uD06C\uB2E4\uC6B4 \uD615\uC2DD\uACFC \uB808\uC774\uC544\uC6C3\uB9CC \uC218\uC815\uD574\uC8FC\uC138\uC694.
+
+**\uC218\uC815 \uC0AC\uD56D**:
+1. \uC904\uBC14\uAFC8\uACFC \uBB38\uB2E8 \uAD6C\uBD84\uC744 \uC790\uC5F0\uC2A4\uB7FD\uAC8C \uC815\uB9AC
+2. \uC81C\uBAA9\uC774 \uD544\uC694\uD55C \uBD80\uBD84\uC5D0 \uC801\uC808\uD55C ## \uB610\uB294 ### \uCD94\uAC00  
+3. \uBAA9\uB85D \uD615\uD0DC\uC758 \uB0B4\uC6A9\uC740 - \uB610\uB294 1. \uD615\uC2DD\uC73C\uB85C \uC815\uB9AC
+4. \uAC15\uC870\uAC00 \uD544\uC694\uD55C \uBD80\uBD84\uB9CC **\uBCFC\uB4DC** \uCC98\uB9AC
+5. \uC804\uCCB4\uC801\uC778 \uB9C8\uD06C\uB2E4\uC6B4 \uD615\uC2DD \uC815\uB9AC
+
+**\uC808\uB300 \uD558\uC9C0 \uB9D0 \uAC83**:
+- \uB0B4\uC6A9 \uCD94\uAC00, \uC0AD\uC81C, \uBCC0\uACBD \uAE08\uC9C0
+- \uC758\uBBF8\uB098 \uB258\uC559\uC2A4 \uBCC0\uACBD \uAE08\uC9C0  
+- \uC0C8\uB85C\uC6B4 \uC815\uBCF4\uB098 \uD574\uC11D \uCD94\uAC00 \uAE08\uC9C0
+
+\uC6D0\uBB38:
+${content}
+
+\uC704 \uB0B4\uC6A9\uC758 \uD615\uC2DD\uB9CC \uAE54\uB054\uD558\uAC8C \uC218\uC815\uD574\uC11C \uB9C8\uD06C\uB2E4\uC6B4\uC73C\uB85C \uCD9C\uB825\uD574\uC8FC\uC138\uC694.`
+            }
+          ],
+          max_tokens: 4e3,
+          temperature: 0.1
+        })
+      });
+      if (response.status === 200 && ((_d = (_c = (_b = (_a5 = response.json) == null ? void 0 : _a5.choices) == null ? void 0 : _b[0]) == null ? void 0 : _c.message) == null ? void 0 : _d.content)) {
+        let content2 = response.json.choices[0].message.content.trim();
+        if (content2.startsWith("```markdown\n") && content2.endsWith("\n```")) {
+          content2 = content2.substring(12, content2.length - 4).trim();
+        } else if (content2.startsWith("```\n") && content2.endsWith("\n```")) {
+          content2 = content2.substring(4, content2.length - 4).trim();
+        }
+        return content2;
+      } else {
+        let errorMsg = `OpenAI API error: ${response.status}`;
+        if ((_f = (_e = response.json) == null ? void 0 : _e.error) == null ? void 0 : _f.message) {
+          errorMsg += ` - ${response.json.error.message}`;
+        }
+        throw new Error(errorMsg);
+      }
+    } catch (error) {
+      console.error("OpenAI API call failed:", error);
+      if (error.message.includes("401") || error.message.includes("Invalid")) {
+        throw new Error("401");
+      } else if (error.message.includes("quota") || error.message.includes("billing")) {
+        throw new Error("quota");
+      } else if (error.message.includes("network") || error.message.includes("fetch")) {
+        throw new Error("network");
+      } else {
+        throw error;
+      }
+    }
+  }
+  convertToDirectImageUrl(url) {
+    let directUrl = url;
+    if (directUrl.includes("postfiles.pstatic.net")) {
+      directUrl = directUrl.replace(/\?type=w\d+/i, "").replace(/&type=w\d+/i, "");
+      console.log(`Postfiles URL cleaned: ${url} -> ${directUrl}`);
+      return directUrl;
+    }
+    directUrl = directUrl.split("?")[0];
+    directUrl = directUrl.replace("https://mblogvideo-phinf.pstatic.net/", "https://blogfiles.pstatic.net/").replace("https://mblogthumb-phinf.pstatic.net/", "https://blogfiles.pstatic.net/").replace("https://blogpfthumb-phinf.pstatic.net/", "https://blogfiles.pstatic.net/").replace("/MjAxOA%3D%3D/", "/MjAxOA==/").replace("/MjAxOQ%3D%3D/", "/MjAxOQ==/").replace("/MjAyMA%3D%3D/", "/MjAyMA==/").replace("/MjAyMQ%3D%3D/", "/MjAyMQ==/").replace("/MjAyMg%3D%3D/", "/MjAyMg==/").replace("/MjAyMw%3D%3D/", "/MjAyMw==/").replace("/MjAyNA%3D%3D/", "/MjAyNA==/").replace("/MjAyNQ%3D%3D/", "/MjAyNQ==/");
+    console.log(`URL conversion: ${url} -> ${directUrl}`);
+    return directUrl;
+  }
+  shouldDownloadImage(imageUrl, altText) {
+    const skipPatterns = [
+      // Naver blog editor assets
+      /se-sticker/i,
+      /se-emoticon/i,
+      /editor/i,
+      /naverblog_pc/i,
+      // Common animation and GIF patterns
+      /\.gif$/i,
+      /loading/i,
+      /spinner/i,
+      /animation/i,
+      /thumb/i,
+      // Profile and background images
+      /profile/i,
+      /defaultimg/i,
+      /bg_/i,
+      /background/i,
+      /_bg/i,
+      // Naver UI elements
+      /icon/i,
+      /logo/i,
+      /button/i,
+      // Size indicators (very small images are likely UI elements)
+      /1x1/,
+      /spacer/i,
+      /dot\./i,
+      // Common UI image names
+      /arrow/i,
+      /bullet/i,
+      /divider/i
+    ];
+    for (const pattern of skipPatterns) {
+      if (pattern.test(imageUrl)) {
+        console.log(`Skipping UI/animation image: ${imageUrl}`);
+        return false;
+      }
+    }
+    if (altText) {
+      const altSkipPatterns = [
+        /이모티콘/i,
+        /스티커/i,
+        /애니메이션/i,
+        /로딩/i,
+        /아이콘/i,
+        /profile/i,
+        /background/i,
+        /프로필/i,
+        /배경/i
+      ];
+      for (const pattern of altSkipPatterns) {
+        if (pattern.test(altText)) {
+          console.log(`Skipping image by alt text: ${altText}`);
+          return false;
+        }
+      }
+    }
+    const thumbnailPattern = /[?&](w|h|width|height)=\d+/i;
+    if (thumbnailPattern.test(imageUrl)) {
+      console.log(`Skipping thumbnail image: ${imageUrl}`);
+      return false;
+    }
+    if (imageUrl.includes("ssl.pstatic.net/static/blog/profile/")) {
+      console.log(`Skipping ssl.pstatic.net profile image: ${imageUrl}`);
+      return false;
+    }
+    const validDomains = [
+      "blogfiles.pstatic.net",
+      "postfiles.pstatic.net",
+      "mblogthumb-phinf.pstatic.net",
+      "blogpfthumb-phinf.pstatic.net"
+    ];
+    const isValidDomain = validDomains.some((domain) => imageUrl.includes(domain));
+    if (!isValidDomain && !imageUrl.match(/\.(jpg|jpeg|png|webp)(\?|$)/i)) {
+      console.log(`Skipping non-image URL: ${imageUrl}`);
+      return false;
+    }
+    return true;
+  }
   sanitizeFilename(filename) {
-    return filename.replace(/[<>:"/\\|?*]/g, "").replace(/\s+/g, "-").substring(0, 100);
+    return filename.replace(/\[.*?\]/g, "").replace(/[<>:"/\\|?*]/g, "").replace(/^\s+|\s+$/g, "").substring(0, 100);
+  }
+  async getExistingLogNos() {
+    const existingLogNos = /* @__PURE__ */ new Set();
+    try {
+      const files = this.app.vault.getMarkdownFiles();
+      for (const file of files) {
+        const content = await this.app.vault.read(file);
+        const logNoMatch = content.match(/logNo: "([^"]+)"/i);
+        if (logNoMatch) {
+          existingLogNos.add(logNoMatch[1]);
+        }
+      }
+    } catch (error) {
+      console.error("Error reading existing logNos:", error);
+    }
+    return existingLogNos;
+  }
+  async syncSubscribedBlogs() {
+    if (this.settings.subscribedBlogs.length === 0)
+      return;
+    const syncNotice = new import_obsidian2.Notice("Syncing subscribed blogs...", 0);
+    let totalNewPosts = 0;
+    let totalErrors = 0;
+    const totalBlogs = this.settings.subscribedBlogs.length;
+    try {
+      for (let i = 0; i < this.settings.subscribedBlogs.length; i++) {
+        const blogId = this.settings.subscribedBlogs[i];
+        const blogProgress = `(${i + 1}/${totalBlogs})`;
+        const blogSubscription = this.settings.blogSubscriptions.find((sub) => sub.blogId === blogId);
+        const postCount = (blogSubscription == null ? void 0 : blogSubscription.postCount) || this.settings.subscriptionCount;
+        try {
+          new import_obsidian2.Notice(`Syncing blog ${blogProgress}: ${blogId} (${postCount} posts)`, 5e3);
+          const posts = await this.fetchNaverBlogPosts(blogId, postCount);
+          let blogSuccessCount = 0;
+          let blogErrorLogCount = 0;
+          let blogErrorCount = 0;
+          for (let j = 0; j < posts.length; j++) {
+            const post = posts[j];
+            const postProgress = `${blogProgress} post (${j + 1}/${posts.length})`;
+            const isErrorPost = post.title.startsWith("[\uC624\uB958]");
+            try {
+              new import_obsidian2.Notice(`Creating ${postProgress}: ${post.title}`, 3e3);
+              await this.createMarkdownFile(post);
+              if (isErrorPost) {
+                blogErrorLogCount++;
+              } else {
+                blogSuccessCount++;
+              }
+              totalNewPosts++;
+            } catch (error) {
+              console.error(`Error creating file for post ${post.logNo} from ${blogId} ${postProgress}:`, error);
+              blogErrorCount++;
+              totalErrors++;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          console.log(`Blog ${blogId}: ${blogSuccessCount} success, ${blogErrorLogCount} error logs, ${blogErrorCount} errors`);
+        } catch (error) {
+          console.error(`Error syncing blog ${blogId} ${blogProgress}:`, error);
+          totalErrors++;
+        }
+      }
+    } finally {
+      syncNotice.hide();
+    }
+    new import_obsidian2.Notice(`Sync complete: ${totalNewPosts} new posts imported, ${totalErrors} errors`);
   }
 };
 var NaverBlogImportModal = class extends import_obsidian2.Modal {
@@ -15802,22 +16615,126 @@ var NaverBlogImportModal = class extends import_obsidian2.Modal {
     this.importPosts();
   }
   async importPosts() {
+    let importCancelled = false;
+    const cancelNotice = new import_obsidian2.Notice("Click here to cancel import", 0);
+    cancelNotice.noticeEl.addEventListener("click", () => {
+      importCancelled = true;
+      cancelNotice.hide();
+      new import_obsidian2.Notice("Import cancelled by user", 5e3);
+    });
     try {
       new import_obsidian2.Notice("Starting import...");
       const posts = await this.plugin.fetchNaverBlogPosts(this.blogId);
       if (posts.length === 0) {
+        cancelNotice.hide();
         new import_obsidian2.Notice("No posts found or failed to fetch posts");
         return;
       }
-      for (const post of posts) {
-        await this.plugin.createMarkdownFile(post);
+      let successCount = 0;
+      let errorCount = 0;
+      let errorLogCount = 0;
+      const totalPosts = posts.length;
+      for (let i = 0; i < posts.length; i++) {
+        if (importCancelled) {
+          console.log(`Import cancelled at ${i}/${totalPosts}`);
+          break;
+        }
+        const post = posts[i];
+        const progress = `(${i + 1}/${totalPosts})`;
+        const isErrorPost = post.title.startsWith("[\uC624\uB958]");
+        try {
+          new import_obsidian2.Notice(`Creating file ${progress}: ${post.title}`, 3e3);
+          await this.plugin.createMarkdownFile(post);
+          if (isErrorPost) {
+            errorLogCount++;
+            console.log(`\u{1F4DD} Created error log ${progress}: ${post.title}`);
+          } else {
+            successCount++;
+            console.log(`\u2713 Created file ${progress}: ${post.title}`);
+          }
+        } catch (error) {
+          console.error(`\u2717 Error creating file for post ${post.logNo} ${progress}:`, error);
+          errorCount++;
+        }
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
-      new import_obsidian2.Notice(`Successfully imported ${posts.length} posts!`);
+      cancelNotice.hide();
+      let summary = importCancelled ? `Import cancelled: ${successCount} successful` : `Import complete: ${successCount} successful`;
+      if (errorLogCount > 0) {
+        summary += `, ${errorLogCount} error logs created`;
+      }
+      if (errorCount > 0) {
+        summary += `, ${errorCount} file creation errors`;
+      }
+      const processed = successCount + errorLogCount + errorCount;
+      summary += ` (${processed}/${totalPosts} processed)`;
+      if (errorLogCount > 0 || errorCount > 0) {
+        summary += ` \u26A0\uFE0F`;
+      } else if (!importCancelled) {
+        summary += ` \u2705`;
+      }
+      new import_obsidian2.Notice(summary, 8e3);
     } catch (error) {
+      cancelNotice.hide();
       console.error("Import error:", error);
       new import_obsidian2.Notice("Import failed. Please check the console for details.");
     }
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
+var NaverBlogSubscribeModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.blogId = "";
+    this.plugin = plugin;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Subscribe to Naver Blog" });
+    let inputElement;
+    new import_obsidian2.Setting(contentEl).setName("Blog ID").setDesc("Enter the Naver Blog ID to subscribe to").addText((text3) => {
+      inputElement = text3.inputEl;
+      text3.setPlaceholder("Blog ID").setValue(this.blogId).onChange(async (value) => {
+        this.blogId = value;
+      });
+      text3.inputEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          this.handleSubscribe();
+        }
+      });
+    });
+    new import_obsidian2.Setting(contentEl).addButton((btn) => btn.setButtonText("Subscribe").setCta().onClick(async () => {
+      this.handleSubscribe();
+    }));
+    setTimeout(() => {
+      if (inputElement) {
+        inputElement.focus();
+      }
+    }, 100);
+  }
+  async handleSubscribe() {
+    if (!this.blogId.trim()) {
+      new import_obsidian2.Notice("Please enter a blog ID");
+      return;
+    }
+    if (this.plugin.settings.subscribedBlogs.includes(this.blogId)) {
+      new import_obsidian2.Notice("Already subscribed to this blog");
+      return;
+    }
+    this.plugin.settings.subscribedBlogs.push(this.blogId);
+    this.plugin.settings.blogSubscriptions.push({
+      blogId: this.blogId,
+      postCount: this.plugin.settings.subscriptionCount
+    });
+    await this.plugin.saveSettings();
+    new import_obsidian2.Notice(`Subscribed to ${this.blogId}`);
+    this.close();
+    this.plugin.syncSubscribedBlogs();
   }
   onClose() {
     const { contentEl } = this;
@@ -15837,10 +16754,22 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
       this.plugin.settings.openaiApiKey = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian2.Setting(containerEl).setName("Default Folder").setDesc("Folder where imported posts will be saved").addText((text3) => text3.setPlaceholder("Naver Blog Posts").setValue(this.plugin.settings.defaultFolder).onChange(async (value) => {
-      this.plugin.settings.defaultFolder = value;
-      await this.plugin.saveSettings();
-    }));
+    new import_obsidian2.Setting(containerEl).setName("Default Folder").setDesc("Folder where imported posts will be saved").addText((text3) => {
+      const input = text3.setPlaceholder("Naver Blog Posts").setValue(this.plugin.settings.defaultFolder).onChange(async (value) => {
+        this.plugin.settings.defaultFolder = value;
+        await this.plugin.saveSettings();
+      });
+      this.setupFolderDropdown(input.inputEl, (folder) => {
+        this.plugin.settings.defaultFolder = folder;
+        this.plugin.saveSettings();
+        input.setValue(folder);
+      }, () => {
+        this.plugin.settings.defaultFolder = "";
+        this.plugin.saveSettings();
+        input.setValue("");
+      });
+      return input;
+    });
     new import_obsidian2.Setting(containerEl).setName("Enable AI Tags").setDesc("Generate tags using AI (requires OpenAI API key)").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableAiTags).onChange(async (value) => {
       this.plugin.settings.enableAiTags = value;
       await this.plugin.saveSettings();
@@ -15849,5 +16778,447 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
       this.plugin.settings.enableAiExcerpt = value;
       await this.plugin.saveSettings();
     }));
+    new import_obsidian2.Setting(containerEl).setName("Enable Duplicate Check").setDesc("Skip importing posts that already exist (based on logNo)").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableDuplicateCheck).onChange(async (value) => {
+      this.plugin.settings.enableDuplicateCheck = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian2.Setting(containerEl).setName("Enable Image Download").setDesc("Download and save images from blog posts").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableImageDownload).onChange(async (value) => {
+      this.plugin.settings.enableImageDownload = value;
+      await this.plugin.saveSettings();
+      this.display();
+    }));
+    if (this.plugin.settings.enableImageDownload) {
+      new import_obsidian2.Setting(containerEl).setName("Image Folder").setDesc("Folder where downloaded images will be saved").addText((text3) => {
+        const input = text3.setPlaceholder("Naver Blog Posts/attachments").setValue(this.plugin.settings.imageFolder).onChange(async (value) => {
+          this.plugin.settings.imageFolder = value;
+          await this.plugin.saveSettings();
+        });
+        this.setupFolderDropdown(input.inputEl, (folder) => {
+          this.plugin.settings.imageFolder = folder;
+          this.plugin.saveSettings();
+          input.setValue(folder);
+        }, () => {
+          this.plugin.settings.imageFolder = "";
+          this.plugin.saveSettings();
+          input.setValue("");
+        });
+        return input;
+      });
+    }
+    new import_obsidian2.Setting(containerEl).setName("Subscription Count").setDesc("Number of recent posts to fetch for subscribed blogs").addText((text3) => text3.setPlaceholder("10").setValue(this.plugin.settings.subscriptionCount.toString()).onChange(async (value) => {
+      const count = parseInt(value) || 10;
+      this.plugin.settings.subscriptionCount = count;
+      await this.plugin.saveSettings();
+    }));
+    containerEl.createEl("h3", { text: "Subscribed Blogs" });
+    const subscriptionDiv = containerEl.createDiv();
+    this.displaySubscriptions(subscriptionDiv);
+    new import_obsidian2.Setting(containerEl).setName("Add Blog Subscription").setDesc("Add a blog ID to automatically sync new posts").addText((text3) => {
+      text3.setPlaceholder("Blog ID (e.g., yonofbooks)");
+      return text3;
+    }).addButton((button) => button.setButtonText("Add").onClick(async () => {
+      const input = button.buttonEl.previousElementSibling;
+      const blogId = input.value.trim();
+      if (blogId && !this.plugin.settings.subscribedBlogs.includes(blogId)) {
+        this.plugin.settings.subscribedBlogs.push(blogId);
+        this.plugin.settings.blogSubscriptions.push({
+          blogId,
+          postCount: this.plugin.settings.subscriptionCount
+        });
+        await this.plugin.saveSettings();
+        input.value = "";
+        this.displaySubscriptions(subscriptionDiv);
+      }
+    }));
+  }
+  displaySubscriptions(containerEl) {
+    containerEl.empty();
+    if (this.plugin.settings.subscribedBlogs.length === 0) {
+      containerEl.createEl("p", { text: "No subscribed blogs" });
+      return;
+    }
+    this.plugin.settings.subscribedBlogs.forEach((blogId, index2) => {
+      const blogDiv = containerEl.createDiv();
+      blogDiv.style.display = "grid";
+      blogDiv.style.gridTemplateColumns = "1fr auto auto auto";
+      blogDiv.style.gap = "10px";
+      blogDiv.style.alignItems = "center";
+      blogDiv.style.padding = "10px";
+      blogDiv.style.border = "1px solid var(--background-modifier-border)";
+      blogDiv.style.borderRadius = "4px";
+      blogDiv.style.marginBottom = "5px";
+      blogDiv.createEl("span", { text: blogId });
+      const countDiv = blogDiv.createDiv();
+      countDiv.style.display = "flex";
+      countDiv.style.alignItems = "center";
+      countDiv.style.gap = "5px";
+      const countLabel = countDiv.createEl("span", { text: "Posts:" });
+      countLabel.style.fontSize = "0.9em";
+      countLabel.style.color = "var(--text-muted)";
+      const blogSubscription = this.plugin.settings.blogSubscriptions.find((sub) => sub.blogId === blogId);
+      const currentCount = (blogSubscription == null ? void 0 : blogSubscription.postCount) || this.plugin.settings.subscriptionCount;
+      const countInput = countDiv.createEl("input", {
+        type: "number",
+        value: currentCount.toString()
+      });
+      countInput.style.width = "60px";
+      countInput.style.padding = "2px 4px";
+      countInput.style.fontSize = "0.9em";
+      countInput.min = "1";
+      countInput.max = "100";
+      countInput.onchange = async () => {
+        const newCount = parseInt(countInput.value) || this.plugin.settings.subscriptionCount;
+        const existingIndex = this.plugin.settings.blogSubscriptions.findIndex((sub) => sub.blogId === blogId);
+        if (existingIndex >= 0) {
+          this.plugin.settings.blogSubscriptions[existingIndex].postCount = newCount;
+        } else {
+          this.plugin.settings.blogSubscriptions.push({
+            blogId,
+            postCount: newCount
+          });
+        }
+        await this.plugin.saveSettings();
+      };
+      const syncButton = blogDiv.createEl("button", { text: "Sync" });
+      syncButton.style.fontSize = "0.8em";
+      syncButton.style.padding = "4px 8px";
+      syncButton.onclick = async () => {
+        try {
+          new import_obsidian2.Notice(`Syncing ${blogId}...`);
+          const posts = await this.plugin.fetchNaverBlogPosts(blogId, currentCount);
+          let successCount = 0;
+          for (const post of posts) {
+            try {
+              await this.plugin.createMarkdownFile(post);
+              successCount++;
+            } catch (error) {
+              console.error(`Failed to save post ${post.logNo}:`, error);
+            }
+          }
+          new import_obsidian2.Notice(`\u2713 Synced ${successCount} posts from ${blogId}`);
+        } catch (error) {
+          new import_obsidian2.Notice(`\u2717 Failed to sync ${blogId}: ${error.message}`);
+          console.error("Sync error:", error);
+        }
+      };
+      const removeButton = blogDiv.createEl("button", { text: "Remove" });
+      removeButton.style.fontSize = "0.8em";
+      removeButton.style.padding = "4px 8px";
+      removeButton.style.backgroundColor = "var(--interactive-accent)";
+      removeButton.style.color = "var(--text-on-accent)";
+      removeButton.onclick = async () => {
+        this.plugin.settings.subscribedBlogs.splice(index2, 1);
+        const subIndex = this.plugin.settings.blogSubscriptions.findIndex((sub) => sub.blogId === blogId);
+        if (subIndex >= 0) {
+          this.plugin.settings.blogSubscriptions.splice(subIndex, 1);
+        }
+        await this.plugin.saveSettings();
+        this.displaySubscriptions(containerEl);
+      };
+    });
+  }
+  getAllFolders() {
+    const folders = [""];
+    const abstractFiles = this.app.vault.getAllLoadedFiles();
+    for (const file of abstractFiles) {
+      if (file instanceof import_obsidian2.TFolder) {
+        folders.push(file.path);
+      }
+    }
+    return folders.sort();
+  }
+  setupFolderDropdown(inputEl, onSelect, onClear) {
+    var _a5;
+    let dropdownEl = null;
+    let isDropdownVisible = false;
+    let searchIcon = null;
+    let clearButton = null;
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = `
+			position: relative;
+			display: flex;
+			align-items: center;
+		`;
+    (_a5 = inputEl.parentNode) == null ? void 0 : _a5.insertBefore(wrapper, inputEl);
+    wrapper.appendChild(inputEl);
+    searchIcon = document.createElement("div");
+    searchIcon.innerHTML = "\u{1F50D}";
+    searchIcon.style.cssText = `
+			position: absolute;
+			left: 8px;
+			top: 50%;
+			transform: translateY(-50%);
+			color: var(--text-muted);
+			pointer-events: none;
+			z-index: 1;
+		`;
+    wrapper.appendChild(searchIcon);
+    inputEl.style.paddingLeft = "32px";
+    const updateClearButton = () => {
+      if (clearButton) {
+        clearButton.remove();
+        clearButton = null;
+      }
+      if (inputEl.value.trim() && onClear) {
+        clearButton = document.createElement("div");
+        clearButton.innerHTML = "\xD7";
+        clearButton.style.cssText = `
+					position: absolute;
+					right: 8px;
+					top: 50%;
+					transform: translateY(-50%);
+					color: var(--text-muted);
+					cursor: pointer;
+					font-size: 16px;
+					font-weight: bold;
+					z-index: 1;
+					width: 16px;
+					height: 16px;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					border-radius: 50%;
+					transition: all 0.1s;
+				`;
+        clearButton.addEventListener("mouseenter", () => {
+          if (clearButton) {
+            clearButton.style.backgroundColor = "var(--background-modifier-hover)";
+            clearButton.style.color = "var(--text-normal)";
+          }
+        });
+        clearButton.addEventListener("mouseleave", () => {
+          if (clearButton) {
+            clearButton.style.backgroundColor = "";
+            clearButton.style.color = "var(--text-muted)";
+          }
+        });
+        clearButton.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (onClear) {
+            onClear();
+          }
+          updateClearButton();
+        });
+        wrapper.appendChild(clearButton);
+        inputEl.style.paddingRight = "28px";
+      } else {
+        inputEl.style.paddingRight = "";
+      }
+    };
+    updateClearButton();
+    const showDropdown = (filter4 = "") => {
+      this.hideDropdown();
+      const folders = this.getAllFolders();
+      const filteredFolders = folders.filter(
+        (folder) => folder.toLowerCase().includes(filter4.toLowerCase())
+      );
+      if (filteredFolders.length === 0)
+        return;
+      dropdownEl = document.createElement("div");
+      dropdownEl.className = "folder-dropdown";
+      dropdownEl.style.cssText = `
+				position: absolute;
+				top: 100%;
+				left: 0;
+				width: ${inputEl.offsetWidth}px;
+				max-height: 200px;
+				overflow-y: auto;
+				background: var(--background-primary);
+				border: 1px solid var(--background-modifier-border);
+				border-radius: 6px;
+				box-shadow: var(--shadow-s);
+				z-index: 1000;
+				margin-top: 2px;
+			`;
+      filteredFolders.forEach((folder, index2) => {
+        const itemEl = document.createElement("div");
+        itemEl.className = "folder-dropdown-item";
+        itemEl.textContent = folder || "(Root)";
+        itemEl.style.cssText = `
+					padding: 8px 12px;
+					cursor: pointer;
+					border-bottom: 1px solid var(--background-modifier-border);
+					transition: background-color 0.1s;
+					white-space: nowrap;
+					overflow: hidden;
+					text-overflow: ellipsis;
+				`;
+        if (index2 === filteredFolders.length - 1) {
+          itemEl.style.borderBottom = "none";
+        }
+        itemEl.addEventListener("mouseenter", () => {
+          itemEl.style.backgroundColor = "var(--background-modifier-hover)";
+        });
+        itemEl.addEventListener("mouseleave", () => {
+          itemEl.style.backgroundColor = "";
+        });
+        itemEl.addEventListener("click", () => {
+          onSelect(folder);
+          this.hideDropdown();
+          updateClearButton();
+        });
+        dropdownEl.appendChild(itemEl);
+      });
+      wrapper.style.position = "relative";
+      wrapper.appendChild(dropdownEl);
+      isDropdownVisible = true;
+    };
+    const hideDropdown = () => {
+      if (dropdownEl && dropdownEl.parentNode) {
+        dropdownEl.parentNode.removeChild(dropdownEl);
+        dropdownEl = null;
+        isDropdownVisible = false;
+      }
+    };
+    this.hideDropdown = hideDropdown;
+    inputEl.addEventListener("focus", () => {
+      showDropdown(inputEl.value);
+    });
+    inputEl.addEventListener("click", () => {
+      if (!isDropdownVisible) {
+        showDropdown(inputEl.value);
+      }
+    });
+    inputEl.addEventListener("input", () => {
+      if (isDropdownVisible) {
+        showDropdown(inputEl.value);
+      }
+      updateClearButton();
+    });
+    inputEl.addEventListener("blur", () => {
+      setTimeout(() => {
+        hideDropdown();
+      }, 150);
+    });
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        hideDropdown();
+      }
+    });
+  }
+  createImportSummary(successCount, errorLogCount, errorCount, totalPosts) {
+    let summary = `Import complete: ${successCount} successful`;
+    if (errorLogCount > 0) {
+      summary += `, ${errorLogCount} error logs created`;
+    }
+    if (errorCount > 0) {
+      summary += `, ${errorCount} file creation errors`;
+    }
+    summary += ` (${totalPosts} total)`;
+    if (errorLogCount > 0 || errorCount > 0) {
+      summary += ` \u26A0\uFE0F`;
+    } else {
+      summary += ` \u2705`;
+    }
+    return summary;
+  }
+  hideDropdown() {
+  }
+};
+var NaverBlogSinglePostModal = class extends import_obsidian2.Modal {
+  constructor(app, plugin) {
+    super(app);
+    this.plugin = plugin;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Import Single Naver Blog Post" });
+    const inputContainer = contentEl.createDiv();
+    inputContainer.style.marginBottom = "20px";
+    const inputLabel = inputContainer.createEl("label", {
+      text: "Post URL or LogNo:",
+      cls: "setting-item-name"
+    });
+    inputLabel.style.display = "block";
+    inputLabel.style.marginBottom = "8px";
+    const input = inputContainer.createEl("input", {
+      type: "text",
+      placeholder: "https://blog.naver.com/blogid/220883239733 or https://m.blog.naver.com/PostView.naver?blogId=blogid&logNo=220883239733 or just 220883239733"
+    });
+    input.style.width = "100%";
+    input.style.padding = "8px";
+    input.style.border = "1px solid var(--background-modifier-border)";
+    input.style.borderRadius = "4px";
+    const exampleDiv = inputContainer.createDiv();
+    exampleDiv.style.marginTop = "8px";
+    exampleDiv.style.fontSize = "0.9em";
+    exampleDiv.style.color = "var(--text-muted)";
+    exampleDiv.innerHTML = `
+			<strong>Examples:</strong><br>
+			\u2022 Desktop URL: https://blog.naver.com/yonofbooks/220883239733<br>
+			\u2022 Mobile URL: https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265<br>
+			\u2022 LogNo only: 220883239733
+		`;
+    const buttonContainer = contentEl.createDiv();
+    buttonContainer.style.display = "flex";
+    buttonContainer.style.gap = "10px";
+    buttonContainer.style.justifyContent = "flex-end";
+    const cancelButton = buttonContainer.createEl("button", {
+      text: "Cancel"
+    });
+    cancelButton.addEventListener("click", () => this.close());
+    const importButton = buttonContainer.createEl("button", {
+      text: "Import Post",
+      cls: "mod-cta"
+    });
+    importButton.addEventListener("click", async () => {
+      const inputValue = input.value.trim();
+      if (!inputValue) {
+        new import_obsidian2.Notice("Please enter a post URL or LogNo");
+        return;
+      }
+      let blogId = "";
+      let logNo = "";
+      if (inputValue.includes("blog.naver.com") || inputValue.includes("m.blog.naver.com")) {
+        let urlMatch;
+        if (inputValue.includes("m.blog.naver.com")) {
+          urlMatch = inputValue.match(/[?&]blogId=([^&]+).*[?&]logNo=(\d+)/);
+        } else {
+          urlMatch = inputValue.match(/blog\.naver\.com\/([^\/]+)\/(\d+)/);
+        }
+        if (urlMatch) {
+          blogId = urlMatch[1];
+          logNo = urlMatch[2];
+        } else {
+          new import_obsidian2.Notice("Invalid Naver blog URL format");
+          return;
+        }
+      } else if (/^\d{8,15}$/.test(inputValue)) {
+        blogId = "yonofbooks";
+        logNo = inputValue;
+        new import_obsidian2.Notice(`Using default blog ID: ${blogId}`, 3e3);
+      } else {
+        new import_obsidian2.Notice("Please enter a valid URL or LogNo (8-15 digits)");
+        return;
+      }
+      this.close();
+      try {
+        new import_obsidian2.Notice(`Importing post ${logNo} from ${blogId}...`, 3e3);
+        const fetcher = new NaverBlogFetcher(blogId);
+        const post = await fetcher.fetchSinglePost(logNo);
+        console.log("Single post import result:", post);
+        await this.plugin.createMarkdownFile({
+          ...post,
+          tags: ["imported"],
+          excerpt: post.content.substring(0, 150) + "..."
+        });
+        new import_obsidian2.Notice(`\u2713 Successfully imported: "${post.title}"`, 5e3);
+      } catch (error) {
+        console.error("Single post import failed:", error);
+        new import_obsidian2.Notice(`\u2717 Failed to import post: ${error.message}`, 5e3);
+      }
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        importButton.click();
+      }
+    });
+    setTimeout(() => input.focus(), 100);
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
   }
 };
