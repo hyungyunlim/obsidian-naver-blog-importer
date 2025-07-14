@@ -15240,7 +15240,18 @@ var NaverBlogFetcher = class {
   }
   extractTextFromElement(element, $2) {
     let content = "";
-    const allComponents = $2(".se-component").toArray();
+    console.log("Looking for .se-main-container...");
+    const mainContainer = $2(".se-main-container");
+    let components;
+    if (mainContainer.length > 0) {
+      console.log("Found .se-main-container, getting components from it");
+      components = mainContainer.find(".se-component").toArray();
+    } else {
+      console.log("No .se-main-container found, falling back to all .se-component elements");
+      components = $2(".se-component").toArray();
+    }
+    console.log(`Found ${components.length} components to process`);
+    const allComponents = components;
     allComponents.forEach((el) => {
       var _a5, _b;
       const $el = $2(el);
@@ -15620,16 +15631,22 @@ var NaverBlogFetcher = class {
       const line = lines[i].trim();
       if (skipMetadata) {
         const metadataPatterns = [
+          /^\d{4}\s+투르\s+드\s+프랑스.*$/,
+          // "2025 투르 드 프랑스 스테이지 9: 유럽의 별, 팀 메를리에 더블 승리."
           /^[가-힣\s]+\s+뉴스$/,
           // "사이클링 뉴스"
-          /^\d{4}\s+[가-힣\s:]+\.$/,
-          // "2025 투르 드 프랑스 스테이지 9: ..."
-          /^[가-힣]+$/,
-          // "아다미" (단일 한글 단어)
+          /^\d{4}\s+[가-힣\s:,]+\.$/,
+          // "2025 투르 드 프랑스 스테이지 9: ..." (일반적인 긴 제목)
+          /^아다미$/,
+          // "아다미" (구체적인 이름)
+          /^글$/,
+          // "글" (단독) - 우선순위 높게
           /^・$/,
-          // "・" 구분자
+          // "・" 구분자 - 우선순위 높게
+          /^[가-힣]{1,4}$/,
+          // 1-4글자 단일 한글 단어 (아다미 같은 이름 포함)
           /^\d+시간?\s*전$/,
-          // "6시간 전"
+          // "7시간 전"
           /^URL\s*복사$/,
           // "URL 복사"
           /^이웃추가$/,
@@ -15662,10 +15679,30 @@ var NaverBlogFetcher = class {
           // "작성자 홍길동"
           /^[\d,]+\s*조회$/,
           // "1,234 조회"
-          /^태그\s*#[가-힣\s#]+$/
+          /^태그\s*#[가-힣\s#]+$/,
           // "태그 #사이클링 #뉴스"
+          /^제목$/,
+          // "제목"
+          /^내용$/,
+          // "내용"
+          /^작성일$/,
+          // "작성일"
+          /^[・·•‧⋅]$/,
+          // 다양한 형태의 점 구분자
+          /^[가-힣]\s*[・·•‧⋅]\s*[가-힣]$/,
+          // "글 ・ 제목" 형태
+          /^[가-힣]{1}\s*$/,
+          // 단일 한글 문자 + 공백
+          // 사이클링 관련 특수 패턴
+          /^.*팀\s+메를리에.*$/,
+          // "팀 메를리에 더블 승리" 등
+          /^.*스테이지\s+\d+.*$/,
+          // "스테이지 9" 등
+          /^유럽의\s*별.*$/
+          // "유럽의 별" 등
         ];
-        const isMetadata = metadataPatterns.some((pattern) => pattern.test(line));
+        const isShortKorean = /^[가-힣]{1,2}\s*$/.test(line) && line.length <= 3;
+        const isMetadata = metadataPatterns.some((pattern) => pattern.test(line)) || isShortKorean;
         const isShortLine = line.length > 0 && line.length <= 2;
         if (line.length > 0 && (isMetadata || isShortLine)) {
           console.log(`Removing metadata line: "${line}"`);
@@ -16001,19 +16038,19 @@ var NaverBlogFetcher = class {
     return null;
   }
   enhanceImageUrl(imgSrc) {
+    console.log(`Original image URL: ${imgSrc}`);
     let enhancedUrl = imgSrc;
-    if (enhancedUrl.includes("postfiles.pstatic.net")) {
-      enhancedUrl = enhancedUrl.replace(/\?type=w\d+[^&]*/i, "").replace(/&type=w\d+[^&]*/i, "").replace(/\?type=w\d+_blur[^&]*/i, "").replace(/&type=w\d+_blur[^&]*/i, "").replace(/\?w=\d+[^&]*/i, "").replace(/&w=\d+[^&]*/i, "").replace(/\?h=\d+[^&]*/i, "").replace(/&h=\d+[^&]*/i, "").replace(/\?resize=\d+[^&]*/i, "").replace(/&resize=\d+[^&]*/i, "");
-      enhancedUrl = enhancedUrl.replace(/\?&/, "?").replace(/&&/, "&").replace(/\?$/, "").replace(/&$/, "");
-      console.log(`Attempting to get original image: ${imgSrc} -> ${enhancedUrl}`);
-    } else if (enhancedUrl.includes("pstatic.net")) {
-      enhancedUrl = enhancedUrl.replace(/\/w\d+\//g, "/").replace(/\/h\d+\//g, "/").replace(/\/thumb\d+\//g, "/").replace(/\/small\//g, "/").replace(/\/medium\//g, "/").replace(/\?w=\d+/i, "").replace(/&w=\d+/i, "").replace(/\?h=\d+/i, "").replace(/&h=\d+/i, "").replace(/\?quality=\d+/i, "").replace(/&quality=\d+/i, "");
-      enhancedUrl = enhancedUrl.replace(/\/+/g, "/").replace("://", "://");
-      console.log(`Cleaned Naver CDN URL: ${imgSrc} -> ${enhancedUrl}`);
-    }
+    enhancedUrl = enhancedUrl.split("?")[0];
+    enhancedUrl = enhancedUrl.replace("postfiles", "blogfiles");
+    enhancedUrl = enhancedUrl.replace(
+      "https://mblogvideo-phinf.pstatic.net/",
+      "https://blogfiles.pstatic.net/"
+    );
+    enhancedUrl = enhancedUrl.replace("https://mblogthumb-phinf.pstatic.net/", "https://blogfiles.pstatic.net/").replace("https://postfiles.pstatic.net/", "https://blogfiles.pstatic.net/").replace("https://blogpfthumb-phinf.pstatic.net/", "https://blogfiles.pstatic.net/");
     if (enhancedUrl !== imgSrc) {
-      console.log(`Enhanced to get original image: ${imgSrc} -> ${enhancedUrl}`);
+      console.log(`Enhanced to original image URL: ${imgSrc} -> ${enhancedUrl}`);
     }
+    console.log(`Enhanced image URL: ${enhancedUrl}`);
     return enhancedUrl;
   }
   delay(ms) {
@@ -16022,8 +16059,286 @@ var NaverBlogFetcher = class {
 };
 
 // main.ts
+var I18n = class {
+  constructor(app) {
+    this.app = app;
+    this.translations = this.getDefaultTranslations();
+  }
+  async loadTranslations(locale) {
+    console.log(`Loading translations for locale: ${locale}`);
+    try {
+      const pluginDir = this.app.vault.adapter.basePath;
+      const manifestPath = `${pluginDir}/.obsidian/plugins/obsidian-naver-blog-plugin/lang/${locale}.json`;
+      const translationFile = this.app.vault.adapter.read(manifestPath);
+      if (translationFile) {
+        const translationData = await translationFile;
+        this.translations = JSON.parse(translationData);
+        console.log(`Successfully loaded translations from file: ${locale}`);
+        return;
+      }
+    } catch (error) {
+      console.log(`Failed to load translations file for ${locale}:`, error);
+    }
+    if (locale === "ko" || locale.startsWith("ko")) {
+      this.translations = this.getKoreanTranslations();
+      console.log(`Loaded built-in Korean translations`);
+    } else {
+      this.translations = this.getDefaultTranslations();
+      console.log(`Loaded built-in English translations`);
+    }
+  }
+  t(key, variables) {
+    const keys = key.split(".");
+    let value = this.translations;
+    for (const k of keys) {
+      value = value == null ? void 0 : value[k];
+    }
+    if (typeof value !== "string") {
+      return key;
+    }
+    if (variables) {
+      return value.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
+        return variables[varName] || match;
+      });
+    }
+    return value;
+  }
+  getDefaultTranslations() {
+    return {
+      commands: {
+        "import-single-post": "Import Single Post by URL",
+        "import-blog-url": "Import All Posts from Blog",
+        "sync-subscribed-blogs": "Sync Subscribed Blogs",
+        "ai-fix-layout": "AI Fix Layout and Format (Preserve Content 100%)"
+      },
+      settings: {
+        title: "Naver Blog Importer Settings",
+        ai_configuration: "AI Configuration",
+        ai_provider: "AI Provider",
+        ai_provider_desc: "Choose your AI service provider",
+        ai_model: "AI Model",
+        ai_model_desc: "Select the model to use for AI features",
+        openai_api_key: "OpenAI API Key",
+        openai_api_key_desc: "Enter your OpenAI API key",
+        anthropic_api_key: "Anthropic API Key",
+        anthropic_api_key_desc: "Enter your Anthropic API key",
+        google_api_key: "Google API Key",
+        google_api_key_desc: "Enter your Google Gemini API key",
+        ollama_endpoint: "Ollama Endpoint",
+        ollama_endpoint_desc: "Ollama server endpoint (default: http://localhost:11434)",
+        default_folder: "Default Folder",
+        default_folder_desc: "Folder where imported posts will be saved",
+        image_folder: "Image Folder",
+        image_folder_desc: "Folder where images will be saved",
+        enable_ai_tags: "Enable AI Tags",
+        enable_ai_tags_desc: "Generate tags using AI (requires API key for selected provider)",
+        enable_ai_excerpt: "Enable AI Excerpt",
+        enable_ai_excerpt_desc: "Generate excerpts using AI (requires API key for selected provider)",
+        enable_duplicate_check: "Enable Duplicate Check",
+        enable_duplicate_check_desc: "Skip importing posts that already exist (based on logNo)",
+        enable_image_download: "Enable Image Download",
+        enable_image_download_desc: "Download images locally and update links",
+        subscribed_blogs: "Subscribed Blogs",
+        add_blog_id: "Add Blog ID",
+        add_blog_id_desc: "Enter a new blog ID and click the add button",
+        add_button: "Add",
+        remove_button: "Remove",
+        sync_button: "Sync",
+        no_subscribed_blogs: "No subscribed blogs",
+        posts_label: "Posts"
+      },
+      notices: {
+        api_key_required: "{{provider}} API Key required for AI formatting",
+        set_api_key: "Please set your API key in plugin settings",
+        no_active_file: "No active file selected for formatting",
+        ai_formatting_progress: "AI layout fixing in progress...",
+        content_too_short: "Content too short for AI formatting (minimum 50 characters)",
+        ai_formatting_failed: "AI formatting failed. Please try again",
+        ai_formatting_success: "Layout and formatting fixed by AI!",
+        invalid_api_key: "Invalid API key",
+        api_quota_exceeded: "API quota exceeded",
+        network_error: "Network error - please check your connection",
+        syncing_blog: "Syncing blog {{progress}}: {{blogId}} ({{postCount}} posts)",
+        sync_completed: "Sync completed: {{successCount}}/{{totalCount}} posts",
+        subscribed_to: "Subscribed to {{blogId}}",
+        unsubscribed_from: "Unsubscribed from {{blogId}}",
+        blog_already_subscribed: "Blog already subscribed: {{blogId}}",
+        file_already_exists: "File already exists: {{filename}}",
+        processing_post: "Processing post: {{title}}",
+        post_imported: "Post imported: {{title}}",
+        import_failed: "Import failed: {{error}}",
+        downloading_images: "Downloading images...",
+        image_download_complete: "Image download complete: {{count}} images",
+        generating_ai_tags: "Generating AI tags...",
+        generating_ai_excerpt: "Generating AI excerpt..."
+      },
+      modals: {
+        import_single_post: {
+          title: "Import Single Post by URL",
+          blog_id_label: "Blog ID",
+          blog_id_placeholder: "e.g., myblog",
+          log_no_label: "Post URL or LogNo",
+          log_no_placeholder: "URL or LogNo (e.g., https://blog.naver.com/yonofbooks/220883239733)",
+          import_button: "Import Post",
+          cancel_button: "Cancel"
+        },
+        import_blog_url: {
+          title: "Import All Posts from Blog",
+          url_label: "Blog ID",
+          url_placeholder: "e.g., yonofbooks",
+          import_button: "Import All Posts",
+          cancel_button: "Cancel"
+        },
+        subscribe_blog: {
+          title: "Subscribe to Naver Blog",
+          blog_id_label: "Blog ID",
+          blog_id_desc: "Enter the Naver Blog ID to subscribe to",
+          blog_id_placeholder: "Blog ID",
+          subscribe_button: "Subscribe"
+        }
+      },
+      errors: {
+        invalid_url: "Invalid URL format",
+        invalid_blog_id: "Invalid blog ID",
+        invalid_log_no: "Invalid post number",
+        fetch_failed: "Failed to fetch post: {{error}}",
+        parse_failed: "Failed to parse post: {{error}}",
+        save_failed: "Failed to save file: {{error}}",
+        ai_error: "AI processing error: {{error}}",
+        network_timeout: "Network timeout",
+        unauthorized: "Unauthorized request - please check your API key",
+        rate_limit: "Rate limit exceeded - please try again later"
+      },
+      providers: {
+        openai: "OpenAI (GPT)",
+        anthropic: "Anthropic (Claude)",
+        google: "Google (Gemini)",
+        ollama: "Ollama (Local)"
+      }
+    };
+  }
+  getKoreanTranslations() {
+    return {
+      commands: {
+        "import-single-post": "URL\uB85C \uB2E8\uC77C \uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30",
+        "import-blog-url": "\uBE14\uB85C\uADF8 \uC804\uCCB4 \uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30",
+        "sync-subscribed-blogs": "\uAD6C\uB3C5 \uBE14\uB85C\uADF8 \uB3D9\uAE30\uD654",
+        "ai-fix-layout": "AI \uB808\uC774\uC544\uC6C3 \uC218\uC815 \uBC0F \uD3EC\uB9F7 (\uB0B4\uC6A9 100% \uBCF4\uC874)"
+      },
+      settings: {
+        title: "\uB124\uC774\uBC84 \uBE14\uB85C\uADF8 \uAC00\uC838\uC624\uAE30 \uC124\uC815",
+        ai_configuration: "AI \uC124\uC815",
+        ai_provider: "AI \uC81C\uACF5\uC5C5\uCCB4",
+        ai_provider_desc: "AI \uC11C\uBE44\uC2A4 \uC81C\uACF5\uC5C5\uCCB4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+        ai_model: "AI \uBAA8\uB378",
+        ai_model_desc: "AI \uAE30\uB2A5\uC5D0 \uC0AC\uC6A9\uD560 \uBAA8\uB378\uC744 \uC120\uD0DD\uD558\uC138\uC694",
+        openai_api_key: "OpenAI API \uD0A4",
+        openai_api_key_desc: "OpenAI API \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694",
+        anthropic_api_key: "Anthropic API \uD0A4",
+        anthropic_api_key_desc: "Anthropic API \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694",
+        google_api_key: "Google API \uD0A4",
+        google_api_key_desc: "Google Gemini API \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694",
+        ollama_endpoint: "Ollama \uC5D4\uB4DC\uD3EC\uC778\uD2B8",
+        ollama_endpoint_desc: "Ollama \uC11C\uBC84 \uC5D4\uB4DC\uD3EC\uC778\uD2B8 (\uAE30\uBCF8\uAC12: http://localhost:11434)",
+        default_folder: "\uAE30\uBCF8 \uD3F4\uB354",
+        default_folder_desc: "\uAC00\uC838\uC628 \uD3EC\uC2A4\uD2B8\uAC00 \uC800\uC7A5\uB420 \uD3F4\uB354",
+        image_folder: "\uC774\uBBF8\uC9C0 \uD3F4\uB354",
+        image_folder_desc: "\uC774\uBBF8\uC9C0\uAC00 \uC800\uC7A5\uB420 \uD3F4\uB354",
+        enable_ai_tags: "AI \uD0DC\uADF8 \uC0DD\uC131 \uD65C\uC131\uD654",
+        enable_ai_tags_desc: "AI\uB97C \uC0AC\uC6A9\uD558\uC5EC \uD0DC\uADF8\uB97C \uC0DD\uC131\uD569\uB2C8\uB2E4 (\uC120\uD0DD\uD55C \uC81C\uACF5\uC5C5\uCCB4\uC758 API \uD0A4 \uD544\uC694)",
+        enable_ai_excerpt: "AI \uC694\uC57D \uC0DD\uC131 \uD65C\uC131\uD654",
+        enable_ai_excerpt_desc: "AI\uB97C \uC0AC\uC6A9\uD558\uC5EC \uC694\uC57D\uC744 \uC0DD\uC131\uD569\uB2C8\uB2E4 (\uC120\uD0DD\uD55C \uC81C\uACF5\uC5C5\uCCB4\uC758 API \uD0A4 \uD544\uC694)",
+        enable_duplicate_check: "\uC911\uBCF5 \uD655\uC778 \uD65C\uC131\uD654",
+        enable_duplicate_check_desc: "\uC774\uBBF8 \uC874\uC7AC\uD558\uB294 \uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30 \uAC74\uB108\uB6F0\uAE30 (logNo \uAE30\uC900)",
+        enable_image_download: "\uC774\uBBF8\uC9C0 \uB2E4\uC6B4\uB85C\uB4DC \uD65C\uC131\uD654",
+        enable_image_download_desc: "\uC774\uBBF8\uC9C0\uB97C \uB85C\uCEEC\uC5D0 \uB2E4\uC6B4\uB85C\uB4DC\uD558\uACE0 \uB9C1\uD06C\uB97C \uC5C5\uB370\uC774\uD2B8\uD569\uB2C8\uB2E4",
+        subscribed_blogs: "\uAD6C\uB3C5 \uBE14\uB85C\uADF8",
+        add_blog_id: "\uBE14\uB85C\uADF8 ID \uCD94\uAC00",
+        add_blog_id_desc: "\uC0C8 \uBE14\uB85C\uADF8 ID\uB97C \uC785\uB825\uD558\uACE0 \uCD94\uAC00 \uBC84\uD2BC\uC744 \uD074\uB9AD\uD558\uC138\uC694",
+        add_button: "\uCD94\uAC00",
+        remove_button: "\uC81C\uAC70",
+        sync_button: "\uB3D9\uAE30\uD654",
+        no_subscribed_blogs: "\uAD6C\uB3C5\uD55C \uBE14\uB85C\uADF8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4",
+        posts_label: "\uD3EC\uC2A4\uD2B8"
+      },
+      notices: {
+        api_key_required: "{{provider}} API \uD0A4\uAC00 AI \uD3EC\uB9F7\uD305\uC5D0 \uD544\uC694\uD569\uB2C8\uB2E4",
+        set_api_key: "\uD50C\uB7EC\uADF8\uC778 \uC124\uC815\uC5D0\uC11C API \uD0A4\uB97C \uC124\uC815\uD574\uC8FC\uC138\uC694",
+        no_active_file: "\uD3EC\uB9F7\uD305\uD560 \uD65C\uC131 \uD30C\uC77C\uC774 \uC120\uD0DD\uB418\uC9C0 \uC54A\uC558\uC2B5\uB2C8\uB2E4",
+        ai_formatting_progress: "AI \uB808\uC774\uC544\uC6C3 \uC218\uC815 \uC9C4\uD589 \uC911...",
+        content_too_short: "AI \uD3EC\uB9F7\uD305\uC744 \uC704\uD55C \uB0B4\uC6A9\uC774 \uB108\uBB34 \uC9E7\uC2B5\uB2C8\uB2E4 (\uCD5C\uC18C 50\uC790)",
+        ai_formatting_failed: "AI \uD3EC\uB9F7\uD305\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694",
+        ai_formatting_success: "AI\uAC00 \uB808\uC774\uC544\uC6C3\uACFC \uD3EC\uB9F7\uC744 \uC218\uC815\uD588\uC2B5\uB2C8\uB2E4!",
+        invalid_api_key: "\uC798\uBABB\uB41C API \uD0A4\uC785\uB2C8\uB2E4",
+        api_quota_exceeded: "API \uD560\uB2F9\uB7C9\uC774 \uCD08\uACFC\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
+        network_error: "\uB124\uD2B8\uC6CC\uD06C \uC624\uB958 - \uC778\uD130\uB137 \uC5F0\uACB0\uC744 \uD655\uC778\uD574\uC8FC\uC138\uC694",
+        syncing_blog: "\uBE14\uB85C\uADF8 \uB3D9\uAE30\uD654 \uC911 {{progress}}: {{blogId}} ({{postCount}}\uAC1C \uD3EC\uC2A4\uD2B8)",
+        sync_completed: "\uB3D9\uAE30\uD654 \uC644\uB8CC: {{successCount}}/{{totalCount}} \uD3EC\uC2A4\uD2B8",
+        subscribed_to: "{{blogId}}\uB97C \uAD6C\uB3C5\uD588\uC2B5\uB2C8\uB2E4",
+        unsubscribed_from: "{{blogId}} \uAD6C\uB3C5\uC744 \uD574\uC81C\uD588\uC2B5\uB2C8\uB2E4",
+        blog_already_subscribed: "\uC774\uBBF8 \uAD6C\uB3C5 \uC911\uC778 \uBE14\uB85C\uADF8\uC785\uB2C8\uB2E4: {{blogId}}",
+        file_already_exists: "\uD30C\uC77C\uC774 \uC774\uBBF8 \uC874\uC7AC\uD569\uB2C8\uB2E4: {{filename}}",
+        processing_post: "\uD3EC\uC2A4\uD2B8 \uCC98\uB9AC \uC911: {{title}}",
+        post_imported: "\uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30 \uC644\uB8CC: {{title}}",
+        import_failed: "\uAC00\uC838\uC624\uAE30 \uC2E4\uD328: {{error}}",
+        downloading_images: "\uC774\uBBF8\uC9C0 \uB2E4\uC6B4\uB85C\uB4DC \uC911...",
+        image_download_complete: "\uC774\uBBF8\uC9C0 \uB2E4\uC6B4\uB85C\uB4DC \uC644\uB8CC: {{count}}\uAC1C",
+        generating_ai_tags: "AI \uD0DC\uADF8 \uC0DD\uC131 \uC911...",
+        generating_ai_excerpt: "AI \uC694\uC57D \uC0DD\uC131 \uC911..."
+      },
+      modals: {
+        import_single_post: {
+          title: "URL\uB85C \uB2E8\uC77C \uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30",
+          blog_id_label: "\uBE14\uB85C\uADF8 ID",
+          blog_id_placeholder: "\uC608: myblog",
+          log_no_label: "\uD3EC\uC2A4\uD2B8 URL \uB610\uB294 LogNo",
+          log_no_placeholder: "URL \uB610\uB294 LogNo (\uC608: https://blog.naver.com/yonofbooks/220883239733)",
+          import_button: "\uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30",
+          cancel_button: "\uCDE8\uC18C"
+        },
+        import_blog_url: {
+          title: "\uBE14\uB85C\uADF8 \uC804\uCCB4 \uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30",
+          url_label: "\uBE14\uB85C\uADF8 ID",
+          url_placeholder: "\uC608: yonofbooks",
+          import_button: "\uC804\uCCB4 \uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30",
+          cancel_button: "\uCDE8\uC18C"
+        },
+        subscribe_blog: {
+          title: "\uB124\uC774\uBC84 \uBE14\uB85C\uADF8 \uAD6C\uB3C5\uD558\uAE30",
+          blog_id_label: "\uBE14\uB85C\uADF8 ID",
+          blog_id_desc: "\uAD6C\uB3C5\uD560 \uB124\uC774\uBC84 \uBE14\uB85C\uADF8 ID\uB97C \uC785\uB825\uD558\uC138\uC694",
+          blog_id_placeholder: "\uBE14\uB85C\uADF8 ID",
+          subscribe_button: "\uAD6C\uB3C5\uD558\uAE30"
+        }
+      },
+      errors: {
+        invalid_url: "\uC798\uBABB\uB41C URL \uD615\uC2DD\uC785\uB2C8\uB2E4",
+        invalid_blog_id: "\uC798\uBABB\uB41C \uBE14\uB85C\uADF8 ID\uC785\uB2C8\uB2E4",
+        invalid_log_no: "\uC798\uBABB\uB41C \uD3EC\uC2A4\uD2B8 \uBC88\uD638\uC785\uB2C8\uB2E4",
+        fetch_failed: "\uD3EC\uC2A4\uD2B8 \uAC00\uC838\uC624\uAE30\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4: {{error}}",
+        parse_failed: "\uD3EC\uC2A4\uD2B8 \uD30C\uC2F1\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4: {{error}}",
+        save_failed: "\uD30C\uC77C \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4: {{error}}",
+        ai_error: "AI \uCC98\uB9AC \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4: {{error}}",
+        network_timeout: "\uB124\uD2B8\uC6CC\uD06C \uC2DC\uAC04 \uCD08\uACFC",
+        unauthorized: "\uC778\uC99D\uB418\uC9C0 \uC54A\uC740 \uC694\uCCAD - API \uD0A4\uB97C \uD655\uC778\uD574\uC8FC\uC138\uC694",
+        rate_limit: "\uC694\uCCAD \uD55C\uB3C4 \uCD08\uACFC - \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574\uC8FC\uC138\uC694"
+      },
+      providers: {
+        openai: "OpenAI (GPT)",
+        anthropic: "Anthropic (Claude)",
+        google: "Google (Gemini)",
+        ollama: "Ollama (\uB85C\uCEEC)"
+      }
+    };
+  }
+};
 var DEFAULT_SETTINGS = {
+  aiProvider: "openai",
   openaiApiKey: "",
+  anthropicApiKey: "",
+  googleApiKey: "",
+  ollamaEndpoint: "http://localhost:11434",
+  aiModel: "gpt-4o-mini",
   defaultFolder: "Naver Blog Posts",
   imageFolder: "Naver Blog Posts/attachments",
   enableAiTags: true,
@@ -16035,44 +16350,59 @@ var DEFAULT_SETTINGS = {
   blogSubscriptions: []
 };
 var NaverBlogPlugin = class extends import_obsidian2.Plugin {
+  constructor() {
+    super(...arguments);
+    // Cached API models
+    this.openai_models = [];
+    this.anthropic_models = [];
+    this.google_models = [];
+  }
   async onload() {
     await this.loadSettings();
+    this.i18n = new I18n(this.app);
+    const locale = this.detectLocale();
+    await this.i18n.loadTranslations(locale);
+    this.setupLanguageChangeListener();
+    this.refreshModels().catch((error) => {
+      console.log("Failed to refresh models on startup:", error);
+    });
     this.addRibbonIcon("download", "Import Naver Blog", (evt) => {
       new NaverBlogImportModal(this.app, this).open();
     });
     this.addCommand({
       id: "import-naver-blog",
-      name: "Import from Naver Blog",
+      name: this.i18n.t("commands.import-blog-url"),
       callback: () => {
         new NaverBlogImportModal(this.app, this).open();
       }
     });
     this.addCommand({
       id: "subscribe-naver-blog",
-      name: "Subscribe to Naver Blog",
+      name: this.i18n.t("commands.sync-subscribed-blogs"),
       callback: () => {
         new NaverBlogSubscribeModal(this.app, this).open();
       }
     });
     this.addCommand({
       id: "import-single-post",
-      name: "Import Single Naver Blog Post",
+      name: this.i18n.t("commands.import-single-post"),
       callback: () => {
         new NaverBlogSinglePostModal(this.app, this).open();
       }
     });
     this.addCommand({
       id: "rewrite-current-note",
-      name: "AI Fix Layout and Format (Preserve Content 100%)",
+      name: this.i18n.t("commands.ai-fix-layout"),
       callback: async () => {
-        if (!this.settings.openaiApiKey || this.settings.openaiApiKey.trim() === "") {
-          new import_obsidian2.Notice("\u274C OpenAI API Key required for AI formatting", 8e3);
-          new import_obsidian2.Notice("\u{1F4A1} Please set your API key in plugin settings", 5e3);
+        const apiKey = this.getApiKey();
+        if (!apiKey || apiKey.trim() === "") {
+          new import_obsidian2.Notice(this.i18n.t("notices.api_key_required", { provider: this.settings.aiProvider.toUpperCase() }), 8e3);
+          new import_obsidian2.Notice(this.i18n.t("notices.set_api_key"), 5e3);
           return;
         }
         const activeFile = this.app.workspace.getActiveFile();
         if (!activeFile) {
-          new import_obsidian2.Notice("No active file selected for formatting");
+          new import_obsidian2.Notice(this.i18n.t("notices.no_active_file"));
           return;
         }
         if (!activeFile.path.endsWith(".md")) {
@@ -16093,6 +16423,12 @@ var NaverBlogPlugin = class extends import_obsidian2.Plugin {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
   }
   async saveSettings() {
+    if (!this.settings.defaultFolder || this.settings.defaultFolder.trim() === "") {
+      this.settings.defaultFolder = DEFAULT_SETTINGS.defaultFolder;
+    }
+    if (!this.settings.imageFolder || this.settings.imageFolder.trim() === "") {
+      this.settings.imageFolder = DEFAULT_SETTINGS.imageFolder;
+    }
     await this.saveData(this.settings);
   }
   async fetchNaverBlogPosts(blogId, maxPosts) {
@@ -16131,105 +16467,488 @@ var NaverBlogPlugin = class extends import_obsidian2.Plugin {
       return [];
     }
   }
-  async generateAITags(title, content) {
-    if (!this.settings.enableAiTags || !this.settings.openaiApiKey) {
+  async callAI(messages, maxTokens = 150) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      throw new Error("No API key configured for selected AI provider");
+    }
+    const model = this.getModelName();
+    switch (this.settings.aiProvider) {
+      case "openai":
+        return await this.callOpenAI(messages, maxTokens, model, apiKey);
+      case "anthropic":
+        return await this.callAnthropic(messages, maxTokens, model, apiKey);
+      case "google":
+        return await this.callGoogle(messages, maxTokens, model, apiKey);
+      case "ollama":
+        return await this.callOllama(messages, maxTokens, model);
+      default:
+        throw new Error(`Unsupported AI provider: ${this.settings.aiProvider}`);
+    }
+  }
+  getApiKey() {
+    switch (this.settings.aiProvider) {
+      case "openai":
+        return this.settings.openaiApiKey;
+      case "anthropic":
+        return this.settings.anthropicApiKey;
+      case "google":
+        return this.settings.googleApiKey;
+      case "ollama":
+        return "";
+      default:
+        return "";
+    }
+  }
+  getModelName() {
+    if (this.settings.aiModel) {
+      return this.settings.aiModel;
+    }
+    return this.getDefaultModelForProvider(this.settings.aiProvider);
+  }
+  getDefaultModelForProvider(provider) {
+    switch (provider) {
+      case "openai":
+        return "gpt-4o-mini";
+      case "anthropic":
+        return "claude-3-haiku-20240307";
+      case "google":
+        return "gemini-2.5-flash";
+      case "ollama":
+        return "llama3.2:3b";
+      default:
+        return "gpt-4o-mini";
+    }
+  }
+  getAvailableModels() {
+    const cacheKey = `${this.settings.aiProvider}_models`;
+    const cachedModels = this[cacheKey];
+    if (cachedModels && cachedModels.length > 0) {
+      return cachedModels;
+    }
+    return this.getStaticModels();
+  }
+  getStaticModels() {
+    switch (this.settings.aiProvider) {
+      case "openai":
+        return [
+          "gpt-4o",
+          "gpt-4o-mini",
+          "gpt-4-turbo",
+          "gpt-4",
+          "gpt-3.5-turbo",
+          "gpt-3.5-turbo-16k",
+          "o1-preview",
+          "o1-mini"
+        ];
+      case "anthropic":
+        return [
+          "claude-3-5-sonnet-20241022",
+          "claude-3-5-haiku-20241022",
+          "claude-3-opus-20240229",
+          "claude-3-sonnet-20240229",
+          "claude-3-haiku-20240307"
+        ];
+      case "google":
+        return [
+          "gemini-2.5-pro",
+          "gemini-2.5-flash",
+          "gemini-2.5-flash-lite-preview-06-17",
+          "gemini-2.0-flash",
+          "gemini-2.0-flash-lite",
+          "gemini-1.5-pro",
+          "gemini-1.5-pro-002",
+          "gemini-1.5-flash",
+          "gemini-1.5-flash-002",
+          "gemini-1.5-flash-8b",
+          "gemini-1.0-pro",
+          "gemini-1.0-pro-001",
+          "gemini-pro"
+        ];
+      case "ollama":
+        return [
+          "llama3.2:3b",
+          "llama3.2:1b",
+          "llama3.1:8b",
+          "mistral:7b",
+          "codellama:7b",
+          "phi3:mini",
+          "qwen2:7b"
+        ];
+      default:
+        return ["gpt-4o-mini"];
+    }
+  }
+  async fetchModelsFromAPI(provider) {
+    try {
+      switch (provider) {
+        case "openai":
+          return await this.fetchOpenAIModels();
+        case "anthropic":
+          return await this.fetchAnthropicModels();
+        case "google":
+          return await this.fetchGoogleModels();
+        default:
+          return [];
+      }
+    } catch (error) {
+      console.error(`Failed to fetch models from ${provider}:`, error);
+      return [];
+    }
+  }
+  async fetchOpenAIModels() {
+    const apiKey = this.settings.openaiApiKey;
+    if (!apiKey) {
       return [];
     }
     try {
       const response = await (0, import_obsidian2.requestUrl)({
-        url: "https://api.openai.com/v1/chat/completions",
-        method: "POST",
+        url: "https://api.openai.com/v1/models",
+        method: "GET",
         headers: {
-          "Authorization": `Bearer ${this.settings.openaiApiKey}`,
+          "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: "\uB2F9\uC2E0\uC740 \uBE14\uB85C\uADF8 \uD0DC\uADF8 \uC0DD\uC131 \uC804\uBB38\uAC00\uC785\uB2C8\uB2E4. \uD55C\uAD6D\uC5B4 \uBE14\uB85C\uADF8 \uAE00\uC744 \uBD84\uC11D\uD558\uC5EC \uC801\uC808\uD55C \uD0DC\uADF8\uB97C \uCD94\uCC9C\uD569\uB2C8\uB2E4."
+        }
+      });
+      if (response.status === 200) {
+        const models = response.json.data.map((model) => model.id).filter(
+          (id) => id.startsWith("gpt-") || id.startsWith("o1-") || id.startsWith("text-davinci") || id.startsWith("text-curie") || id.startsWith("text-babbage") || id.startsWith("text-ada")
+        ).sort();
+        console.log(`Fetched ${models.length} OpenAI models`);
+        return models;
+      }
+    } catch (error) {
+      console.error("OpenAI models fetch error:", error);
+    }
+    return [];
+  }
+  async fetchAnthropicModels() {
+    const apiKey = this.settings.anthropicApiKey;
+    if (!apiKey) {
+      return [];
+    }
+    try {
+      const response = await (0, import_obsidian2.requestUrl)({
+        url: "https://api.anthropic.com/v1/models",
+        method: "GET",
+        headers: {
+          "x-api-key": apiKey,
+          "Content-Type": "application/json",
+          "anthropic-version": "2023-06-01"
+        }
+      });
+      if (response.status === 200) {
+        const models = response.json.data.map((model) => model.id).filter((id) => id.startsWith("claude-")).sort();
+        console.log(`Fetched ${models.length} Anthropic models`);
+        return models;
+      }
+    } catch (error) {
+      console.error("Anthropic models fetch error:", error);
+    }
+    return [];
+  }
+  async fetchGoogleModels() {
+    const apiKey = this.settings.googleApiKey;
+    if (!apiKey) {
+      return [];
+    }
+    try {
+      const response = await (0, import_obsidian2.requestUrl)({
+        url: `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      });
+      if (response.status === 200) {
+        const models = response.json.models.filter((model) => {
+          const supportedMethods = model.supportedGenerationMethods || [];
+          const hasGenerateContent = supportedMethods.includes("generateContent");
+          const modelName = model.name.toLowerCase();
+          const isGeminiModel = modelName.includes("gemini");
+          const isTextModel = !modelName.includes("embedding") && !modelName.includes("vision") && !modelName.includes("code") && !modelName.includes("image");
+          console.log(`Google model: ${model.name}, supports generateContent: ${hasGenerateContent}, is gemini: ${isGeminiModel}, is text: ${isTextModel}`);
+          return hasGenerateContent && isGeminiModel && isTextModel;
+        }).map((model) => {
+          const cleanName = model.name.replace("models/", "");
+          return cleanName;
+        }).sort();
+        console.log(`Fetched ${models.length} Google models:`, models);
+        return models;
+      }
+    } catch (error) {
+      console.error("Google models fetch error:", error);
+    }
+    return [];
+  }
+  async refreshModels(provider) {
+    const providersToRefresh = provider ? [provider] : ["openai", "anthropic", "google"];
+    for (const p of providersToRefresh) {
+      const models = await this.fetchModelsFromAPI(p);
+      if (models.length > 0) {
+        const cacheKey = `${p}_models`;
+        this[cacheKey] = models;
+      }
+    }
+  }
+  detectLocale() {
+    var _a5;
+    const obsidianLang = window.localStorage.getItem("language");
+    if (obsidianLang) {
+      console.log("Detected Obsidian language:", obsidianLang);
+      return obsidianLang;
+    }
+    try {
+      const momentLang = (_a5 = window.moment) == null ? void 0 : _a5.locale();
+      if (momentLang) {
+        console.log("Detected moment language:", momentLang);
+        return momentLang;
+      }
+    } catch (e) {
+    }
+    if (navigator.language.startsWith("ko") || navigator.languages.some((lang) => lang.startsWith("ko")) || Intl.DateTimeFormat().resolvedOptions().locale.startsWith("ko")) {
+      console.log("Detected system language: ko");
+      return "ko";
+    }
+    console.log("Defaulting to language: en");
+    return "en";
+  }
+  setupLanguageChangeListener() {
+    const handleStorageChange = async (event) => {
+      var _a5, _b;
+      if (event.key === "language" && event.newValue !== event.oldValue) {
+        console.log("Obsidian language changed to:", event.newValue);
+        const newLocale = event.newValue || "en";
+        await this.i18n.loadTranslations(newLocale);
+        const settingsTab = (_a5 = this.app.setting) == null ? void 0 : _a5.activeTab;
+        if (settingsTab && settingsTab.id === "naver-blog-importer") {
+          (_b = settingsTab.display) == null ? void 0 : _b.call(settingsTab);
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    this.register(() => {
+      window.removeEventListener("storage", handleStorageChange);
+    });
+  }
+  async callOpenAI(messages, maxTokens, model, apiKey) {
+    const response = await (0, import_obsidian2.requestUrl)({
+      url: "https://api.openai.com/v1/chat/completions",
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0.3
+      })
+    });
+    if (response.status === 200) {
+      return response.json.choices[0].message.content.trim();
+    } else {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+  }
+  async callAnthropic(messages, maxTokens, model, apiKey) {
+    var _a5;
+    const systemMessage = ((_a5 = messages.find((m) => m.role === "system")) == null ? void 0 : _a5.content) || "";
+    const userMessages = messages.filter((m) => m.role !== "system");
+    const response = await (0, import_obsidian2.requestUrl)({
+      url: "https://api.anthropic.com/v1/messages",
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system: systemMessage,
+        messages: userMessages
+      })
+    });
+    if (response.status === 200) {
+      return response.json.content[0].text.trim();
+    } else {
+      throw new Error(`Anthropic API error: ${response.status}`);
+    }
+  }
+  async callGoogle(messages, maxTokens, model, apiKey) {
+    const contents2 = messages.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }]
+    }));
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await (0, import_obsidian2.requestUrl)({
+          url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: contents2,
+            generationConfig: {
+              maxOutputTokens: maxTokens,
+              temperature: 0.3
             },
-            {
-              role: "user",
-              content: `\uB2E4\uC74C \uBE14\uB85C\uADF8 \uAE00\uC758 \uC81C\uBAA9\uACFC \uB0B4\uC6A9\uC744 \uBD84\uC11D\uD558\uC5EC \uC801\uC808\uD55C \uD0DC\uADF8\uB97C \uC0DD\uC131\uD574\uC8FC\uC138\uC694.
+            systemInstruction: {
+              parts: [{ text: "You are a helpful assistant. Respond directly and concisely without showing your thinking process or reasoning. Give only the final answer." }]
+            }
+          })
+        });
+        if (response.status === 200) {
+          const data2 = response.json;
+          console.log("Google API full response:", JSON.stringify(data2, null, 2));
+          if (!data2.candidates || data2.candidates.length === 0) {
+            console.error("Google API response missing candidates:", data2);
+            throw new Error("Google API response missing candidates");
+          }
+          const candidate = data2.candidates[0];
+          console.log("Google API candidate:", JSON.stringify(candidate, null, 2));
+          if (!candidate.content) {
+            console.error("Google API candidate missing content:", candidate);
+            throw new Error("Google API candidate missing content");
+          }
+          if (candidate.finishReason === "MAX_TOKENS") {
+            console.warn("Google API response was truncated due to MAX_TOKENS");
+            if (!candidate.content.parts || candidate.content.parts.length === 0) {
+              console.error("Google API response completely truncated - no usable content");
+              throw new Error("Google API response completely truncated - try increasing maxTokens or reducing input size");
+            }
+          }
+          if (!candidate.content.parts || candidate.content.parts.length === 0) {
+            console.error("Google API candidate content missing parts:", candidate.content);
+            throw new Error("Google API candidate content missing parts");
+          }
+          const text3 = candidate.content.parts[0].text;
+          if (!text3) {
+            console.error("Google API content missing text:", candidate.content.parts[0]);
+            throw new Error("Google API content missing text");
+          }
+          return text3.trim();
+        } else if (response.status === 503 && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1e3;
+          console.warn(`Google API 503 error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+          const retryNotice = new import_obsidian2.Notice(`API \uC11C\uBC84 \uACFC\uBD80\uD558, ${delay / 1e3}\uCD08 \uD6C4 \uC7AC\uC2DC\uB3C4... (${attempt}/${maxRetries})`, delay);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        } else {
+          console.error("Google API error:", response.status, response.text);
+          throw new Error(`Google API error: ${response.status} - ${response.text}`);
+        }
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        console.warn(`Google API request failed (attempt ${attempt}/${maxRetries}):`, error);
+        await new Promise((resolve) => setTimeout(resolve, 1e3 * attempt));
+      }
+    }
+    throw new Error("Google API: Maximum retries exceeded");
+  }
+  async callOllama(messages, maxTokens, model) {
+    const response = await (0, import_obsidian2.requestUrl)({
+      url: `${this.settings.ollamaEndpoint}/api/chat`,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        options: {
+          num_predict: maxTokens,
+          temperature: 0.3
+        }
+      })
+    });
+    if (response.status === 200) {
+      return response.json.message.content.trim();
+    } else {
+      throw new Error(`Ollama API error: ${response.status}`);
+    }
+  }
+  async generateAITags(title, content) {
+    if (!this.settings.enableAiTags) {
+      return [];
+    }
+    const notice = new import_obsidian2.Notice(this.i18n.t("notices.generating_ai_tags"), 0);
+    try {
+      const messages = [
+        {
+          role: "user",
+          content: `\uB2E4\uC74C \uBE14\uB85C\uADF8 \uAE00\uC5D0 \uC801\uD569\uD55C \uD55C\uAD6D\uC5B4 \uD0DC\uADF8 3-7\uAC1C\uB97C JSON \uBC30\uC5F4\uB85C \uC0DD\uC131\uD574\uC8FC\uC138\uC694.
 
 \uC81C\uBAA9: ${title}
-\uB0B4\uC6A9: ${content.substring(0, 2e3)}
+\uB0B4\uC6A9: ${content.substring(0, 800)}
 
-\uC694\uAD6C\uC0AC\uD56D:
-1. \uD55C\uAD6D\uC5B4 \uD0DC\uADF8\uB85C \uC0DD\uC131
-2. 3-7\uAC1C\uC758 \uD0DC\uADF8 \uCD94\uCC9C
-3. \uAE00\uC758 \uD575\uC2EC \uC8FC\uC81C\uC640 \uB0B4\uC6A9\uC744 \uBC18\uC601
-4. \uC77C\uBC18\uC801\uC778 \uBE14\uB85C\uADF8 \uD0DC\uADF8 \uD615\uC2DD \uC0AC\uC6A9
-
-\uC751\uB2F5 \uD615\uC2DD: JSON \uBC30\uC5F4\uB85C\uB9CC \uC751\uB2F5 (\uC608: ["\uB9AC\uBDF0", "\uAE30\uC220", "\uC77C\uC0C1"])`
-            }
-          ],
-          max_tokens: 100,
-          temperature: 0.3
-        })
-      });
-      const data2 = response.json;
-      const content_text = data2.choices[0].message.content.trim();
+JSON \uBC30\uC5F4\uB85C\uB9CC \uC751\uB2F5\uD558\uC138\uC694. \uC608: ["\uB9AC\uBDF0", "\uAE30\uC220", "\uC77C\uC0C1"]`
+        }
+      ];
+      const maxTokens = this.settings.aiModel.includes("pro") ? 1e4 : 4e3;
+      const content_text = await this.callAI(messages, maxTokens);
       try {
-        const tags = JSON.parse(content_text);
+        let cleanedText = content_text;
+        if (cleanedText.includes("```json")) {
+          cleanedText = cleanedText.replace(/```json\n?/, "").replace(/\n?```$/, "");
+        }
+        if (cleanedText.includes("```")) {
+          cleanedText = cleanedText.replace(/```\n?/, "").replace(/\n?```$/, "");
+        }
+        const tags = JSON.parse(cleanedText.trim());
         return Array.isArray(tags) ? tags : [];
       } catch (parseError) {
-        const matches = content_text.match(/\[(.*?)\]/);
+        console.warn("Failed to parse tags as JSON:", content_text);
+        const matches = content_text.match(/\[(.*?)\]/s);
         if (matches) {
-          return matches[1].split(",").map((tag) => tag.trim().replace(/"/g, ""));
+          try {
+            const arrayContent = "[" + matches[1] + "]";
+            const tags = JSON.parse(arrayContent);
+            return Array.isArray(tags) ? tags : [];
+          } catch (e) {
+            return matches[1].split(",").map((tag) => tag.trim().replace(/["\n]/g, ""));
+          }
         }
         return [];
       }
     } catch (error) {
       console.error("Error generating AI tags:", error);
       return [];
+    } finally {
+      notice.hide();
     }
   }
   async generateAIExcerpt(title, content) {
-    if (!this.settings.enableAiExcerpt || !this.settings.openaiApiKey) {
+    if (!this.settings.enableAiExcerpt) {
       return "";
     }
+    const notice = new import_obsidian2.Notice(this.i18n.t("notices.generating_ai_excerpt"), 0);
     try {
-      const response = await (0, import_obsidian2.requestUrl)({
-        url: "https://api.openai.com/v1/chat/completions",
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${this.settings.openaiApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content: "\uB2F9\uC2E0\uC740 \uBE14\uB85C\uADF8 \uC694\uC57D \uC804\uBB38\uAC00\uC785\uB2C8\uB2E4. \uD55C\uAD6D\uC5B4 \uBE14\uB85C\uADF8 \uAE00\uC744 \uBD84\uC11D\uD558\uC5EC \uB9E4\uB825\uC801\uC778 \uC694\uC57D\uC744 \uC791\uC131\uD569\uB2C8\uB2E4."
-            },
-            {
-              role: "user",
-              content: `\uB2E4\uC74C \uBE14\uB85C\uADF8 \uAE00\uC758 \uC81C\uBAA9\uACFC \uB0B4\uC6A9\uC744 \uBD84\uC11D\uD558\uC5EC \uC801\uC808\uD55C \uC694\uC57D(excerpt)\uC744 \uC0DD\uC131\uD574\uC8FC\uC138\uC694.
+      const messages = [
+        {
+          role: "user",
+          content: `\uB2E4\uC74C \uBE14\uB85C\uADF8 \uAE00\uC744 1-2\uBB38\uC7A5\uC73C\uB85C \uC694\uC57D\uD574\uC8FC\uC138\uC694.
 
 \uC81C\uBAA9: ${title}
-\uB0B4\uC6A9: ${content.substring(0, 1500)}
+\uB0B4\uC6A9: ${content.substring(0, 500)}
 
-\uC694\uAD6C\uC0AC\uD56D:
-1. \uD55C\uAD6D\uC5B4\uB85C \uC791\uC131
-2. 1-2\uBB38\uC7A5\uC73C\uB85C \uAC04\uACB0\uD558\uAC8C \uC694\uC57D
-3. \uAE00\uC758 \uD575\uC2EC \uB0B4\uC6A9\uACFC \uBAA9\uC801\uC744 \uD3EC\uD568
-4. \uB3C5\uC790\uC758 \uAD00\uC2EC\uC744 \uB04C \uC218 \uC788\uB3C4\uB85D \uC791\uC131
-5. \uB530\uC634\uD45C \uC5C6\uC774 \uBCF8\uBB38\uB9CC \uC751\uB2F5`
-            }
-          ],
-          max_tokens: 150,
-          temperature: 0.3
-        })
-      });
-      const data2 = response.json;
-      return data2.choices[0].message.content.trim();
+\uD55C\uAD6D\uC5B4\uB85C \uAC04\uACB0\uD558\uAC8C \uC694\uC57D\uD558\uACE0, \uB530\uC634\uD45C \uC5C6\uC774 \uBCF8\uBB38\uB9CC \uC751\uB2F5\uD558\uC138\uC694.`
+        }
+      ];
+      const maxTokens = this.settings.aiModel.includes("pro") ? 1e4 : 4e3;
+      return await this.callAI(messages, maxTokens);
     } catch (error) {
       console.error("Error generating AI excerpt:", error);
       return "";
+    } finally {
+      notice.hide();
     }
   }
   async createMarkdownFile(post) {
@@ -16238,6 +16957,9 @@ var NaverBlogPlugin = class extends import_obsidian2.Plugin {
         post.tags = await this.generateAITags(post.title, post.content);
       }
       if (this.settings.enableAiExcerpt) {
+        if (this.settings.enableAiTags) {
+          await new Promise((resolve) => setTimeout(resolve, 1e3));
+        }
         post.excerpt = await this.generateAIExcerpt(post.title, post.content);
       }
       let processedContent = post.content;
@@ -16245,7 +16967,7 @@ var NaverBlogPlugin = class extends import_obsidian2.Plugin {
         processedContent = await this.downloadAndProcessImages(post.content, post.logNo);
       }
       const filename = this.sanitizeFilename(`${post.title}.md`);
-      const folder = this.settings.defaultFolder;
+      const folder = this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder;
       if (!await this.app.vault.adapter.exists(folder)) {
         await this.app.vault.createFolder(folder);
       }
@@ -16286,7 +17008,7 @@ logNo: "${post.logNo}"
       return content;
     }
     try {
-      const attachmentsFolder = this.settings.imageFolder;
+      const attachmentsFolder = this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder;
       if (!await this.app.vault.adapter.exists(attachmentsFolder)) {
         await this.app.vault.createFolder(attachmentsFolder);
       }
@@ -16347,8 +17069,8 @@ logNo: "${post.logNo}"
               console.error(`Failed to save image file: ${saveError}`);
               throw saveError;
             }
-            const defaultFolderPath = this.settings.defaultFolder;
-            const imageFolderPath = this.settings.imageFolder;
+            const defaultFolderPath = this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder;
+            const imageFolderPath = this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder;
             let relativePath = "";
             if (imageFolderPath.startsWith(defaultFolderPath)) {
               relativePath = imageFolderPath.substring(defaultFolderPath.length + 1);
@@ -16407,8 +17129,8 @@ logNo: "${post.logNo}"
                 filename = this.sanitizeFilename(filename);
                 const imagePath = `${attachmentsFolder}/${filename}`;
                 await this.app.vault.adapter.writeBinary(imagePath, altResponse.arrayBuffer);
-                const defaultFolderPath = this.settings.defaultFolder;
-                const imageFolderPath = this.settings.imageFolder;
+                const defaultFolderPath = this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder;
+                const imageFolderPath = this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder;
                 let relativePath = "";
                 if (imageFolderPath.startsWith(defaultFolderPath)) {
                   relativePath = imageFolderPath.substring(defaultFolderPath.length + 1);
@@ -16461,7 +17183,7 @@ logNo: "${post.logNo}"
         new import_obsidian2.Notice("Content too short for AI formatting (minimum 50 characters)");
         return;
       }
-      const fixedContent = await this.callOpenAIForLayoutFix(cleanBody);
+      const fixedContent = await this.callAIForLayoutFix(cleanBody);
       if (!fixedContent) {
         new import_obsidian2.Notice("\u274C AI formatting failed. Please try again.");
         return;
@@ -16493,23 +17215,12 @@ ${fixedContent}`;
       }
     }
   }
-  async callOpenAIForLayoutFix(content) {
-    var _a5, _b, _c, _d, _e, _f;
+  async callAIForLayoutFix(content) {
     try {
-      const response = await (0, import_obsidian2.requestUrl)({
-        url: "https://api.openai.com/v1/chat/completions",
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${this.settings.openaiApiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          // Using gpt-4o for better cost efficiency
-          messages: [
-            {
-              role: "user",
-              content: `\uB2E4\uC74C\uC740 \uB124\uC774\uBC84 \uBE14\uB85C\uADF8\uC5D0\uC11C HTML \uD30C\uC2F1\uC73C\uB85C \uAC00\uC838\uC628 \uD14D\uC2A4\uD2B8\uC785\uB2C8\uB2E4. HTML \uD30C\uC2F1 \uACFC\uC815\uC5D0\uC11C \uB808\uC774\uC544\uC6C3\uC774 \uAE68\uC9C0\uACE0 \uD615\uC2DD\uC774 \uB9DD\uAC00\uC9C4 \uBD80\uBD84\uC744 \uC218\uC815\uD574\uC8FC\uC138\uC694.
+      const messages = [
+        {
+          role: "user",
+          content: `\uB2E4\uC74C\uC740 \uB124\uC774\uBC84 \uBE14\uB85C\uADF8\uC5D0\uC11C HTML \uD30C\uC2F1\uC73C\uB85C \uAC00\uC838\uC628 \uD14D\uC2A4\uD2B8\uC785\uB2C8\uB2E4. HTML \uD30C\uC2F1 \uACFC\uC815\uC5D0\uC11C \uB808\uC774\uC544\uC6C3\uC774 \uAE68\uC9C0\uACE0 \uD615\uC2DD\uC774 \uB9DD\uAC00\uC9C4 \uBD80\uBD84\uC744 \uC218\uC815\uD574\uC8FC\uC138\uC694.
 
 \u26A0\uFE0F **\uC911\uC694**: \uC6D0\uBB38\uC758 \uB0B4\uC6A9\uC740 100% \uADF8\uB300\uB85C \uC720\uC9C0\uD558\uACE0, \uC624\uC9C1 \uB9C8\uD06C\uB2E4\uC6B4 \uD615\uC2DD\uACFC \uB808\uC774\uC544\uC6C3\uB9CC \uC218\uC815\uD574\uC8FC\uC138\uC694.
 
@@ -16529,35 +17240,23 @@ ${fixedContent}`;
 ${content}
 
 \uC704 \uB0B4\uC6A9\uC758 \uD615\uC2DD\uB9CC \uAE54\uB054\uD558\uAC8C \uC218\uC815\uD574\uC11C \uB9C8\uD06C\uB2E4\uC6B4\uC73C\uB85C \uCD9C\uB825\uD574\uC8FC\uC138\uC694.`
-            }
-          ],
-          max_tokens: 4e3,
-          temperature: 0.1
-        })
-      });
-      if (response.status === 200 && ((_d = (_c = (_b = (_a5 = response.json) == null ? void 0 : _a5.choices) == null ? void 0 : _b[0]) == null ? void 0 : _c.message) == null ? void 0 : _d.content)) {
-        let content2 = response.json.choices[0].message.content.trim();
-        if (content2.startsWith("```markdown\n") && content2.endsWith("\n```")) {
-          content2 = content2.substring(12, content2.length - 4).trim();
-        } else if (content2.startsWith("```\n") && content2.endsWith("\n```")) {
-          content2 = content2.substring(4, content2.length - 4).trim();
         }
-        return content2;
-      } else {
-        let errorMsg = `OpenAI API error: ${response.status}`;
-        if ((_f = (_e = response.json) == null ? void 0 : _e.error) == null ? void 0 : _f.message) {
-          errorMsg += ` - ${response.json.error.message}`;
-        }
-        throw new Error(errorMsg);
+      ];
+      let fixedContent = await this.callAI(messages, 4e3);
+      if (fixedContent.startsWith("```markdown\n") && fixedContent.endsWith("\n```")) {
+        fixedContent = fixedContent.substring(12, fixedContent.length - 4).trim();
+      } else if (fixedContent.startsWith("```\n") && fixedContent.endsWith("\n```")) {
+        fixedContent = fixedContent.substring(4, fixedContent.length - 4).trim();
       }
+      return fixedContent;
     } catch (error) {
-      console.error("OpenAI API call failed:", error);
+      console.error("AI formatting call failed:", error);
       if (error.message.includes("401") || error.message.includes("Invalid")) {
-        throw new Error("401");
+        throw new Error(`Invalid API key. Please check your ${this.settings.aiProvider.toUpperCase()} API key in settings.`);
       } else if (error.message.includes("quota") || error.message.includes("billing")) {
-        throw new Error("quota");
+        throw new Error(`API quota exceeded. Please check your ${this.settings.aiProvider.toUpperCase()} billing.`);
       } else if (error.message.includes("network") || error.message.includes("fetch")) {
-        throw new Error("network");
+        throw new Error("Network error. Please check your internet connection.");
       } else {
         throw error;
       }
@@ -16685,7 +17384,7 @@ ${content}
         const blogId = this.settings.subscribedBlogs[i];
         const blogProgress = `(${i + 1}/${totalBlogs})`;
         const blogSubscription = this.settings.blogSubscriptions.find((sub) => sub.blogId === blogId);
-        const postCount = (blogSubscription == null ? void 0 : blogSubscription.postCount) || this.settings.subscriptionCount;
+        const postCount = (blogSubscription == null ? void 0 : blogSubscription.postCount) || 10;
         try {
           new import_obsidian2.Notice(`Syncing blog ${blogProgress}: ${blogId} (${postCount} posts)`, 5e3);
           const posts = await this.fetchNaverBlogPosts(blogId, postCount);
@@ -16733,11 +17432,11 @@ var NaverBlogImportModal = class extends import_obsidian2.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Import from Naver Blog" });
+    contentEl.createEl("h2", { text: this.plugin.i18n.t("modals.import_blog_url.title") });
     let inputElement;
-    new import_obsidian2.Setting(contentEl).setName("Blog ID").setDesc("Enter the Naver Blog ID (e.g., 'yonofbooks')").addText((text3) => {
+    new import_obsidian2.Setting(contentEl).setName(this.plugin.i18n.t("modals.import_blog_url.url_label")).setDesc(this.plugin.i18n.t("modals.import_blog_url.url_placeholder")).addText((text3) => {
       inputElement = text3.inputEl;
-      text3.setPlaceholder("Blog ID").setValue(this.blogId).onChange(async (value) => {
+      text3.setPlaceholder(this.plugin.i18n.t("modals.import_blog_url.url_label")).setValue(this.blogId).onChange(async (value) => {
         this.blogId = value;
       });
       text3.inputEl.addEventListener("keydown", (event) => {
@@ -16747,7 +17446,7 @@ var NaverBlogImportModal = class extends import_obsidian2.Modal {
         }
       });
     });
-    new import_obsidian2.Setting(contentEl).addButton((btn) => btn.setButtonText("Import Posts").setCta().onClick(async () => {
+    new import_obsidian2.Setting(contentEl).addButton((btn) => btn.setButtonText(this.plugin.i18n.t("modals.import_blog_url.import_button")).setCta().onClick(async () => {
       this.handleImport();
     }));
     setTimeout(() => {
@@ -16844,11 +17543,11 @@ var NaverBlogSubscribeModal = class extends import_obsidian2.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Subscribe to Naver Blog" });
+    contentEl.createEl("h2", { text: this.plugin.i18n.t("modals.subscribe_blog.title") });
     let inputElement;
-    new import_obsidian2.Setting(contentEl).setName("Blog ID").setDesc("Enter the Naver Blog ID to subscribe to").addText((text3) => {
+    new import_obsidian2.Setting(contentEl).setName(this.plugin.i18n.t("modals.subscribe_blog.blog_id_label")).setDesc(this.plugin.i18n.t("modals.subscribe_blog.blog_id_desc")).addText((text3) => {
       inputElement = text3.inputEl;
-      text3.setPlaceholder("Blog ID").setValue(this.blogId).onChange(async (value) => {
+      text3.setPlaceholder(this.plugin.i18n.t("modals.subscribe_blog.blog_id_placeholder")).setValue(this.blogId).onChange(async (value) => {
         this.blogId = value;
       });
       text3.inputEl.addEventListener("keydown", (event) => {
@@ -16858,7 +17557,7 @@ var NaverBlogSubscribeModal = class extends import_obsidian2.Modal {
         }
       });
     });
-    new import_obsidian2.Setting(contentEl).addButton((btn) => btn.setButtonText("Subscribe").setCta().onClick(async () => {
+    new import_obsidian2.Setting(contentEl).addButton((btn) => btn.setButtonText(this.plugin.i18n.t("modals.subscribe_blog.subscribe_button")).setCta().onClick(async () => {
       this.handleSubscribe();
     }));
     setTimeout(() => {
@@ -16879,7 +17578,7 @@ var NaverBlogSubscribeModal = class extends import_obsidian2.Modal {
     this.plugin.settings.subscribedBlogs.push(this.blogId);
     this.plugin.settings.blogSubscriptions.push({
       blogId: this.blogId,
-      postCount: this.plugin.settings.subscriptionCount
+      postCount: 10
     });
     await this.plugin.saveSettings();
     new import_obsidian2.Notice(`Subscribed to ${this.blogId}`);
@@ -16899,12 +17598,58 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Naver Blog Importer Settings" });
-    new import_obsidian2.Setting(containerEl).setName("OpenAI API Key").setDesc("Enter your OpenAI API key for AI-generated tags and excerpts").addText((text3) => text3.setPlaceholder("sk-...").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
-      this.plugin.settings.openaiApiKey = value;
+    containerEl.createEl("h2", { text: this.plugin.i18n.t("settings.title") });
+    containerEl.createEl("h3", { text: this.plugin.i18n.t("settings.ai_configuration") });
+    new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.ai_provider")).setDesc(this.plugin.i18n.t("settings.ai_provider_desc")).addDropdown((dropdown) => dropdown.addOption("openai", this.plugin.i18n.t("providers.openai")).addOption("anthropic", this.plugin.i18n.t("providers.anthropic")).addOption("google", this.plugin.i18n.t("providers.google")).addOption("ollama", this.plugin.i18n.t("providers.ollama")).setValue(this.plugin.settings.aiProvider).onChange(async (value) => {
+      this.plugin.settings.aiProvider = value;
+      this.plugin.settings.aiModel = this.plugin.getDefaultModelForProvider(value);
       await this.plugin.saveSettings();
+      if (value !== "ollama") {
+        this.plugin.refreshModels(value).catch((error) => {
+          console.log(`Failed to refresh models for ${value}:`, error);
+        });
+      }
+      this.display();
     }));
-    new import_obsidian2.Setting(containerEl).setName("Default Folder").setDesc("Folder where imported posts will be saved").addText((text3) => {
+    const modelSetting = new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.ai_model")).setDesc(this.plugin.i18n.t("settings.ai_model_desc")).addDropdown((dropdown) => {
+      const availableModels = this.plugin.getAvailableModels();
+      availableModels.forEach((model) => {
+        dropdown.addOption(model, model);
+      });
+      const currentModel = this.plugin.settings.aiModel || this.plugin.getModelName();
+      dropdown.setValue(currentModel);
+      dropdown.onChange(async (value) => {
+        this.plugin.settings.aiModel = value;
+        await this.plugin.saveSettings();
+      });
+    });
+    switch (this.plugin.settings.aiProvider) {
+      case "openai":
+        new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.openai_api_key")).setDesc(this.plugin.i18n.t("settings.openai_api_key_desc")).addText((text3) => text3.setPlaceholder("sk-...").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
+          this.plugin.settings.openaiApiKey = value;
+          await this.plugin.saveSettings();
+        }));
+        break;
+      case "anthropic":
+        new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.anthropic_api_key")).setDesc(this.plugin.i18n.t("settings.anthropic_api_key_desc")).addText((text3) => text3.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.anthropicApiKey).onChange(async (value) => {
+          this.plugin.settings.anthropicApiKey = value;
+          await this.plugin.saveSettings();
+        }));
+        break;
+      case "google":
+        new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.google_api_key")).setDesc(this.plugin.i18n.t("settings.google_api_key_desc")).addText((text3) => text3.setPlaceholder("AIza...").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
+          this.plugin.settings.googleApiKey = value;
+          await this.plugin.saveSettings();
+        }));
+        break;
+      case "ollama":
+        new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.ollama_endpoint")).setDesc(this.plugin.i18n.t("settings.ollama_endpoint_desc")).addText((text3) => text3.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaEndpoint).onChange(async (value) => {
+          this.plugin.settings.ollamaEndpoint = value;
+          await this.plugin.saveSettings();
+        }));
+        break;
+    }
+    new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.default_folder")).setDesc(this.plugin.i18n.t("settings.default_folder_desc")).addText((text3) => {
       const input = text3.setPlaceholder("Naver Blog Posts").setValue(this.plugin.settings.defaultFolder).onChange(async (value) => {
         this.plugin.settings.defaultFolder = value;
         await this.plugin.saveSettings();
@@ -16920,25 +17665,25 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
       });
       return input;
     });
-    new import_obsidian2.Setting(containerEl).setName("Enable AI Tags").setDesc("Generate tags using AI (requires OpenAI API key)").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableAiTags).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_ai_tags")).setDesc(this.plugin.i18n.t("settings.enable_ai_tags_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableAiTags).onChange(async (value) => {
       this.plugin.settings.enableAiTags = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian2.Setting(containerEl).setName("Enable AI Excerpt").setDesc("Generate excerpts using AI (requires OpenAI API key)").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableAiExcerpt).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_ai_excerpt")).setDesc(this.plugin.i18n.t("settings.enable_ai_excerpt_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableAiExcerpt).onChange(async (value) => {
       this.plugin.settings.enableAiExcerpt = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian2.Setting(containerEl).setName("Enable Duplicate Check").setDesc("Skip importing posts that already exist (based on logNo)").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableDuplicateCheck).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_duplicate_check")).setDesc(this.plugin.i18n.t("settings.enable_duplicate_check_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableDuplicateCheck).onChange(async (value) => {
       this.plugin.settings.enableDuplicateCheck = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian2.Setting(containerEl).setName("Enable Image Download").setDesc("Download and save images from blog posts").addToggle((toggle) => toggle.setValue(this.plugin.settings.enableImageDownload).onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_image_download")).setDesc(this.plugin.i18n.t("settings.enable_image_download_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableImageDownload).onChange(async (value) => {
       this.plugin.settings.enableImageDownload = value;
       await this.plugin.saveSettings();
       this.display();
     }));
     if (this.plugin.settings.enableImageDownload) {
-      new import_obsidian2.Setting(containerEl).setName("Image Folder").setDesc("Folder where downloaded images will be saved").addText((text3) => {
+      new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.image_folder")).setDesc(this.plugin.i18n.t("settings.image_folder_desc")).addText((text3) => {
         const input = text3.setPlaceholder("Naver Blog Posts/attachments").setValue(this.plugin.settings.imageFolder).onChange(async (value) => {
           this.plugin.settings.imageFolder = value;
           await this.plugin.saveSettings();
@@ -16955,25 +17700,20 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
         return input;
       });
     }
-    new import_obsidian2.Setting(containerEl).setName("Subscription Count").setDesc("Number of recent posts to fetch for subscribed blogs").addText((text3) => text3.setPlaceholder("10").setValue(this.plugin.settings.subscriptionCount.toString()).onChange(async (value) => {
-      const count = parseInt(value) || 10;
-      this.plugin.settings.subscriptionCount = count;
-      await this.plugin.saveSettings();
-    }));
-    containerEl.createEl("h3", { text: "Subscribed Blogs" });
+    containerEl.createEl("h3", { text: this.plugin.i18n.t("settings.subscribed_blogs") });
     const subscriptionDiv = containerEl.createDiv();
     this.displaySubscriptions(subscriptionDiv);
-    new import_obsidian2.Setting(containerEl).setName("Add Blog Subscription").setDesc("Add a blog ID to automatically sync new posts").addText((text3) => {
+    new import_obsidian2.Setting(containerEl).setName(this.plugin.i18n.t("settings.add_blog_id")).setDesc(this.plugin.i18n.t("settings.add_blog_id_desc")).addText((text3) => {
       text3.setPlaceholder("Blog ID (e.g., yonofbooks)");
       return text3;
-    }).addButton((button) => button.setButtonText("Add").onClick(async () => {
+    }).addButton((button) => button.setButtonText(this.plugin.i18n.t("settings.add_button")).onClick(async () => {
       const input = button.buttonEl.previousElementSibling;
       const blogId = input.value.trim();
       if (blogId && !this.plugin.settings.subscribedBlogs.includes(blogId)) {
         this.plugin.settings.subscribedBlogs.push(blogId);
         this.plugin.settings.blogSubscriptions.push({
           blogId,
-          postCount: this.plugin.settings.subscriptionCount
+          postCount: 10
         });
         await this.plugin.saveSettings();
         input.value = "";
@@ -16984,7 +17724,7 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
   displaySubscriptions(containerEl) {
     containerEl.empty();
     if (this.plugin.settings.subscribedBlogs.length === 0) {
-      containerEl.createEl("p", { text: "No subscribed blogs" });
+      containerEl.createEl("p", { text: this.plugin.i18n.t("settings.no_subscribed_blogs") });
       return;
     }
     this.plugin.settings.subscribedBlogs.forEach((blogId, index2) => {
@@ -17002,11 +17742,11 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
       countDiv.style.display = "flex";
       countDiv.style.alignItems = "center";
       countDiv.style.gap = "5px";
-      const countLabel = countDiv.createEl("span", { text: "Posts:" });
+      const countLabel = countDiv.createEl("span", { text: this.plugin.i18n.t("settings.posts_label") + ":" });
       countLabel.style.fontSize = "0.9em";
       countLabel.style.color = "var(--text-muted)";
       const blogSubscription = this.plugin.settings.blogSubscriptions.find((sub) => sub.blogId === blogId);
-      const currentCount = (blogSubscription == null ? void 0 : blogSubscription.postCount) || this.plugin.settings.subscriptionCount;
+      const currentCount = (blogSubscription == null ? void 0 : blogSubscription.postCount) || 10;
       const countInput = countDiv.createEl("input", {
         type: "number",
         value: currentCount.toString()
@@ -17017,7 +17757,7 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
       countInput.min = "1";
       countInput.max = "100";
       countInput.onchange = async () => {
-        const newCount = parseInt(countInput.value) || this.plugin.settings.subscriptionCount;
+        const newCount = parseInt(countInput.value) || 10;
         const existingIndex = this.plugin.settings.blogSubscriptions.findIndex((sub) => sub.blogId === blogId);
         if (existingIndex >= 0) {
           this.plugin.settings.blogSubscriptions[existingIndex].postCount = newCount;
@@ -17029,7 +17769,7 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
         }
         await this.plugin.saveSettings();
       };
-      const syncButton = blogDiv.createEl("button", { text: "Sync" });
+      const syncButton = blogDiv.createEl("button", { text: this.plugin.i18n.t("settings.sync_button") });
       syncButton.style.fontSize = "0.8em";
       syncButton.style.padding = "4px 8px";
       syncButton.onclick = async () => {
@@ -17051,7 +17791,7 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
           console.error("Sync error:", error);
         }
       };
-      const removeButton = blogDiv.createEl("button", { text: "Remove" });
+      const removeButton = blogDiv.createEl("button", { text: this.plugin.i18n.t("settings.remove_button") });
       removeButton.style.fontSize = "0.8em";
       removeButton.style.padding = "4px 8px";
       removeButton.style.backgroundColor = "var(--interactive-accent)";
@@ -17193,6 +17933,8 @@ var NaverBlogSettingTab = class extends import_obsidian2.PluginSettingTab {
 					white-space: nowrap;
 					overflow: hidden;
 					text-overflow: ellipsis;
+					font-size: 13px;
+					line-height: 1.3;
 				`;
         if (index2 === filteredFolders.length - 1) {
           itemEl.style.borderBottom = "none";
@@ -17274,18 +18016,18 @@ var NaverBlogSinglePostModal = class extends import_obsidian2.Modal {
   onOpen() {
     const { contentEl } = this;
     contentEl.empty();
-    contentEl.createEl("h2", { text: "Import Single Naver Blog Post" });
+    contentEl.createEl("h2", { text: this.plugin.i18n.t("modals.import_single_post.title") });
     const inputContainer = contentEl.createDiv();
     inputContainer.style.marginBottom = "20px";
     const inputLabel = inputContainer.createEl("label", {
-      text: "Post URL or LogNo:",
+      text: this.plugin.i18n.t("modals.import_single_post.log_no_label") + ":",
       cls: "setting-item-name"
     });
     inputLabel.style.display = "block";
     inputLabel.style.marginBottom = "8px";
     const input = inputContainer.createEl("input", {
       type: "text",
-      placeholder: "https://blog.naver.com/blogid/220883239733 or https://m.blog.naver.com/PostView.naver?blogId=blogid&logNo=220883239733 or just 220883239733"
+      placeholder: this.plugin.i18n.t("modals.import_single_post.log_no_placeholder")
     });
     input.style.width = "100%";
     input.style.padding = "8px";
@@ -17306,11 +18048,11 @@ var NaverBlogSinglePostModal = class extends import_obsidian2.Modal {
     buttonContainer.style.gap = "10px";
     buttonContainer.style.justifyContent = "flex-end";
     const cancelButton = buttonContainer.createEl("button", {
-      text: "Cancel"
+      text: this.plugin.i18n.t("modals.import_single_post.cancel_button")
     });
     cancelButton.addEventListener("click", () => this.close());
     const importButton = buttonContainer.createEl("button", {
-      text: "Import Post",
+      text: this.plugin.i18n.t("modals.import_single_post.import_button"),
       cls: "mod-cta"
     });
     importButton.addEventListener("click", async () => {

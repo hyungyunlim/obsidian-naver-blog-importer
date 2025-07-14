@@ -13,13 +13,426 @@ import {
 
 import { NaverBlogFetcher, NaverBlogPost } from './naver-blog-fetcher';
 
+// Translation interface
+interface Translations {
+	commands: {
+		'import-single-post': string;
+		'import-blog-url': string;
+		'sync-subscribed-blogs': string;
+		'ai-fix-layout': string;
+	};
+	settings: {
+		title: string;
+		ai_configuration: string;
+		ai_provider: string;
+		ai_provider_desc: string;
+		ai_model: string;
+		ai_model_desc: string;
+		openai_api_key: string;
+		openai_api_key_desc: string;
+		anthropic_api_key: string;
+		anthropic_api_key_desc: string;
+		google_api_key: string;
+		google_api_key_desc: string;
+		ollama_endpoint: string;
+		ollama_endpoint_desc: string;
+		default_folder: string;
+		default_folder_desc: string;
+		image_folder: string;
+		image_folder_desc: string;
+		enable_ai_tags: string;
+		enable_ai_tags_desc: string;
+		enable_ai_excerpt: string;
+		enable_ai_excerpt_desc: string;
+		enable_duplicate_check: string;
+		enable_duplicate_check_desc: string;
+		enable_image_download: string;
+		enable_image_download_desc: string;
+		subscribed_blogs: string;
+		add_blog_id: string;
+		add_blog_id_desc: string;
+		add_button: string;
+		remove_button: string;
+		sync_button: string;
+		no_subscribed_blogs: string;
+		posts_label: string;
+	};
+	notices: {
+		api_key_required: string;
+		set_api_key: string;
+		no_active_file: string;
+		ai_formatting_progress: string;
+		content_too_short: string;
+		ai_formatting_failed: string;
+		ai_formatting_success: string;
+		invalid_api_key: string;
+		api_quota_exceeded: string;
+		network_error: string;
+		syncing_blog: string;
+		sync_completed: string;
+		subscribed_to: string;
+		unsubscribed_from: string;
+		blog_already_subscribed: string;
+		file_already_exists: string;
+		processing_post: string;
+		post_imported: string;
+		import_failed: string;
+		downloading_images: string;
+		image_download_complete: string;
+		generating_ai_tags: string;
+		generating_ai_excerpt: string;
+	};
+	modals: {
+		import_single_post: {
+			title: string;
+			blog_id_label: string;
+			blog_id_placeholder: string;
+			log_no_label: string;
+			log_no_placeholder: string;
+			import_button: string;
+			cancel_button: string;
+		};
+		import_blog_url: {
+			title: string;
+			url_label: string;
+			url_placeholder: string;
+			import_button: string;
+			cancel_button: string;
+		};
+		subscribe_blog: {
+			title: string;
+			blog_id_label: string;
+			blog_id_desc: string;
+			blog_id_placeholder: string;
+			subscribe_button: string;
+		};
+	};
+	errors: {
+		invalid_url: string;
+		invalid_blog_id: string;
+		invalid_log_no: string;
+		fetch_failed: string;
+		parse_failed: string;
+		save_failed: string;
+		ai_error: string;
+		network_timeout: string;
+		unauthorized: string;
+		rate_limit: string;
+	};
+	providers: {
+		openai: string;
+		anthropic: string;
+		google: string;
+		ollama: string;
+	};
+}
+
+// Translation helper class
+class I18n {
+	private translations: Translations;
+	private app: App;
+	
+	constructor(app: App) {
+		this.app = app;
+		this.translations = this.getDefaultTranslations();
+	}
+	
+	async loadTranslations(locale: string) {
+		console.log(`Loading translations for locale: ${locale}`);
+		
+		try {
+			// Try to load locale-specific translations from plugin directory
+			const pluginDir = (this.app.vault.adapter as any).basePath;
+			const manifestPath = `${pluginDir}/.obsidian/plugins/obsidian-naver-blog-plugin/lang/${locale}.json`;
+			
+			// Use Obsidian's file system to read the translation file
+			const translationFile = this.app.vault.adapter.read(manifestPath);
+			if (translationFile) {
+				const translationData = await translationFile;
+				this.translations = JSON.parse(translationData);
+				console.log(`Successfully loaded translations from file: ${locale}`);
+				return;
+			}
+		} catch (error) {
+			console.log(`Failed to load translations file for ${locale}:`, error);
+		}
+		
+		// Load built-in translations
+		if (locale === 'ko' || locale.startsWith('ko')) {
+			this.translations = this.getKoreanTranslations();
+			console.log(`Loaded built-in Korean translations`);
+		} else {
+			// Load default English translations
+			this.translations = this.getDefaultTranslations();
+			console.log(`Loaded built-in English translations`);
+		}
+	}
+	
+	t(key: string, variables?: Record<string, string>): string {
+		const keys = key.split('.');
+		let value: any = this.translations;
+		
+		for (const k of keys) {
+			value = value?.[k];
+		}
+		
+		if (typeof value !== 'string') {
+			return key; // Return key if translation not found
+		}
+		
+		// Replace variables in the format {{variable}}
+		if (variables) {
+			return value.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
+				return variables[varName] || match;
+			});
+		}
+		
+		return value;
+	}
+	
+	private getDefaultTranslations(): Translations {
+		return {
+			commands: {
+				'import-single-post': 'Import Single Post by URL',
+				'import-blog-url': 'Import All Posts from Blog',
+				'sync-subscribed-blogs': 'Sync Subscribed Blogs',
+				'ai-fix-layout': 'AI Fix Layout and Format (Preserve Content 100%)'
+			},
+			settings: {
+				title: 'Naver Blog Importer Settings',
+				ai_configuration: 'AI Configuration',
+				ai_provider: 'AI Provider',
+				ai_provider_desc: 'Choose your AI service provider',
+				ai_model: 'AI Model',
+				ai_model_desc: 'Select the model to use for AI features',
+				openai_api_key: 'OpenAI API Key',
+				openai_api_key_desc: 'Enter your OpenAI API key',
+				anthropic_api_key: 'Anthropic API Key',
+				anthropic_api_key_desc: 'Enter your Anthropic API key',
+				google_api_key: 'Google API Key',
+				google_api_key_desc: 'Enter your Google Gemini API key',
+				ollama_endpoint: 'Ollama Endpoint',
+				ollama_endpoint_desc: 'Ollama server endpoint (default: http://localhost:11434)',
+				default_folder: 'Default Folder',
+				default_folder_desc: 'Folder where imported posts will be saved',
+				image_folder: 'Image Folder',
+				image_folder_desc: 'Folder where images will be saved',
+				enable_ai_tags: 'Enable AI Tags',
+				enable_ai_tags_desc: 'Generate tags using AI (requires API key for selected provider)',
+				enable_ai_excerpt: 'Enable AI Excerpt',
+				enable_ai_excerpt_desc: 'Generate excerpts using AI (requires API key for selected provider)',
+				enable_duplicate_check: 'Enable Duplicate Check',
+				enable_duplicate_check_desc: 'Skip importing posts that already exist (based on logNo)',
+				enable_image_download: 'Enable Image Download',
+				enable_image_download_desc: 'Download images locally and update links',
+				subscribed_blogs: 'Subscribed Blogs',
+				add_blog_id: 'Add Blog ID',
+				add_blog_id_desc: 'Enter a new blog ID and click the add button',
+				add_button: 'Add',
+				remove_button: 'Remove',
+				sync_button: 'Sync',
+				no_subscribed_blogs: 'No subscribed blogs',
+				posts_label: 'Posts'
+			},
+			notices: {
+				api_key_required: '{{provider}} API Key required for AI formatting',
+				set_api_key: 'Please set your API key in plugin settings',
+				no_active_file: 'No active file selected for formatting',
+				ai_formatting_progress: 'AI layout fixing in progress...',
+				content_too_short: 'Content too short for AI formatting (minimum 50 characters)',
+				ai_formatting_failed: 'AI formatting failed. Please try again',
+				ai_formatting_success: 'Layout and formatting fixed by AI!',
+				invalid_api_key: 'Invalid API key',
+				api_quota_exceeded: 'API quota exceeded',
+				network_error: 'Network error - please check your connection',
+				syncing_blog: 'Syncing blog {{progress}}: {{blogId}} ({{postCount}} posts)',
+				sync_completed: 'Sync completed: {{successCount}}/{{totalCount}} posts',
+				subscribed_to: 'Subscribed to {{blogId}}',
+				unsubscribed_from: 'Unsubscribed from {{blogId}}',
+				blog_already_subscribed: 'Blog already subscribed: {{blogId}}',
+				file_already_exists: 'File already exists: {{filename}}',
+				processing_post: 'Processing post: {{title}}',
+				post_imported: 'Post imported: {{title}}',
+				import_failed: 'Import failed: {{error}}',
+				downloading_images: 'Downloading images...',
+				image_download_complete: 'Image download complete: {{count}} images',
+				generating_ai_tags: 'Generating AI tags...',
+				generating_ai_excerpt: 'Generating AI excerpt...'
+			},
+			modals: {
+				import_single_post: {
+					title: 'Import Single Post by URL',
+					blog_id_label: 'Blog ID',
+					blog_id_placeholder: 'e.g., myblog',
+					log_no_label: 'Post URL or LogNo',
+					log_no_placeholder: 'URL or LogNo (e.g., https://blog.naver.com/yonofbooks/220883239733)',
+					import_button: 'Import Post',
+					cancel_button: 'Cancel'
+				},
+				import_blog_url: {
+					title: 'Import All Posts from Blog',
+					url_label: 'Blog ID',
+					url_placeholder: 'e.g., yonofbooks',
+					import_button: 'Import All Posts',
+					cancel_button: 'Cancel'
+				},
+				subscribe_blog: {
+					title: 'Subscribe to Naver Blog',
+					blog_id_label: 'Blog ID',
+					blog_id_desc: 'Enter the Naver Blog ID to subscribe to',
+					blog_id_placeholder: 'Blog ID',
+					subscribe_button: 'Subscribe'
+				}
+			},
+			errors: {
+				invalid_url: 'Invalid URL format',
+				invalid_blog_id: 'Invalid blog ID',
+				invalid_log_no: 'Invalid post number',
+				fetch_failed: 'Failed to fetch post: {{error}}',
+				parse_failed: 'Failed to parse post: {{error}}',
+				save_failed: 'Failed to save file: {{error}}',
+				ai_error: 'AI processing error: {{error}}',
+				network_timeout: 'Network timeout',
+				unauthorized: 'Unauthorized request - please check your API key',
+				rate_limit: 'Rate limit exceeded - please try again later'
+			},
+			providers: {
+				openai: 'OpenAI (GPT)',
+				anthropic: 'Anthropic (Claude)',
+				google: 'Google (Gemini)',
+				ollama: 'Ollama (Local)'
+			}
+		};
+	}
+	
+	private getKoreanTranslations(): Translations {
+		return {
+			commands: {
+				'import-single-post': 'URL로 단일 포스트 가져오기',
+				'import-blog-url': '블로그 전체 포스트 가져오기',
+				'sync-subscribed-blogs': '구독 블로그 동기화',
+				'ai-fix-layout': 'AI 레이아웃 수정 및 포맷 (내용 100% 보존)'
+			},
+			settings: {
+				title: '네이버 블로그 가져오기 설정',
+				ai_configuration: 'AI 설정',
+				ai_provider: 'AI 제공업체',
+				ai_provider_desc: 'AI 서비스 제공업체를 선택하세요',
+				ai_model: 'AI 모델',
+				ai_model_desc: 'AI 기능에 사용할 모델을 선택하세요',
+				openai_api_key: 'OpenAI API 키',
+				openai_api_key_desc: 'OpenAI API 키를 입력하세요',
+				anthropic_api_key: 'Anthropic API 키',
+				anthropic_api_key_desc: 'Anthropic API 키를 입력하세요',
+				google_api_key: 'Google API 키',
+				google_api_key_desc: 'Google Gemini API 키를 입력하세요',
+				ollama_endpoint: 'Ollama 엔드포인트',
+				ollama_endpoint_desc: 'Ollama 서버 엔드포인트 (기본값: http://localhost:11434)',
+				default_folder: '기본 폴더',
+				default_folder_desc: '가져온 포스트가 저장될 폴더',
+				image_folder: '이미지 폴더',
+				image_folder_desc: '이미지가 저장될 폴더',
+				enable_ai_tags: 'AI 태그 생성 활성화',
+				enable_ai_tags_desc: 'AI를 사용하여 태그를 생성합니다 (선택한 제공업체의 API 키 필요)',
+				enable_ai_excerpt: 'AI 요약 생성 활성화',
+				enable_ai_excerpt_desc: 'AI를 사용하여 요약을 생성합니다 (선택한 제공업체의 API 키 필요)',
+				enable_duplicate_check: '중복 확인 활성화',
+				enable_duplicate_check_desc: '이미 존재하는 포스트 가져오기 건너뛰기 (logNo 기준)',
+				enable_image_download: '이미지 다운로드 활성화',
+				enable_image_download_desc: '이미지를 로컬에 다운로드하고 링크를 업데이트합니다',
+				subscribed_blogs: '구독 블로그',
+				add_blog_id: '블로그 ID 추가',
+				add_blog_id_desc: '새 블로그 ID를 입력하고 추가 버튼을 클릭하세요',
+				add_button: '추가',
+				remove_button: '제거',
+				sync_button: '동기화',
+				no_subscribed_blogs: '구독한 블로그가 없습니다',
+				posts_label: '포스트'
+			},
+			notices: {
+				api_key_required: '{{provider}} API 키가 AI 포맷팅에 필요합니다',
+				set_api_key: '플러그인 설정에서 API 키를 설정해주세요',
+				no_active_file: '포맷팅할 활성 파일이 선택되지 않았습니다',
+				ai_formatting_progress: 'AI 레이아웃 수정 진행 중...',
+				content_too_short: 'AI 포맷팅을 위한 내용이 너무 짧습니다 (최소 50자)',
+				ai_formatting_failed: 'AI 포맷팅에 실패했습니다. 다시 시도해주세요',
+				ai_formatting_success: 'AI가 레이아웃과 포맷을 수정했습니다!',
+				invalid_api_key: '잘못된 API 키입니다',
+				api_quota_exceeded: 'API 할당량이 초과되었습니다',
+				network_error: '네트워크 오류 - 인터넷 연결을 확인해주세요',
+				syncing_blog: '블로그 동기화 중 {{progress}}: {{blogId}} ({{postCount}}개 포스트)',
+				sync_completed: '동기화 완료: {{successCount}}/{{totalCount}} 포스트',
+				subscribed_to: '{{blogId}}를 구독했습니다',
+				unsubscribed_from: '{{blogId}} 구독을 해제했습니다',
+				blog_already_subscribed: '이미 구독 중인 블로그입니다: {{blogId}}',
+				file_already_exists: '파일이 이미 존재합니다: {{filename}}',
+				processing_post: '포스트 처리 중: {{title}}',
+				post_imported: '포스트 가져오기 완료: {{title}}',
+				import_failed: '가져오기 실패: {{error}}',
+				downloading_images: '이미지 다운로드 중...',
+				image_download_complete: '이미지 다운로드 완료: {{count}}개',
+				generating_ai_tags: 'AI 태그 생성 중...',
+				generating_ai_excerpt: 'AI 요약 생성 중...'
+			},
+			modals: {
+				import_single_post: {
+					title: 'URL로 단일 포스트 가져오기',
+					blog_id_label: '블로그 ID',
+					blog_id_placeholder: '예: myblog',
+					log_no_label: '포스트 URL 또는 LogNo',
+					log_no_placeholder: 'URL 또는 LogNo (예: https://blog.naver.com/yonofbooks/220883239733)',
+					import_button: '포스트 가져오기',
+					cancel_button: '취소'
+				},
+				import_blog_url: {
+					title: '블로그 전체 포스트 가져오기',
+					url_label: '블로그 ID',
+					url_placeholder: '예: yonofbooks',
+					import_button: '전체 포스트 가져오기',
+					cancel_button: '취소'
+				},
+				subscribe_blog: {
+					title: '네이버 블로그 구독하기',
+					blog_id_label: '블로그 ID',
+					blog_id_desc: '구독할 네이버 블로그 ID를 입력하세요',
+					blog_id_placeholder: '블로그 ID',
+					subscribe_button: '구독하기'
+				}
+			},
+			errors: {
+				invalid_url: '잘못된 URL 형식입니다',
+				invalid_blog_id: '잘못된 블로그 ID입니다',
+				invalid_log_no: '잘못된 포스트 번호입니다',
+				fetch_failed: '포스트 가져오기에 실패했습니다: {{error}}',
+				parse_failed: '포스트 파싱에 실패했습니다: {{error}}',
+				save_failed: '파일 저장에 실패했습니다: {{error}}',
+				ai_error: 'AI 처리 중 오류가 발생했습니다: {{error}}',
+				network_timeout: '네트워크 시간 초과',
+				unauthorized: '인증되지 않은 요청 - API 키를 확인해주세요',
+				rate_limit: '요청 한도 초과 - 잠시 후 다시 시도해주세요'
+			},
+			providers: {
+				openai: 'OpenAI (GPT)',
+				anthropic: 'Anthropic (Claude)',
+				google: 'Google (Gemini)',
+				ollama: 'Ollama (로컬)'
+			}
+		};
+	}
+}
+
 interface BlogSubscription {
 	blogId: string;
 	postCount: number;
 }
 
 interface NaverBlogSettings {
+	aiProvider: 'openai' | 'anthropic' | 'google' | 'ollama';
 	openaiApiKey: string;
+	anthropicApiKey: string;
+	googleApiKey: string;
+	ollamaEndpoint: string;
+	aiModel: string;
 	defaultFolder: string;
 	imageFolder: string;
 	enableAiTags: boolean;
@@ -32,7 +445,12 @@ interface NaverBlogSettings {
 }
 
 const DEFAULT_SETTINGS: NaverBlogSettings = {
+	aiProvider: 'openai',
 	openaiApiKey: '',
+	anthropicApiKey: '',
+	googleApiKey: '',
+	ollamaEndpoint: 'http://localhost:11434',
+	aiModel: 'gpt-4o-mini',
 	defaultFolder: 'Naver Blog Posts',
 	imageFolder: 'Naver Blog Posts/attachments',
 	enableAiTags: true,
@@ -51,9 +469,29 @@ interface ProcessedBlogPost extends NaverBlogPost {
 
 export default class NaverBlogPlugin extends Plugin {
 	settings: NaverBlogSettings;
+	i18n: I18n;
+	
+	// Cached API models
+	private openai_models: string[] = [];
+	private anthropic_models: string[] = [];
+	private google_models: string[] = [];
 
 	async onload() {
 		await this.loadSettings();
+		
+		// Initialize translations
+		this.i18n = new I18n(this.app);
+		// Detect locale from Obsidian's language setting
+		const locale = this.detectLocale();
+		await this.i18n.loadTranslations(locale);
+		
+		// Listen for Obsidian language changes
+		this.setupLanguageChangeListener();
+
+		// Fetch models from APIs in background
+		this.refreshModels().catch(error => {
+			console.log('Failed to refresh models on startup:', error);
+		});
 
 		// Add ribbon icon
 		this.addRibbonIcon('download', 'Import Naver Blog', (evt: MouseEvent) => {
@@ -63,7 +501,7 @@ export default class NaverBlogPlugin extends Plugin {
 		// Add commands
 		this.addCommand({
 			id: 'import-naver-blog',
-			name: 'Import from Naver Blog',
+			name: this.i18n.t('commands.import-blog-url'),
 			callback: () => {
 				new NaverBlogImportModal(this.app, this).open();
 			}
@@ -71,7 +509,7 @@ export default class NaverBlogPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'subscribe-naver-blog',
-			name: 'Subscribe to Naver Blog',
+			name: this.i18n.t('commands.sync-subscribed-blogs'),
 			callback: () => {
 				new NaverBlogSubscribeModal(this.app, this).open();
 			}
@@ -79,7 +517,7 @@ export default class NaverBlogPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'import-single-post',
-			name: 'Import Single Naver Blog Post',
+			name: this.i18n.t('commands.import-single-post'),
 			callback: () => {
 				new NaverBlogSinglePostModal(this.app, this).open();
 			}
@@ -87,18 +525,19 @@ export default class NaverBlogPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'rewrite-current-note',
-			name: 'AI Fix Layout and Format (Preserve Content 100%)',
+			name: this.i18n.t('commands.ai-fix-layout'),
 			callback: async () => {
 				// Check API key first
-				if (!this.settings.openaiApiKey || this.settings.openaiApiKey.trim() === '') {
-					new Notice('❌ OpenAI API Key required for AI formatting', 8000);
-					new Notice('💡 Please set your API key in plugin settings', 5000);
+				const apiKey = this.getApiKey();
+				if (!apiKey || apiKey.trim() === '') {
+					new Notice(this.i18n.t('notices.api_key_required', { provider: this.settings.aiProvider.toUpperCase() }), 8000);
+					new Notice(this.i18n.t('notices.set_api_key'), 5000);
 					return;
 				}
 
 				const activeFile = this.app.workspace.getActiveFile();
 				if (!activeFile) {
-					new Notice('No active file selected for formatting');
+					new Notice(this.i18n.t('notices.no_active_file'));
 					return;
 				}
 
@@ -129,6 +568,13 @@ export default class NaverBlogPlugin extends Plugin {
 	}
 
 	async saveSettings() {
+		// Ensure default values are used if folders are empty
+		if (!this.settings.defaultFolder || this.settings.defaultFolder.trim() === '') {
+			this.settings.defaultFolder = DEFAULT_SETTINGS.defaultFolder;
+		}
+		if (!this.settings.imageFolder || this.settings.imageFolder.trim() === '') {
+			this.settings.imageFolder = DEFAULT_SETTINGS.imageFolder;
+		}
 		await this.saveData(this.settings);
 	}
 
@@ -179,112 +625,597 @@ export default class NaverBlogPlugin extends Plugin {
 		}
 	}
 
-	async generateAITags(title: string, content: string): Promise<string[]> {
-		if (!this.settings.enableAiTags || !this.settings.openaiApiKey) {
+	async callAI(messages: Array<{role: string, content: string}>, maxTokens: number = 150): Promise<string> {
+		const apiKey = this.getApiKey();
+		if (!apiKey) {
+			throw new Error('No API key configured for selected AI provider');
+		}
+
+		const model = this.getModelName();
+		
+		switch (this.settings.aiProvider) {
+			case 'openai':
+				return await this.callOpenAI(messages, maxTokens, model, apiKey);
+			case 'anthropic':
+				return await this.callAnthropic(messages, maxTokens, model, apiKey);
+			case 'google':
+				return await this.callGoogle(messages, maxTokens, model, apiKey);
+			case 'ollama':
+				return await this.callOllama(messages, maxTokens, model);
+			default:
+				throw new Error(`Unsupported AI provider: ${this.settings.aiProvider}`);
+		}
+	}
+
+	private getApiKey(): string {
+		switch (this.settings.aiProvider) {
+			case 'openai': return this.settings.openaiApiKey;
+			case 'anthropic': return this.settings.anthropicApiKey;
+			case 'google': return this.settings.googleApiKey;
+			case 'ollama': return ''; // Ollama doesn't need API key
+			default: return '';
+		}
+	}
+
+	getModelName(): string {
+		if (this.settings.aiModel) {
+			return this.settings.aiModel;
+		}
+		
+		return this.getDefaultModelForProvider(this.settings.aiProvider);
+	}
+	
+	getDefaultModelForProvider(provider: 'openai' | 'anthropic' | 'google' | 'ollama'): string {
+		// Default models per provider
+		switch (provider) {
+			case 'openai': return 'gpt-4o-mini';
+			case 'anthropic': return 'claude-3-haiku-20240307';
+			case 'google': return 'gemini-2.5-flash';
+			case 'ollama': return 'llama3.2:3b';
+			default: return 'gpt-4o-mini';
+		}
+	}
+
+	getAvailableModels(): string[] {
+		// Return cached models if available, otherwise fallback to static list
+		const cacheKey = `${this.settings.aiProvider}_models`;
+		const cachedModels = (this as any)[cacheKey];
+		
+		if (cachedModels && cachedModels.length > 0) {
+			return cachedModels;
+		}
+		
+		// Fallback to static models
+		return this.getStaticModels();
+	}
+	
+	getStaticModels(): string[] {
+		switch (this.settings.aiProvider) {
+			case 'openai':
+				return [
+					'gpt-4o',
+					'gpt-4o-mini',
+					'gpt-4-turbo',
+					'gpt-4',
+					'gpt-3.5-turbo',
+					'gpt-3.5-turbo-16k',
+					'o1-preview',
+					'o1-mini'
+				];
+			case 'anthropic':
+				return [
+					'claude-3-5-sonnet-20241022',
+					'claude-3-5-haiku-20241022',
+					'claude-3-opus-20240229',
+					'claude-3-sonnet-20240229',
+					'claude-3-haiku-20240307'
+				];
+			case 'google':
+				return [
+					'gemini-2.5-pro',
+					'gemini-2.5-flash',
+					'gemini-2.5-flash-lite-preview-06-17',
+					'gemini-2.0-flash',
+					'gemini-2.0-flash-lite',
+					'gemini-1.5-pro',
+					'gemini-1.5-pro-002',
+					'gemini-1.5-flash',
+					'gemini-1.5-flash-002',
+					'gemini-1.5-flash-8b',
+					'gemini-1.0-pro',
+					'gemini-1.0-pro-001',
+					'gemini-pro'
+				];
+			case 'ollama':
+				return [
+					'llama3.2:3b',
+					'llama3.2:1b',
+					'llama3.1:8b',
+					'mistral:7b',
+					'codellama:7b',
+					'phi3:mini',
+					'qwen2:7b'
+				];
+			default:
+				return ['gpt-4o-mini'];
+		}
+	}
+
+	async fetchModelsFromAPI(provider: 'openai' | 'anthropic' | 'google'): Promise<string[]> {
+		try {
+			switch (provider) {
+				case 'openai':
+					return await this.fetchOpenAIModels();
+				case 'anthropic':
+					return await this.fetchAnthropicModels();
+				case 'google':
+					return await this.fetchGoogleModels();
+				default:
+					return [];
+			}
+		} catch (error) {
+			console.error(`Failed to fetch models from ${provider}:`, error);
+			return [];
+		}
+	}
+
+	async fetchOpenAIModels(): Promise<string[]> {
+		const apiKey = this.settings.openaiApiKey;
+		if (!apiKey) {
 			return [];
 		}
 
 		try {
 			const response = await requestUrl({
-				url: 'https://api.openai.com/v1/chat/completions',
-				method: 'POST',
+				url: 'https://api.openai.com/v1/models',
+				method: 'GET',
 				headers: {
-					'Authorization': `Bearer ${this.settings.openaiApiKey}`,
+					'Authorization': `Bearer ${apiKey}`,
 					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					model: 'gpt-4o-mini',
-					messages: [
-						{
-							role: 'system',
-							content: '당신은 블로그 태그 생성 전문가입니다. 한국어 블로그 글을 분석하여 적절한 태그를 추천합니다.'
-						},
-						{
-							role: 'user',
-							content: `다음 블로그 글의 제목과 내용을 분석하여 적절한 태그를 생성해주세요.
-
-제목: ${title}
-내용: ${content.substring(0, 2000)}
-
-요구사항:
-1. 한국어 태그로 생성
-2. 3-7개의 태그 추천
-3. 글의 핵심 주제와 내용을 반영
-4. 일반적인 블로그 태그 형식 사용
-
-응답 형식: JSON 배열로만 응답 (예: ["리뷰", "기술", "일상"])`
-						}
-					],
-					max_tokens: 100,
-					temperature: 0.3
-				})
+				}
 			});
 
-			const data = response.json;
-			const content_text = data.choices[0].message.content.trim();
+			if (response.status === 200) {
+				const models = response.json.data
+					.map((model: any) => model.id)
+					.filter((id: string) => 
+						id.startsWith('gpt-') || 
+						id.startsWith('o1-') || 
+						id.startsWith('text-davinci') ||
+						id.startsWith('text-curie') ||
+						id.startsWith('text-babbage') ||
+						id.startsWith('text-ada')
+					)
+					.sort();
+				
+				console.log(`Fetched ${models.length} OpenAI models`);
+				return models;
+			}
+		} catch (error) {
+			console.error('OpenAI models fetch error:', error);
+		}
+		
+		return [];
+	}
+
+	async fetchAnthropicModels(): Promise<string[]> {
+		const apiKey = this.settings.anthropicApiKey;
+		if (!apiKey) {
+			return [];
+		}
+
+		try {
+			const response = await requestUrl({
+				url: 'https://api.anthropic.com/v1/models',
+				method: 'GET',
+				headers: {
+					'x-api-key': apiKey,
+					'Content-Type': 'application/json',
+					'anthropic-version': '2023-06-01'
+				}
+			});
+
+			if (response.status === 200) {
+				const models = response.json.data
+					.map((model: any) => model.id)
+					.filter((id: string) => id.startsWith('claude-'))
+					.sort();
+				
+				console.log(`Fetched ${models.length} Anthropic models`);
+				return models;
+			}
+		} catch (error) {
+			console.error('Anthropic models fetch error:', error);
+		}
+		
+		return [];
+	}
+
+	async fetchGoogleModels(): Promise<string[]> {
+		const apiKey = this.settings.googleApiKey;
+		if (!apiKey) {
+			return [];
+		}
+
+		try {
+			const response = await requestUrl({
+				url: `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
+				method: 'GET',
+				headers: {
+					'Content-Type': 'application/json'
+				}
+			});
+
+			if (response.status === 200) {
+				const models = response.json.models
+					.filter((model: any) => {
+						// Check if model supports generateContent
+						const supportedMethods = model.supportedGenerationMethods || [];
+						const hasGenerateContent = supportedMethods.includes('generateContent');
+						
+						// More flexible filtering - include all gemini models that support text generation
+						const modelName = model.name.toLowerCase();
+						const isGeminiModel = modelName.includes('gemini');
+						const isTextModel = !modelName.includes('embedding') && 
+							!modelName.includes('vision') && 
+							!modelName.includes('code') && 
+							!modelName.includes('image');
+						
+						// Debug logging for all models to see what's available
+						console.log(`Google model: ${model.name}, supports generateContent: ${hasGenerateContent}, is gemini: ${isGeminiModel}, is text: ${isTextModel}`);
+						
+						return hasGenerateContent && isGeminiModel && isTextModel;
+					})
+					.map((model: any) => {
+						// Remove 'models/' prefix and return clean model name
+						const cleanName = model.name.replace('models/', '');
+						return cleanName;
+					})
+					.sort();
+				
+				console.log(`Fetched ${models.length} Google models:`, models);
+				return models;
+			}
+		} catch (error) {
+			console.error('Google models fetch error:', error);
+		}
+		
+		return [];
+	}
+
+	async refreshModels(provider?: 'openai' | 'anthropic' | 'google'): Promise<void> {
+		const providersToRefresh = provider ? [provider] : ['openai', 'anthropic', 'google'];
+		
+		for (const p of providersToRefresh) {
+			const models = await this.fetchModelsFromAPI(p as 'openai' | 'anthropic' | 'google');
+			if (models.length > 0) {
+				const cacheKey = `${p}_models`;
+				(this as any)[cacheKey] = models;
+			}
+		}
+	}
+
+	detectLocale(): string {
+		// Primary: Use Obsidian's language setting (most reliable)
+		const obsidianLang = window.localStorage.getItem('language');
+		if (obsidianLang) {
+			console.log('Detected Obsidian language:', obsidianLang);
+			return obsidianLang;
+		}
+		
+		// Fallback: Use moment.locale() (though unreliable in newer Obsidian versions)
+		try {
+			const momentLang = (window as any).moment?.locale();
+			if (momentLang) {
+				console.log('Detected moment language:', momentLang);
+				return momentLang;
+			}
+		} catch (e) {
+			// Ignore moment errors
+		}
+		
+		// Final fallback: Use system locale
+		if (navigator.language.startsWith('ko') || 
+		    navigator.languages.some(lang => lang.startsWith('ko')) ||
+		    Intl.DateTimeFormat().resolvedOptions().locale.startsWith('ko')) {
+			console.log('Detected system language: ko');
+			return 'ko';
+		}
+		
+		console.log('Defaulting to language: en');
+		return 'en';
+	}
+
+	setupLanguageChangeListener(): void {
+		// Listen for localStorage changes (when user changes language in Obsidian)
+		const handleStorageChange = async (event: StorageEvent) => {
+			if (event.key === 'language' && event.newValue !== event.oldValue) {
+				console.log('Obsidian language changed to:', event.newValue);
+				
+				// Reload translations with new language
+				const newLocale = event.newValue || 'en';
+				await this.i18n.loadTranslations(newLocale);
+				
+				// Refresh UI elements if settings tab is open
+				const settingsTab = (this.app as any).setting?.activeTab;
+				if (settingsTab && settingsTab.id === 'naver-blog-importer') {
+					// Refresh the settings display
+					(settingsTab as any).display?.();
+				}
+			}
+		};
+		
+		window.addEventListener('storage', handleStorageChange);
+		
+		// Clean up listener on unload
+		this.register(() => {
+			window.removeEventListener('storage', handleStorageChange);
+		});
+	}
+
+	private async callOpenAI(messages: Array<{role: string, content: string}>, maxTokens: number, model: string, apiKey: string): Promise<string> {
+		const response = await requestUrl({
+			url: 'https://api.openai.com/v1/chat/completions',
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${apiKey}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				model: model,
+				messages: messages,
+				max_tokens: maxTokens,
+				temperature: 0.3
+			})
+		});
+
+		if (response.status === 200) {
+			return response.json.choices[0].message.content.trim();
+		} else {
+			throw new Error(`OpenAI API error: ${response.status}`);
+		}
+	}
+
+	private async callAnthropic(messages: Array<{role: string, content: string}>, maxTokens: number, model: string, apiKey: string): Promise<string> {
+		// Convert messages format for Claude
+		const systemMessage = messages.find(m => m.role === 'system')?.content || '';
+		const userMessages = messages.filter(m => m.role !== 'system');
+		
+		const response = await requestUrl({
+			url: 'https://api.anthropic.com/v1/messages',
+			method: 'POST',
+			headers: {
+				'x-api-key': apiKey,
+				'Content-Type': 'application/json',
+				'anthropic-version': '2023-06-01'
+			},
+			body: JSON.stringify({
+				model: model,
+				max_tokens: maxTokens,
+				system: systemMessage,
+				messages: userMessages
+			})
+		});
+
+		if (response.status === 200) {
+			return response.json.content[0].text.trim();
+		} else {
+			throw new Error(`Anthropic API error: ${response.status}`);
+		}
+	}
+
+	private async callGoogle(messages: Array<{role: string, content: string}>, maxTokens: number, model: string, apiKey: string): Promise<string> {
+		// Convert messages format for Gemini
+		const contents = messages.map(m => ({
+			role: m.role === 'assistant' ? 'model' : 'user',
+			parts: [{ text: m.content }]
+		}));
+
+		// Retry logic for 503 errors
+		const maxRetries = 3;
+		for (let attempt = 1; attempt <= maxRetries; attempt++) {
+			try {
+				const response = await requestUrl({
+					url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						contents: contents,
+						generationConfig: {
+							maxOutputTokens: maxTokens,
+							temperature: 0.3
+						},
+						systemInstruction: {
+							parts: [{ text: "You are a helpful assistant. Respond directly and concisely without showing your thinking process or reasoning. Give only the final answer." }]
+						}
+					})
+				});
+
+				if (response.status === 200) {
+					const data = response.json;
+					
+					// Debug log the full response
+					console.log('Google API full response:', JSON.stringify(data, null, 2));
+					
+					// Check if response has candidates
+					if (!data.candidates || data.candidates.length === 0) {
+						console.error('Google API response missing candidates:', data);
+						throw new Error('Google API response missing candidates');
+					}
+					
+					const candidate = data.candidates[0];
+					console.log('Google API candidate:', JSON.stringify(candidate, null, 2));
+					
+					// Check if candidate has content
+					if (!candidate.content) {
+						console.error('Google API candidate missing content:', candidate);
+						throw new Error('Google API candidate missing content');
+					}
+					
+					// Handle MAX_TOKENS finish reason - response may be incomplete
+					if (candidate.finishReason === 'MAX_TOKENS') {
+						console.warn('Google API response was truncated due to MAX_TOKENS');
+						if (!candidate.content.parts || candidate.content.parts.length === 0) {
+							console.error('Google API response completely truncated - no usable content');
+							throw new Error('Google API response completely truncated - try increasing maxTokens or reducing input size');
+						}
+					}
+					
+					if (!candidate.content.parts || candidate.content.parts.length === 0) {
+						console.error('Google API candidate content missing parts:', candidate.content);
+						throw new Error('Google API candidate content missing parts');
+					}
+					
+					const text = candidate.content.parts[0].text;
+					if (!text) {
+						console.error('Google API content missing text:', candidate.content.parts[0]);
+						throw new Error('Google API content missing text');
+					}
+					
+					return text.trim();
+				} else if (response.status === 503 && attempt < maxRetries) {
+					// 503 Service Unavailable - retry with exponential backoff
+					const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+					console.warn(`Google API 503 error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+					// Show retry notice
+					const retryNotice = new Notice(`API 서버 과부하, ${delay/1000}초 후 재시도... (${attempt}/${maxRetries})`, delay);
+					await new Promise(resolve => setTimeout(resolve, delay));
+					continue;
+				} else {
+					console.error('Google API error:', response.status, response.text);
+					throw new Error(`Google API error: ${response.status} - ${response.text}`);
+				}
+			} catch (error) {
+				if (attempt === maxRetries) {
+					throw error;
+				}
+				console.warn(`Google API request failed (attempt ${attempt}/${maxRetries}):`, error);
+				// Wait before retrying
+				await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+			}
+		}
+		
+		throw new Error('Google API: Maximum retries exceeded');
+	}
+
+	private async callOllama(messages: Array<{role: string, content: string}>, maxTokens: number, model: string): Promise<string> {
+		const response = await requestUrl({
+			url: `${this.settings.ollamaEndpoint}/api/chat`,
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				model: model,
+				messages: messages,
+				stream: false,
+				options: {
+					num_predict: maxTokens,
+					temperature: 0.3
+				}
+			})
+		});
+
+		if (response.status === 200) {
+			return response.json.message.content.trim();
+		} else {
+			throw new Error(`Ollama API error: ${response.status}`);
+		}
+	}
+
+	async generateAITags(title: string, content: string): Promise<string[]> {
+		if (!this.settings.enableAiTags) {
+			return [];
+		}
+
+		// Show progress notice
+		const notice = new Notice(this.i18n.t('notices.generating_ai_tags'), 0);
+		
+		try {
+			const messages = [
+				{
+					role: 'user',
+					content: `다음 블로그 글에 적합한 한국어 태그 3-7개를 JSON 배열로 생성해주세요.
+
+제목: ${title}
+내용: ${content.substring(0, 800)}
+
+JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
+				}
+			];
+
+			// Use higher maxTokens for Pro models due to thinking mode
+			const maxTokens = this.settings.aiModel.includes('pro') ? 10000 : 4000;
+			const content_text = await this.callAI(messages, maxTokens);
 			
 			try {
-				const tags = JSON.parse(content_text);
+				// Remove markdown code blocks if present
+				let cleanedText = content_text;
+				if (cleanedText.includes('```json')) {
+					cleanedText = cleanedText.replace(/```json\n?/, '').replace(/\n?```$/, '');
+				}
+				if (cleanedText.includes('```')) {
+					cleanedText = cleanedText.replace(/```\n?/, '').replace(/\n?```$/, '');
+				}
+				
+				const tags = JSON.parse(cleanedText.trim());
 				return Array.isArray(tags) ? tags : [];
 			} catch (parseError) {
-				// Fallback parsing
-				const matches = content_text.match(/\[(.*?)\]/);
+				console.warn('Failed to parse tags as JSON:', content_text);
+				// Fallback parsing - extract array from text
+				const matches = content_text.match(/\[(.*?)\]/s);
 				if (matches) {
-					return matches[1].split(',').map((tag: string) => tag.trim().replace(/"/g, ''));
+					try {
+						// Try to parse the matched content as JSON
+						const arrayContent = '[' + matches[1] + ']';
+						const tags = JSON.parse(arrayContent);
+						return Array.isArray(tags) ? tags : [];
+					} catch (e) {
+						// Manual parsing if JSON fails
+						return matches[1].split(',').map((tag: string) => tag.trim().replace(/["\n]/g, ''));
+					}
 				}
 				return [];
 			}
 		} catch (error) {
 			console.error('Error generating AI tags:', error);
 			return [];
+		} finally {
+			notice.hide();
 		}
 	}
 
 	async generateAIExcerpt(title: string, content: string): Promise<string> {
-		if (!this.settings.enableAiExcerpt || !this.settings.openaiApiKey) {
+		if (!this.settings.enableAiExcerpt) {
 			return '';
 		}
 
+		// Show progress notice
+		const notice = new Notice(this.i18n.t('notices.generating_ai_excerpt'), 0);
+		
 		try {
-			const response = await requestUrl({
-				url: 'https://api.openai.com/v1/chat/completions',
-				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${this.settings.openaiApiKey}`,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					model: 'gpt-4o-mini',
-					messages: [
-						{
-							role: 'system',
-							content: '당신은 블로그 요약 전문가입니다. 한국어 블로그 글을 분석하여 매력적인 요약을 작성합니다.'
-						},
-						{
-							role: 'user',
-							content: `다음 블로그 글의 제목과 내용을 분석하여 적절한 요약(excerpt)을 생성해주세요.
+			const messages = [
+				{
+					role: 'user',
+					content: `다음 블로그 글을 1-2문장으로 요약해주세요.
 
 제목: ${title}
-내용: ${content.substring(0, 1500)}
+내용: ${content.substring(0, 500)}
 
-요구사항:
-1. 한국어로 작성
-2. 1-2문장으로 간결하게 요약
-3. 글의 핵심 내용과 목적을 포함
-4. 독자의 관심을 끌 수 있도록 작성
-5. 따옴표 없이 본문만 응답`
-						}
-					],
-					max_tokens: 150,
-					temperature: 0.3
-				})
-			});
+한국어로 간결하게 요약하고, 따옴표 없이 본문만 응답하세요.`
+				}
+			];
 
-			const data = response.json;
-			return data.choices[0].message.content.trim();
+			// Use higher maxTokens for Pro models due to thinking mode
+			const maxTokens = this.settings.aiModel.includes('pro') ? 10000 : 4000;
+			return await this.callAI(messages, maxTokens);
 		} catch (error) {
 			console.error('Error generating AI excerpt:', error);
 			return '';
+		} finally {
+			notice.hide();
 		}
 	}
 
@@ -296,6 +1227,10 @@ export default class NaverBlogPlugin extends Plugin {
 			}
 			
 			if (this.settings.enableAiExcerpt) {
+				// Add small delay between AI calls to avoid rate limiting
+				if (this.settings.enableAiTags) {
+					await new Promise(resolve => setTimeout(resolve, 1000));
+				}
 				post.excerpt = await this.generateAIExcerpt(post.title, post.content);
 			}
 
@@ -307,7 +1242,7 @@ export default class NaverBlogPlugin extends Plugin {
 
 			// Create filename - just title.md without date prefix and hyphen replacements
 			const filename = this.sanitizeFilename(`${post.title}.md`);
-			const folder = this.settings.defaultFolder;
+			const folder = this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder;
 			
 			// Ensure folder exists
 			if (!await this.app.vault.adapter.exists(folder)) {
@@ -363,7 +1298,7 @@ logNo: "${post.logNo}"
 
 		try {
 			// Create attachments folder
-			const attachmentsFolder = this.settings.imageFolder;
+			const attachmentsFolder = this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder;
 			if (!await this.app.vault.adapter.exists(attachmentsFolder)) {
 				await this.app.vault.createFolder(attachmentsFolder);
 			}
@@ -457,8 +1392,8 @@ logNo: "${post.logNo}"
 						}
 						
 						// Update content with local path (relative to default folder)
-						const defaultFolderPath = this.settings.defaultFolder;
-						const imageFolderPath = this.settings.imageFolder;
+						const defaultFolderPath = this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder;
+						const imageFolderPath = this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder;
 						
 						// Calculate relative path from default folder to image folder
 						let relativePath = '';
@@ -540,8 +1475,8 @@ logNo: "${post.logNo}"
 								const imagePath = `${attachmentsFolder}/${filename}`;
 								await this.app.vault.adapter.writeBinary(imagePath, altResponse.arrayBuffer);
 								
-								const defaultFolderPath = this.settings.defaultFolder;
-								const imageFolderPath = this.settings.imageFolder;
+								const defaultFolderPath = this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder;
+								const imageFolderPath = this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder;
 								let relativePath = '';
 								if (imageFolderPath.startsWith(defaultFolderPath)) {
 									relativePath = imageFolderPath.substring(defaultFolderPath.length + 1);
@@ -612,8 +1547,8 @@ logNo: "${post.logNo}"
 				return;
 			}
 
-			// Call OpenAI for layout fixing
-			const fixedContent = await this.callOpenAIForLayoutFix(cleanBody);
+			// Call AI for layout fixing
+			const fixedContent = await this.callAIForLayoutFix(cleanBody);
 			
 			if (!fixedContent) {
 				new Notice('❌ AI formatting failed. Please try again.');
@@ -651,21 +1586,12 @@ logNo: "${post.logNo}"
 		}
 	}
 
-	async callOpenAIForLayoutFix(content: string): Promise<string> {
+	async callAIForLayoutFix(content: string): Promise<string> {
 		try {
-			const response = await requestUrl({
-				url: 'https://api.openai.com/v1/chat/completions',
-				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${this.settings.openaiApiKey}`,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					model: 'gpt-4o', // Using gpt-4o for better cost efficiency
-					messages: [
-						{
-							role: 'user',
-							content: `다음은 네이버 블로그에서 HTML 파싱으로 가져온 텍스트입니다. HTML 파싱 과정에서 레이아웃이 깨지고 형식이 망가진 부분을 수정해주세요.
+			const messages = [
+				{
+					role: 'user',
+					content: `다음은 네이버 블로그에서 HTML 파싱으로 가져온 텍스트입니다. HTML 파싱 과정에서 레이아웃이 깨지고 형식이 망가진 부분을 수정해주세요.
 
 ⚠️ **중요**: 원문의 내용은 100% 그대로 유지하고, 오직 마크다운 형식과 레이아웃만 수정해주세요.
 
@@ -685,43 +1611,30 @@ logNo: "${post.logNo}"
 ${content}
 
 위 내용의 형식만 깔끔하게 수정해서 마크다운으로 출력해주세요.`
-						}
-					],
-					max_tokens: 4000,
-					temperature: 0.1
-				})
-			});
+				}
+			];
 
-			if (response.status === 200 && response.json?.choices?.[0]?.message?.content) {
-				let content = response.json.choices[0].message.content.trim();
-				
-				// Remove markdown code block wrappers if present
-				if (content.startsWith('```markdown\n') && content.endsWith('\n```')) {
-					content = content.substring(12, content.length - 4).trim();
-				} else if (content.startsWith('```\n') && content.endsWith('\n```')) {
-					content = content.substring(4, content.length - 4).trim();
-				}
-				
-				return content;
-			} else {
-				// Enhanced error handling
-				let errorMsg = `OpenAI API error: ${response.status}`;
-				if (response.json?.error?.message) {
-					errorMsg += ` - ${response.json.error.message}`;
-				}
-				throw new Error(errorMsg);
+			let fixedContent = await this.callAI(messages, 4000);
+			
+			// Remove markdown code block wrappers if present
+			if (fixedContent.startsWith('```markdown\n') && fixedContent.endsWith('\n```')) {
+				fixedContent = fixedContent.substring(12, fixedContent.length - 4).trim();
+			} else if (fixedContent.startsWith('```\n') && fixedContent.endsWith('\n```')) {
+				fixedContent = fixedContent.substring(4, fixedContent.length - 4).trim();
 			}
 			
+			return fixedContent;
+			
 		} catch (error) {
-			console.error('OpenAI API call failed:', error);
+			console.error('AI formatting call failed:', error);
 			
 			// Re-throw with more specific error types
 			if (error.message.includes('401') || error.message.includes('Invalid')) {
-				throw new Error('401');
+				throw new Error(`Invalid API key. Please check your ${this.settings.aiProvider.toUpperCase()} API key in settings.`);
 			} else if (error.message.includes('quota') || error.message.includes('billing')) {
-				throw new Error('quota');
+				throw new Error(`API quota exceeded. Please check your ${this.settings.aiProvider.toUpperCase()} billing.`);
 			} else if (error.message.includes('network') || error.message.includes('fetch')) {
-				throw new Error('network');
+				throw new Error('Network error. Please check your internet connection.');
 			} else {
 				throw error;
 			}
@@ -900,7 +1813,7 @@ ${content}
 				
 				// Get blog-specific post count or use default
 				const blogSubscription = this.settings.blogSubscriptions.find(sub => sub.blogId === blogId);
-				const postCount = blogSubscription?.postCount || this.settings.subscriptionCount;
+				const postCount = blogSubscription?.postCount || 10;
 				
 				try {
 					new Notice(`Syncing blog ${blogProgress}: ${blogId} (${postCount} posts)`, 5000);
@@ -961,16 +1874,16 @@ class NaverBlogImportModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl("h2", { text: "Import from Naver Blog" });
+		contentEl.createEl("h2", { text: this.plugin.i18n.t('modals.import_blog_url.title') });
 
 		let inputElement: HTMLInputElement;
 
 		new Setting(contentEl)
-			.setName("Blog ID")
-			.setDesc("Enter the Naver Blog ID (e.g., 'yonofbooks')")
+			.setName(this.plugin.i18n.t('modals.import_blog_url.url_label'))
+			.setDesc(this.plugin.i18n.t('modals.import_blog_url.url_placeholder'))
 			.addText(text => {
 				inputElement = text.inputEl;
-				text.setPlaceholder("Blog ID")
+				text.setPlaceholder(this.plugin.i18n.t('modals.import_blog_url.url_label'))
 					.setValue(this.blogId)
 					.onChange(async (value) => {
 						this.blogId = value;
@@ -987,7 +1900,7 @@ class NaverBlogImportModal extends Modal {
 
 		new Setting(contentEl)
 			.addButton(btn => btn
-				.setButtonText("Import Posts")
+				.setButtonText(this.plugin.i18n.t('modals.import_blog_url.import_button'))
 				.setCta()
 				.onClick(async () => {
 					this.handleImport();
@@ -1118,16 +2031,16 @@ class NaverBlogSubscribeModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl("h2", { text: "Subscribe to Naver Blog" });
+		contentEl.createEl("h2", { text: this.plugin.i18n.t('modals.subscribe_blog.title') });
 
 		let inputElement: HTMLInputElement;
 
 		new Setting(contentEl)
-			.setName("Blog ID")
-			.setDesc("Enter the Naver Blog ID to subscribe to")
+			.setName(this.plugin.i18n.t('modals.subscribe_blog.blog_id_label'))
+			.setDesc(this.plugin.i18n.t('modals.subscribe_blog.blog_id_desc'))
 			.addText(text => {
 				inputElement = text.inputEl;
-				text.setPlaceholder("Blog ID")
+				text.setPlaceholder(this.plugin.i18n.t('modals.subscribe_blog.blog_id_placeholder'))
 					.setValue(this.blogId)
 					.onChange(async (value) => {
 						this.blogId = value;
@@ -1143,7 +2056,7 @@ class NaverBlogSubscribeModal extends Modal {
 
 		new Setting(contentEl)
 			.addButton(btn => btn
-				.setButtonText("Subscribe")
+				.setButtonText(this.plugin.i18n.t('modals.subscribe_blog.subscribe_button'))
 				.setCta()
 				.onClick(async () => {
 					this.handleSubscribe();
@@ -1172,7 +2085,7 @@ class NaverBlogSubscribeModal extends Modal {
 		// Initialize blog subscription with default count
 		this.plugin.settings.blogSubscriptions.push({
 			blogId: this.blogId,
-			postCount: this.plugin.settings.subscriptionCount
+			postCount: 10
 		});
 		
 		await this.plugin.saveSettings();
@@ -1202,22 +2115,115 @@ class NaverBlogSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Naver Blog Importer Settings' });
+		containerEl.createEl('h2', { text: this.plugin.i18n.t('settings.title') });
+
+		containerEl.createEl('h3', { text: this.plugin.i18n.t('settings.ai_configuration') });
 
 		new Setting(containerEl)
-			.setName('OpenAI API Key')
-			.setDesc('Enter your OpenAI API key for AI-generated tags and excerpts')
-			.addText(text => text
-				.setPlaceholder('sk-...')
-				.setValue(this.plugin.settings.openaiApiKey)
-				.onChange(async (value) => {
-					this.plugin.settings.openaiApiKey = value;
+			.setName(this.plugin.i18n.t('settings.ai_provider'))
+			.setDesc(this.plugin.i18n.t('settings.ai_provider_desc'))
+			.addDropdown(dropdown => dropdown
+				.addOption('openai', this.plugin.i18n.t('providers.openai'))
+				.addOption('anthropic', this.plugin.i18n.t('providers.anthropic'))
+				.addOption('google', this.plugin.i18n.t('providers.google'))
+				.addOption('ollama', this.plugin.i18n.t('providers.ollama'))
+				.setValue(this.plugin.settings.aiProvider)
+				.onChange(async (value: 'openai' | 'anthropic' | 'google' | 'ollama') => {
+					this.plugin.settings.aiProvider = value;
+					// Auto-select default model for the new provider
+					this.plugin.settings.aiModel = this.plugin.getDefaultModelForProvider(value);
 					await this.plugin.saveSettings();
+					
+					// Refresh models for the new provider
+					if (value !== 'ollama') {
+						this.plugin.refreshModels(value as 'openai' | 'anthropic' | 'google').catch(error => {
+							console.log(`Failed to refresh models for ${value}:`, error);
+						});
+					}
+					
+					this.display(); // Refresh settings to show appropriate API key field and model
 				}));
 
+		const modelSetting = new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.ai_model'))
+			.setDesc(this.plugin.i18n.t('settings.ai_model_desc'))
+			.addDropdown(dropdown => {
+				const availableModels = this.plugin.getAvailableModels();
+				
+				// Add available models to dropdown
+				availableModels.forEach(model => {
+					dropdown.addOption(model, model);
+				});
+				
+				// Set current value or default
+				const currentModel = this.plugin.settings.aiModel || this.plugin.getModelName();
+				dropdown.setValue(currentModel);
+				
+				dropdown.onChange(async (value) => {
+					this.plugin.settings.aiModel = value;
+					await this.plugin.saveSettings();
+				});
+			});
+
+
+		// Show appropriate API key field based on provider
+		switch (this.plugin.settings.aiProvider) {
+			case 'openai':
+				new Setting(containerEl)
+					.setName(this.plugin.i18n.t('settings.openai_api_key'))
+					.setDesc(this.plugin.i18n.t('settings.openai_api_key_desc'))
+					.addText(text => text
+						.setPlaceholder('sk-...')
+						.setValue(this.plugin.settings.openaiApiKey)
+						.onChange(async (value) => {
+							this.plugin.settings.openaiApiKey = value;
+							await this.plugin.saveSettings();
+						}));
+				break;
+				
+			case 'anthropic':
+				new Setting(containerEl)
+					.setName(this.plugin.i18n.t('settings.anthropic_api_key'))
+					.setDesc(this.plugin.i18n.t('settings.anthropic_api_key_desc'))
+					.addText(text => text
+						.setPlaceholder('sk-ant-...')
+						.setValue(this.plugin.settings.anthropicApiKey)
+						.onChange(async (value) => {
+							this.plugin.settings.anthropicApiKey = value;
+							await this.plugin.saveSettings();
+						}));
+				break;
+				
+			case 'google':
+				new Setting(containerEl)
+					.setName(this.plugin.i18n.t('settings.google_api_key'))
+					.setDesc(this.plugin.i18n.t('settings.google_api_key_desc'))
+					.addText(text => text
+						.setPlaceholder('AIza...')
+						.setValue(this.plugin.settings.googleApiKey)
+						.onChange(async (value) => {
+							this.plugin.settings.googleApiKey = value;
+							await this.plugin.saveSettings();
+						}));
+				break;
+				
+			case 'ollama':
+				new Setting(containerEl)
+					.setName(this.plugin.i18n.t('settings.ollama_endpoint'))
+					.setDesc(this.plugin.i18n.t('settings.ollama_endpoint_desc'))
+					.addText(text => text
+						.setPlaceholder('http://localhost:11434')
+						.setValue(this.plugin.settings.ollamaEndpoint)
+						.onChange(async (value) => {
+							this.plugin.settings.ollamaEndpoint = value;
+							await this.plugin.saveSettings();
+						}));
+				break;
+		}
+
 		new Setting(containerEl)
-			.setName('Default Folder')
-			.setDesc('Folder where imported posts will be saved')
+			.setName(this.plugin.i18n.t('settings.default_folder'))
+			.setDesc(this.plugin.i18n.t('settings.default_folder_desc'))
 			.addText(text => {
 				const input = text
 					.setPlaceholder('Naver Blog Posts')
@@ -1242,8 +2248,8 @@ class NaverBlogSettingTab extends PluginSettingTab {
 			});
 
 		new Setting(containerEl)
-			.setName('Enable AI Tags')
-			.setDesc('Generate tags using AI (requires OpenAI API key)')
+			.setName(this.plugin.i18n.t('settings.enable_ai_tags'))
+			.setDesc(this.plugin.i18n.t('settings.enable_ai_tags_desc'))
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.enableAiTags)
 				.onChange(async (value) => {
@@ -1252,8 +2258,8 @@ class NaverBlogSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Enable AI Excerpt')
-			.setDesc('Generate excerpts using AI (requires OpenAI API key)')
+			.setName(this.plugin.i18n.t('settings.enable_ai_excerpt'))
+			.setDesc(this.plugin.i18n.t('settings.enable_ai_excerpt_desc'))
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.enableAiExcerpt)
 				.onChange(async (value) => {
@@ -1262,8 +2268,8 @@ class NaverBlogSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Enable Duplicate Check')
-			.setDesc('Skip importing posts that already exist (based on logNo)')
+			.setName(this.plugin.i18n.t('settings.enable_duplicate_check'))
+			.setDesc(this.plugin.i18n.t('settings.enable_duplicate_check_desc'))
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.enableDuplicateCheck)
 				.onChange(async (value) => {
@@ -1272,8 +2278,8 @@ class NaverBlogSettingTab extends PluginSettingTab {
 				}));
 
 		new Setting(containerEl)
-			.setName('Enable Image Download')
-			.setDesc('Download and save images from blog posts')
+			.setName(this.plugin.i18n.t('settings.enable_image_download'))
+			.setDesc(this.plugin.i18n.t('settings.enable_image_download_desc'))
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.enableImageDownload)
 				.onChange(async (value) => {
@@ -1284,8 +2290,8 @@ class NaverBlogSettingTab extends PluginSettingTab {
 
 		if (this.plugin.settings.enableImageDownload) {
 			new Setting(containerEl)
-				.setName('Image Folder')
-				.setDesc('Folder where downloaded images will be saved')
+				.setName(this.plugin.i18n.t('settings.image_folder'))
+				.setDesc(this.plugin.i18n.t('settings.image_folder_desc'))
 				.addText(text => {
 					const input = text
 						.setPlaceholder('Naver Blog Posts/attachments')
@@ -1310,32 +2316,21 @@ class NaverBlogSettingTab extends PluginSettingTab {
 				});
 		}
 
-		new Setting(containerEl)
-			.setName('Subscription Count')
-			.setDesc('Number of recent posts to fetch for subscribed blogs')
-			.addText(text => text
-				.setPlaceholder('10')
-				.setValue(this.plugin.settings.subscriptionCount.toString())
-				.onChange(async (value) => {
-					const count = parseInt(value) || 10;
-					this.plugin.settings.subscriptionCount = count;
-					await this.plugin.saveSettings();
-				}));
 
-		containerEl.createEl('h3', { text: 'Subscribed Blogs' });
+		containerEl.createEl('h3', { text: this.plugin.i18n.t('settings.subscribed_blogs') });
 		
 		const subscriptionDiv = containerEl.createDiv();
 		this.displaySubscriptions(subscriptionDiv);
 
 		new Setting(containerEl)
-			.setName('Add Blog Subscription')
-			.setDesc('Add a blog ID to automatically sync new posts')
+			.setName(this.plugin.i18n.t('settings.add_blog_id'))
+			.setDesc(this.plugin.i18n.t('settings.add_blog_id_desc'))
 			.addText(text => {
 				text.setPlaceholder('Blog ID (e.g., yonofbooks)');
 				return text;
 			})
 			.addButton(button => button
-				.setButtonText('Add')
+				.setButtonText(this.plugin.i18n.t('settings.add_button'))
 				.onClick(async () => {
 					const input = button.buttonEl.previousElementSibling as HTMLInputElement;
 					const blogId = input.value.trim();
@@ -1345,7 +2340,7 @@ class NaverBlogSettingTab extends PluginSettingTab {
 						// Initialize blog subscription with default count
 						this.plugin.settings.blogSubscriptions.push({
 							blogId: blogId,
-							postCount: this.plugin.settings.subscriptionCount
+							postCount: 10
 						});
 						
 						await this.plugin.saveSettings();
@@ -1359,7 +2354,7 @@ class NaverBlogSettingTab extends PluginSettingTab {
 		containerEl.empty();
 		
 		if (this.plugin.settings.subscribedBlogs.length === 0) {
-			containerEl.createEl('p', { text: 'No subscribed blogs' });
+			containerEl.createEl('p', { text: this.plugin.i18n.t('settings.no_subscribed_blogs') });
 			return;
 		}
 
@@ -1383,12 +2378,12 @@ class NaverBlogSettingTab extends PluginSettingTab {
 			countDiv.style.alignItems = 'center';
 			countDiv.style.gap = '5px';
 			
-			const countLabel = countDiv.createEl('span', { text: 'Posts:' });
+			const countLabel = countDiv.createEl('span', { text: this.plugin.i18n.t('settings.posts_label') + ':' });
 			countLabel.style.fontSize = '0.9em';
 			countLabel.style.color = 'var(--text-muted)';
 			
 			const blogSubscription = this.plugin.settings.blogSubscriptions.find(sub => sub.blogId === blogId);
-			const currentCount = blogSubscription?.postCount || this.plugin.settings.subscriptionCount;
+			const currentCount = blogSubscription?.postCount || 10;
 			
 			const countInput = countDiv.createEl('input', {
 				type: 'number',
@@ -1401,7 +2396,7 @@ class NaverBlogSettingTab extends PluginSettingTab {
 			countInput.max = '100';
 			
 			countInput.onchange = async () => {
-				const newCount = parseInt(countInput.value) || this.plugin.settings.subscriptionCount;
+				const newCount = parseInt(countInput.value) || 10;
 				
 				// Update or create blog subscription
 				const existingIndex = this.plugin.settings.blogSubscriptions.findIndex(sub => sub.blogId === blogId);
@@ -1418,7 +2413,7 @@ class NaverBlogSettingTab extends PluginSettingTab {
 			};
 			
 			// Sync button
-			const syncButton = blogDiv.createEl('button', { text: 'Sync' });
+			const syncButton = blogDiv.createEl('button', { text: this.plugin.i18n.t('settings.sync_button') });
 			syncButton.style.fontSize = '0.8em';
 			syncButton.style.padding = '4px 8px';
 			syncButton.onclick = async () => {
@@ -1444,7 +2439,7 @@ class NaverBlogSettingTab extends PluginSettingTab {
 			};
 			
 			// Remove button
-			const removeButton = blogDiv.createEl('button', { text: 'Remove' });
+			const removeButton = blogDiv.createEl('button', { text: this.plugin.i18n.t('settings.remove_button') });
 			removeButton.style.fontSize = '0.8em';
 			removeButton.style.padding = '4px 8px';
 			removeButton.style.backgroundColor = 'var(--interactive-accent)';
@@ -1614,6 +2609,8 @@ class NaverBlogSettingTab extends PluginSettingTab {
 					white-space: nowrap;
 					overflow: hidden;
 					text-overflow: ellipsis;
+					font-size: 13px;
+					line-height: 1.3;
 				`;
 
 				if (index === filteredFolders.length - 1) {
@@ -1801,13 +2798,13 @@ class NaverBlogSinglePostModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h2', { text: 'Import Single Naver Blog Post' });
+		contentEl.createEl('h2', { text: this.plugin.i18n.t('modals.import_single_post.title') });
 
 		const inputContainer = contentEl.createDiv();
 		inputContainer.style.marginBottom = '20px';
 
 		const inputLabel = inputContainer.createEl('label', {
-			text: 'Post URL or LogNo:',
+			text: this.plugin.i18n.t('modals.import_single_post.log_no_label') + ':',
 			cls: 'setting-item-name'
 		});
 		inputLabel.style.display = 'block';
@@ -1815,7 +2812,7 @@ class NaverBlogSinglePostModal extends Modal {
 
 		const input = inputContainer.createEl('input', {
 			type: 'text',
-			placeholder: 'https://blog.naver.com/blogid/220883239733 or https://m.blog.naver.com/PostView.naver?blogId=blogid&logNo=220883239733 or just 220883239733'
+			placeholder: this.plugin.i18n.t('modals.import_single_post.log_no_placeholder')
 		});
 		input.style.width = '100%';
 		input.style.padding = '8px';
@@ -1839,12 +2836,12 @@ class NaverBlogSinglePostModal extends Modal {
 		buttonContainer.style.justifyContent = 'flex-end';
 
 		const cancelButton = buttonContainer.createEl('button', {
-			text: 'Cancel'
+			text: this.plugin.i18n.t('modals.import_single_post.cancel_button')
 		});
 		cancelButton.addEventListener('click', () => this.close());
 
 		const importButton = buttonContainer.createEl('button', {
-			text: 'Import Post',
+			text: this.plugin.i18n.t('modals.import_single_post.import_button'),
 			cls: 'mod-cta'
 		});
 

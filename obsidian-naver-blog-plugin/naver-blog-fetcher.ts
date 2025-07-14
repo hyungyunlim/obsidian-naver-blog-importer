@@ -688,8 +688,23 @@ export class NaverBlogFetcher {
     private extractTextFromElement(element: any, $: any): string {
         let content = '';
         
+        // Use Python library approach: find .se-main-container first, then .se-component
+        console.log('Looking for .se-main-container...');
+        const mainContainer = $('.se-main-container');
+        
+        let components;
+        if (mainContainer.length > 0) {
+            console.log('Found .se-main-container, getting components from it');
+            components = mainContainer.find('.se-component').toArray();
+        } else {
+            console.log('No .se-main-container found, falling back to all .se-component elements');
+            components = $('.se-component').toArray();
+        }
+        
+        console.log(`Found ${components.length} components to process`);
+        
         // Process components in document order to maintain text-image flow
-        const allComponents = $('.se-component').toArray();
+        const allComponents = components;
         
         allComponents.forEach((el: any) => {
             const $el = $(el);
@@ -1127,11 +1142,14 @@ export class NaverBlogFetcher {
             if (skipMetadata) {
                 // Common blog metadata patterns to remove
                 const metadataPatterns = [
+                    /^\d{4}\s+투르\s+드\s+프랑스.*$/,        // "2025 투르 드 프랑스 스테이지 9: 유럽의 별, 팀 메를리에 더블 승리."
                     /^[가-힣\s]+\s+뉴스$/,                    // "사이클링 뉴스"
-                    /^\d{4}\s+[가-힣\s:]+\.$/,              // "2025 투르 드 프랑스 스테이지 9: ..."
-                    /^[가-힣]+$/,                           // "아다미" (단일 한글 단어)
-                    /^・$/,                                // "・" 구분자
-                    /^\d+시간?\s*전$/,                      // "6시간 전"
+                    /^\d{4}\s+[가-힣\s:,]+\.$/,            // "2025 투르 드 프랑스 스테이지 9: ..." (일반적인 긴 제목)
+                    /^아다미$/,                            // "아다미" (구체적인 이름)
+                    /^글$/,                                // "글" (단독) - 우선순위 높게
+                    /^・$/,                                // "・" 구분자 - 우선순위 높게
+                    /^[가-힣]{1,4}$/,                       // 1-4글자 단일 한글 단어 (아다미 같은 이름 포함)
+                    /^\d+시간?\s*전$/,                      // "7시간 전"
                     /^URL\s*복사$/,                        // "URL 복사"
                     /^이웃추가$/,                          // "이웃추가"
                     /^본문\s*기타\s*기능$/,                 // "본문 기타 기능"
@@ -1148,11 +1166,24 @@ export class NaverBlogFetcher {
                     /^\d+\.\d+\.\d+\.\s*\d{2}:\d{2}$/,     // "2025.1.15. 14:30" 형태의 날짜
                     /^작성자\s*[가-힣]+$/,                  // "작성자 홍길동"
                     /^[\d,]+\s*조회$/,                     // "1,234 조회"
-                    /^태그\s*#[가-힣\s#]+$/                // "태그 #사이클링 #뉴스"
+                    /^태그\s*#[가-힣\s#]+$/,               // "태그 #사이클링 #뉴스"
+                    /^제목$/,                              // "제목"
+                    /^내용$/,                              // "내용"
+                    /^작성일$/,                            // "작성일"
+                    /^[・·•‧⋅]$/,                         // 다양한 형태의 점 구분자
+                    /^[가-힣]\s*[・·•‧⋅]\s*[가-힣]$/,      // "글 ・ 제목" 형태
+                    /^[가-힣]{1}\s*$/,                     // 단일 한글 문자 + 공백
+                    // 사이클링 관련 특수 패턴
+                    /^.*팀\s+메를리에.*$/,                  // "팀 메를리에 더블 승리" 등
+                    /^.*스테이지\s+\d+.*$/,                // "스테이지 9" 등
+                    /^유럽의\s*별.*$/                      // "유럽의 별" 등
                 ];
 
+                // Additional check for very short Korean text
+                const isShortKorean = /^[가-힣]{1,2}\s*$/.test(line) && line.length <= 3;
+
                 // Check if the line matches any metadata pattern
-                const isMetadata = metadataPatterns.some(pattern => pattern.test(line));
+                const isMetadata = metadataPatterns.some(pattern => pattern.test(line)) || isShortKorean;
                 
                 // Also skip very short lines that are likely metadata
                 const isShortLine = line.length > 0 && line.length <= 2;
@@ -1577,60 +1608,35 @@ export class NaverBlogFetcher {
     }
 
     private enhanceImageUrl(imgSrc: string): string {
-        // Try to get original/highest quality image from Naver CDN
+        console.log(`Original image URL: ${imgSrc}`);
+        
+        // Use the same logic as Python naver_blog_md library for getting original images
         let enhancedUrl = imgSrc;
         
-        // For postfiles.pstatic.net images, try to get original without size restrictions
-        if (enhancedUrl.includes('postfiles.pstatic.net')) {
-            // Remove ALL size parameters to get original image
-            enhancedUrl = enhancedUrl
-                .replace(/\?type=w\d+[^&]*/i, '')      // Remove type=w parameters completely
-                .replace(/&type=w\d+[^&]*/i, '')
-                .replace(/\?type=w\d+_blur[^&]*/i, '') // Remove blur parameters
-                .replace(/&type=w\d+_blur[^&]*/i, '')
-                .replace(/\?w=\d+[^&]*/i, '')          // Remove w= parameters
-                .replace(/&w=\d+[^&]*/i, '')
-                .replace(/\?h=\d+[^&]*/i, '')          // Remove h= parameters
-                .replace(/&h=\d+[^&]*/i, '')
-                .replace(/\?resize=\d+[^&]*/i, '')     // Remove resize parameters
-                .replace(/&resize=\d+[^&]*/i, '');
-            
-            // Clean up any remaining query parameter artifacts
-            enhancedUrl = enhancedUrl
-                .replace(/\?&/, '?')                   // Fix malformed query params
-                .replace(/&&/, '&')
-                .replace(/\?$/, '')                    // Remove trailing question mark
-                .replace(/&$/, '');                    // Remove trailing ampersand
-            
-            console.log(`Attempting to get original image: ${imgSrc} -> ${enhancedUrl}`);
-        }
+        // Step 1: Remove all query parameters (same as Python's split("?")[0])
+        enhancedUrl = enhancedUrl.split('?')[0];
         
-        // For other Naver CDN images, try to remove size restrictions
-        else if (enhancedUrl.includes('pstatic.net')) {
-            // Remove common size limitation parameters to get original
-            enhancedUrl = enhancedUrl
-                .replace(/\/w\d+\//g, '/')             // Remove width in path
-                .replace(/\/h\d+\//g, '/')             // Remove height in path
-                .replace(/\/thumb\d+\//g, '/')         // Remove thumbnail indicators
-                .replace(/\/small\//g, '/')            // Remove small size indicators
-                .replace(/\/medium\//g, '/')           // Remove medium size indicators
-                .replace(/\?w=\d+/i, '')               // Remove width parameter
-                .replace(/&w=\d+/i, '')
-                .replace(/\?h=\d+/i, '')               // Remove height parameter
-                .replace(/&h=\d+/i, '')
-                .replace(/\?quality=\d+/i, '')         // Remove quality reduction
-                .replace(/&quality=\d+/i, '');
-                
-            // Clean up path artifacts
-            enhancedUrl = enhancedUrl.replace(/\/+/g, '/').replace('://', '://');
-            
-            console.log(`Cleaned Naver CDN URL: ${imgSrc} -> ${enhancedUrl}`);
-        }
+        // Step 2: Replace postfiles with blogfiles for original images
+        enhancedUrl = enhancedUrl.replace('postfiles', 'blogfiles');
         
-        // Log the enhancement for debugging
+        // Step 3: Replace video CDN with blogfiles CDN
+        enhancedUrl = enhancedUrl.replace(
+            'https://mblogvideo-phinf.pstatic.net/', 
+            'https://blogfiles.pstatic.net/'
+        );
+        
+        // Step 4: Additional replacements for other Naver CDN variants
+        enhancedUrl = enhancedUrl
+            .replace('https://mblogthumb-phinf.pstatic.net/', 'https://blogfiles.pstatic.net/')
+            .replace('https://postfiles.pstatic.net/', 'https://blogfiles.pstatic.net/')
+            .replace('https://blogpfthumb-phinf.pstatic.net/', 'https://blogfiles.pstatic.net/');
+        
+        // Log the transformation for debugging
         if (enhancedUrl !== imgSrc) {
-            console.log(`Enhanced to get original image: ${imgSrc} -> ${enhancedUrl}`);
+            console.log(`Enhanced to original image URL: ${imgSrc} -> ${enhancedUrl}`);
         }
+        
+        console.log(`Enhanced image URL: ${enhancedUrl}`);
         
         return enhancedUrl;
     }
