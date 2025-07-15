@@ -43,9 +43,7 @@ export class ImageService {
 			
 			const totalImages = filteredMatches.length;
 
-			if (totalImages > 0) {
-				console.log(`Found ${totalImages} valid images to download for post ${logNo} (filtered from ${allMatches.length})`);
-			}
+			// Found ${totalImages} valid images to download
 
 			// Process only filtered images
 			for (let i = 0; i < filteredMatches.length; i++) {
@@ -61,7 +59,7 @@ export class ImageService {
 					let directUrl = this.convertToDirectImageUrl(imageUrl);
 					const imageProgress = `(${imageCount + 1}/${totalImages})`;
 					
-					console.log(`Processing image ${imageProgress}: ${imageUrl} -> ${directUrl}`);
+					// Processing image ${imageProgress}
 					new Notice(`Downloading image ${imageProgress} for post ${logNo}`, 2000);
 					
 					// Download image
@@ -98,7 +96,7 @@ export class ImageService {
 						filename = `${logNo}_${imageCount}_${filename}`;
 						filename = this.sanitizeFilename(filename);
 						
-						console.log(`Generated filename: ${filename}`);
+						// Generated filename for image
 						
 						// Save image
 						const imagePath = `${attachmentsFolder}/${filename}`;
@@ -107,7 +105,7 @@ export class ImageService {
 							
 							// Verify file was saved
 							const fileExists = await this.app.vault.adapter.exists(imagePath);
-							console.log(`File saved successfully: ${fileExists} at ${imagePath}`);
+							// File saved successfully
 							
 							if (!fileExists) {
 								throw new Error('File was not saved properly');
@@ -126,13 +124,12 @@ export class ImageService {
 						const cleanOriginalUrl = imageUrl.split('?')[0];
 						processedContent = processedContent.replace(fullMatch, newImageMd);
 						
-						console.log(`Updated markdown: ${fullMatch} -> ${newImageMd}`);
+						// Updated markdown with local image path
 						
 						imageCount++;
-						console.log(`✓ Downloaded image ${imageProgress}: ${filename}`);
+						// Downloaded image successfully
 					} else {
-						console.log(`✗ Failed to download image ${imageProgress}: ${directUrl} (Status: ${response.status})`);
-						console.log(`Response headers:`, response.headers);
+						// Failed to download image - trying alternative method
 					}
 				} catch (imageError) {
 					const imageProgress = `(${imageCount + 1}/${totalImages})`;

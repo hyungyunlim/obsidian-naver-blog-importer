@@ -285,39 +285,27 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		}
 
 		this.plugin.settings.subscribedBlogs.forEach((blogId: string, index: number) => {
-			const blogDiv = containerEl.createDiv();
-			blogDiv.style.display = 'grid';
-			blogDiv.style.gridTemplateColumns = '1fr auto auto auto';
-			blogDiv.style.gap = UI_DEFAULTS.modalGap;
-			blogDiv.style.alignItems = 'center';
-			blogDiv.style.padding = UI_DEFAULTS.modalPadding;
-			blogDiv.style.border = '1px solid var(--background-modifier-border)';
-			blogDiv.style.borderRadius = '4px';
-			blogDiv.style.marginBottom = '5px';
+			const blogDiv = containerEl.createDiv({ cls: 'naver-blog-item' });
 			
 			// Blog ID
 			blogDiv.createEl('span', { text: blogId });
 			
 			// Post count setting
-			const countDiv = blogDiv.createDiv();
-			countDiv.style.display = 'flex';
-			countDiv.style.alignItems = 'center';
-			countDiv.style.gap = '5px';
+			const countDiv = blogDiv.createDiv({ cls: 'naver-blog-count-container' });
 			
-			const countLabel = countDiv.createEl('span', { text: this.plugin.i18n.t('settings.posts_label') + ':' });
-			countLabel.style.fontSize = '0.9em';
-			countLabel.style.color = 'var(--text-muted)';
+			const countLabel = countDiv.createEl('span', { 
+				text: this.plugin.i18n.t('settings.posts_label') + ':',
+				cls: 'naver-blog-count-label'
+			});
 			
 			const blogSubscription = this.plugin.settings.blogSubscriptions.find((sub: any) => sub.blogId === blogId);
 			const currentCount = blogSubscription?.postCount || DEFAULT_BLOG_POST_COUNT;
 			
 			const countInput = countDiv.createEl('input', {
 				type: 'number',
-				value: currentCount.toString()
+				value: currentCount.toString(),
+				cls: 'naver-blog-count-input'
 			});
-			countInput.style.width = '60px';
-			countInput.style.padding = '2px 4px';
-			countInput.style.fontSize = '0.9em';
 			countInput.min = '1';
 			countInput.max = MAX_SUBSCRIPTION_POST_COUNT.toString();
 			
@@ -339,9 +327,10 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			};
 			
 			// Sync button
-			const syncButton = blogDiv.createEl('button', { text: this.plugin.i18n.t('settings.sync_button') });
-			syncButton.style.fontSize = '0.8em';
-			syncButton.style.padding = '4px 8px';
+			const syncButton = blogDiv.createEl('button', { 
+				text: this.plugin.i18n.t('settings.sync_button'),
+				cls: 'naver-blog-sync-button'
+			});
 			syncButton.onclick = async () => {
 				try {
 					new Notice(`Syncing ${blogId}...`);
@@ -365,11 +354,10 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			};
 			
 			// Remove button
-			const removeButton = blogDiv.createEl('button', { text: this.plugin.i18n.t('settings.remove_button') });
-			removeButton.style.fontSize = '0.8em';
-			removeButton.style.padding = '4px 8px';
-			removeButton.style.backgroundColor = 'var(--interactive-accent)';
-			removeButton.style.color = 'var(--text-on-accent)';
+			const removeButton = blogDiv.createEl('button', { 
+				text: this.plugin.i18n.t('settings.remove_button'),
+				cls: 'naver-blog-remove-button'
+			});
 			removeButton.onclick = async () => {
 				// Remove from subscribed blogs
 				this.plugin.settings.subscribedBlogs.splice(index, 1);
@@ -407,11 +395,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 		// Create wrapper container for input with icons
 		const wrapper = document.createElement('div');
-		wrapper.style.cssText = `
-			position: relative;
-			display: flex;
-			align-items: center;
-		`;
+		wrapper.className = 'naver-blog-search-wrapper';
 
 		// Insert wrapper before input and move input into it
 		inputEl.parentNode?.insertBefore(wrapper, inputEl);
@@ -419,20 +403,12 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 		// Create search icon
 		searchIcon = document.createElement('div');
-		searchIcon.innerHTML = '🔍';
-		searchIcon.style.cssText = `
-			position: absolute;
-			left: 8px;
-			top: 50%;
-			transform: translateY(-50%);
-			color: var(--text-muted);
-			pointer-events: none;
-			z-index: 1;
-		`;
+		searchIcon.textContent = '🔍';
+		searchIcon.className = 'naver-blog-search-icon';
 		wrapper.appendChild(searchIcon);
 
 		// Add padding to input for search icon
-		inputEl.style.paddingLeft = '32px';
+		inputEl.className = 'naver-blog-search-input';
 
 		// Create clear button (initially hidden)
 		const updateClearButton = () => {
@@ -443,39 +419,8 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 			if (inputEl.value.trim() && onClear) {
 				clearButton = document.createElement('div');
-				clearButton.innerHTML = '×';
-				clearButton.style.cssText = `
-					position: absolute;
-					right: 8px;
-					top: 50%;
-					transform: translateY(-50%);
-					color: var(--text-muted);
-					cursor: pointer;
-					font-size: 16px;
-					font-weight: bold;
-					z-index: 1;
-					width: 16px;
-					height: 16px;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					border-radius: 50%;
-					transition: all 0.1s;
-				`;
-
-				clearButton.addEventListener('mouseenter', () => {
-					if (clearButton) {
-						clearButton.style.backgroundColor = 'var(--background-modifier-hover)';
-						clearButton.style.color = 'var(--text-normal)';
-					}
-				});
-
-				clearButton.addEventListener('mouseleave', () => {
-					if (clearButton) {
-						clearButton.style.backgroundColor = '';
-						clearButton.style.color = 'var(--text-muted)';
-					}
-				});
+				clearButton.textContent = '×';
+				clearButton.className = 'naver-blog-search-clear';
 
 				clearButton.addEventListener('click', (e) => {
 					e.preventDefault();
@@ -487,9 +432,6 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				});
 
 				wrapper.appendChild(clearButton);
-				inputEl.style.paddingRight = '28px';
-			} else {
-				inputEl.style.paddingRight = '';
 			}
 		};
 
@@ -507,49 +449,13 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			if (filteredFolders.length === 0) return;
 
 			dropdownEl = document.createElement('div');
-			dropdownEl.className = 'folder-dropdown';
-			dropdownEl.style.cssText = `
-				position: absolute;
-				top: '100%';
-				left: 0;
-				width: ${inputEl.offsetWidth}px;
-				max-height: 200px;
-				overflow-y: auto;
-				background: var(--background-primary);
-				border: 1px solid var(--background-modifier-border);
-				border-radius: 6px;
-				box-shadow: var(--shadow-s);
-				z-index: ${UI_DEFAULTS.dropdownZIndex};
-				margin-top: 2px;
-			`;
+			dropdownEl.className = 'naver-blog-dropdown';
+			dropdownEl.style.width = `${inputEl.offsetWidth}px`;
 
 			filteredFolders.forEach((folder, index) => {
 				const itemEl = document.createElement('div');
-				itemEl.className = 'folder-dropdown-item';
+				itemEl.className = 'naver-blog-dropdown-item';
 				itemEl.textContent = folder || '(Root)';
-				itemEl.style.cssText = `
-					padding: 8px 12px;
-					cursor: pointer;
-					border-bottom: 1px solid var(--background-modifier-border);
-					transition: background-color 0.1s;
-					white-space: nowrap;
-					overflow: hidden;
-					text-overflow: ellipsis;
-					font-size: 13px;
-					line-height: 1.3;
-				`;
-
-				if (index === filteredFolders.length - 1) {
-					itemEl.style.borderBottom = 'none';
-				}
-
-				itemEl.addEventListener('mouseenter', () => {
-					itemEl.style.backgroundColor = 'var(--background-modifier-hover)';
-				});
-
-				itemEl.addEventListener('mouseleave', () => {
-					itemEl.style.backgroundColor = '';
-				});
 
 				itemEl.addEventListener('click', () => {
 					onSelect(folder);
@@ -561,7 +467,6 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			});
 
 			// Position the dropdown relative to the wrapper
-			wrapper.style.position = 'relative';
 			wrapper.appendChild(dropdownEl);
 			isDropdownVisible = true;
 		};

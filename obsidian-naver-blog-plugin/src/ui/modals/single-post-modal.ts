@@ -16,40 +16,30 @@ export class NaverBlogSinglePostModal extends Modal {
 
 		contentEl.createEl('h2', { text: this.plugin.i18n.t('modals.import_single_post.title') });
 
-		const inputContainer = contentEl.createDiv();
-		inputContainer.style.marginBottom = '20px';
+		const inputContainer = contentEl.createDiv({ cls: 'naver-blog-input-container' });
 
 		const inputLabel = inputContainer.createEl('label', {
 			text: this.plugin.i18n.t('modals.import_single_post.log_no_label') + ':',
-			cls: 'setting-item-name'
+			cls: 'setting-item-name naver-blog-input-label'
 		});
-		inputLabel.style.display = 'block';
-		inputLabel.style.marginBottom = '8px';
 
 		const input = inputContainer.createEl('input', {
 			type: 'text',
-			placeholder: this.plugin.i18n.t('modals.import_single_post.log_no_placeholder')
+			placeholder: this.plugin.i18n.t('modals.import_single_post.log_no_placeholder'),
+			cls: 'naver-blog-input'
 		});
-		input.style.width = UI_DEFAULTS.modalInputWidth;
-		input.style.padding = '8px';
-		input.style.border = '1px solid var(--background-modifier-border)';
-		input.style.borderRadius = '4px';
 
-		const exampleDiv = inputContainer.createDiv();
-		exampleDiv.style.marginTop = '8px';
-		exampleDiv.style.fontSize = '0.9em';
-		exampleDiv.style.color = 'var(--text-muted)';
-		exampleDiv.innerHTML = `
-			<strong>Examples:</strong><br>
-			• Desktop URL: https://blog.naver.com/yonofbooks/220883239733<br>
-			• Mobile URL: https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265<br>
-			• LogNo only: 220883239733
-		`;
+		const exampleDiv = inputContainer.createDiv({ cls: 'naver-blog-example' });
+		
+		const exampleTitle = exampleDiv.createEl('strong', { text: 'Examples:' });
+		exampleDiv.createEl('br');
+		exampleDiv.appendText('• Desktop URL: https://blog.naver.com/yonofbooks/220883239733');
+		exampleDiv.createEl('br');
+		exampleDiv.appendText('• Mobile URL: https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265');
+		exampleDiv.createEl('br');
+		exampleDiv.appendText('• LogNo only: 220883239733');
 
-		const buttonContainer = contentEl.createDiv();
-		buttonContainer.style.display = 'flex';
-		buttonContainer.style.gap = UI_DEFAULTS.modalGap;
-		buttonContainer.style.justifyContent = 'flex-end';
+		const buttonContainer = contentEl.createDiv({ cls: 'naver-blog-button-container' });
 
 		const cancelButton = buttonContainer.createEl('button', {
 			text: this.plugin.i18n.t('modals.import_single_post.cancel_button')

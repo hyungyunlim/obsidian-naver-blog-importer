@@ -54,7 +54,7 @@ __export(main_exports, {
   default: () => NaverBlogPlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian9 = require("obsidian");
+var import_obsidian12 = require("obsidian");
 
 // src/utils/i18n.ts
 var I18n = class {
@@ -63,26 +63,21 @@ var I18n = class {
     this.translations = this.getDefaultTranslations();
   }
   async loadTranslations(locale) {
-    console.log(`Loading translations for locale: ${locale}`);
     try {
       const pluginDir = this.app.vault.adapter.basePath;
-      const manifestPath = `${pluginDir}/.obsidian/plugins/obsidian-naver-blog-plugin/lang/${locale}.json`;
+      const manifestPath = `${pluginDir}/${this.app.vault.configDir}/plugins/obsidian-naver-blog-plugin/lang/${locale}.json`;
       const translationFile = this.app.vault.adapter.read(manifestPath);
       if (translationFile) {
         const translationData = await translationFile;
         this.translations = JSON.parse(translationData);
-        console.log(`Successfully loaded translations from file: ${locale}`);
         return;
       }
     } catch (error) {
-      console.log(`Failed to load translations file for ${locale}:`, error);
     }
     if (locale === "ko" || locale.startsWith("ko")) {
       this.translations = this.getKoreanTranslations();
-      console.log(`Loaded built-in Korean translations`);
     } else {
       this.translations = this.getDefaultTranslations();
-      console.log(`Loaded built-in English translations`);
     }
   }
   t(key, variables) {
@@ -337,52 +332,484 @@ var I18n = class {
   }
 };
 
-// src/services/ai-service.ts
+// src/api/openai-client.ts
 var import_obsidian = require("obsidian");
-var AIService = class {
-  constructor(settings) {
-    this.settings = settings;
+
+// src/constants/api-endpoints.ts
+var OPENAI_BASE_URL = "https://api.openai.com/v1";
+var OPENAI_MODELS_ENDPOINT = `${OPENAI_BASE_URL}/models`;
+var OPENAI_CHAT_ENDPOINT = `${OPENAI_BASE_URL}/chat/completions`;
+var ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
+var ANTHROPIC_MODELS_ENDPOINT = `${ANTHROPIC_BASE_URL}/models`;
+var ANTHROPIC_MESSAGES_ENDPOINT = `${ANTHROPIC_BASE_URL}/messages`;
+var GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+var GOOGLE_MODELS_ENDPOINT = `${GOOGLE_BASE_URL}/models`;
+var GOOGLE_GENERATE_CONTENT_ENDPOINT = (model) => `${GOOGLE_BASE_URL}/models/${model}:generateContent`;
+var NAVER_BLOG_BASE_URL = "https://blog.naver.com";
+var NAVER_BLOG_POST_LIST_URL = `${NAVER_BLOG_BASE_URL}/PostList.naver`;
+var NAVER_PROFILE_IMAGE_PATH = "ssl.pstatic.net/static/blog/profile/";
+
+// src/constants/ai-models.ts
+var OPENAI_MODEL_PREFIXES = ["gpt-", "o1-", "text-", "davinci-", "curie-", "babbage-", "ada-"];
+
+// src/constants/default-values.ts
+var DEFAULT_BLOG_POST_COUNT = 10;
+var MAX_POST_IMPORT_LIMIT = 1e3;
+var MAX_SUBSCRIPTION_POST_COUNT = 100;
+var MAX_FILENAME_LENGTH = 100;
+var MIN_CONTENT_LENGTH_FOR_AI = 50;
+var AI_TOKEN_LIMITS = {
+  default: 4e3,
+  pro: 1e4
+};
+var DEFAULT_IMAGE_EXTENSION = "jpg";
+var UI_DEFAULTS = {
+  modalInputWidth: "100%",
+  modalInputMargin: "10px",
+  modalGap: "10px",
+  modalPadding: "10px",
+  dropdownZIndex: 1e3,
+  modalTimeout: 100,
+  blurDelay: 150
+};
+
+// src/constants/timeouts.ts
+var NOTICE_TIMEOUTS = {
+  short: 2e3,
+  // Brief notifications
+  medium: 5e3,
+  // Standard notifications
+  long: 1e4
+  // Important notifications
+};
+var RETRY_DELAYS = {
+  base: 1e3,
+  // Base delay for retries
+  multiplier: 2,
+  // Exponential backoff multiplier
+  maxRetries: 3
+  // Maximum number of retries
+};
+var UI_DELAYS = {
+  focus: 100,
+  // Delay before focusing inputs
+  blur: 150,
+  // Delay before hiding dropdowns
+  autoSync: 5e3
+  // Auto-sync delay after plugin load
+};
+var API_DELAYS = {
+  betweenPosts: 1e3,
+  // Delay between processing posts
+  betweenBlogs: 1e3
+  // Delay between processing blogs
+};
+var calculateBackoffDelay = (attempt) => {
+  return Math.pow(RETRY_DELAYS.multiplier, attempt) * RETRY_DELAYS.base;
+};
+
+// src/constants/http-headers.ts
+var USER_AGENTS = {
+  default: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+  chrome: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  images: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+};
+var NAVER_HEADERS = {
+  referer: "https://blog.naver.com/",
+  userAgent: USER_AGENTS.chrome
+};
+var API_VERSIONS = {
+  anthropic: "2023-06-01",
+  openai: "v1"
+};
+var CONTENT_TYPES = {
+  json: "application/json",
+  formData: "multipart/form-data",
+  urlEncoded: "application/x-www-form-urlencoded"
+};
+
+// src/constants/messages.ts
+var AI_PROMPTS = {
+  layoutFix: `\u26A0\uFE0F **\uC911\uC694**: \uC6D0\uBB38\uC758 \uB0B4\uC6A9\uC740 100% \uADF8\uB300\uB85C \uC720\uC9C0\uD558\uACE0, \uC624\uC9C1 \uB9C8\uD06C\uB2E4\uC6B4 \uD615\uC2DD\uACFC \uB808\uC774\uC544\uC6C3\uB9CC \uC218\uC815\uD574\uC8FC\uC138\uC694.
+
+\uB2E4\uC74C \uB124\uC774\uBC84 \uBE14\uB85C\uADF8 \uAE00\uC744 Obsidian\uC6A9 \uB9C8\uD06C\uB2E4\uC6B4\uC73C\uB85C \uAC1C\uC120\uD574\uC8FC\uC138\uC694:
+
+1. **\uC81C\uBAA9 \uC815\uB9AC**: \uC801\uC808\uD55C \uD5E4\uB529 \uB808\uBCA8(#, ##, ###)\uB85C \uAD6C\uC870\uD654
+2. **\uBB38\uB2E8 \uC815\uB9AC**: \uAE34 \uBB38\uB2E8\uC744 \uC77D\uAE30 \uC27D\uAC8C \uBD84\uD560\uD558\uACE0 \uC801\uC808\uD55C \uC904\uBC14\uAFC8 \uCD94\uAC00
+3. **\uBAA9\uB85D \uC815\uB9AC**: \uBAA9\uB85D\uC740 \uAE54\uB054\uD55C - \uB610\uB294 1. \uD615\uC2DD\uC73C\uB85C \uBCC0\uD658
+4. **\uAC15\uC870 \uC815\uB9AC**: \uC911\uC694\uD55C \uBD80\uBD84\uC5D0 **\uAD75\uAC8C** \uB610\uB294 *\uAE30\uC6B8\uC784* \uC801\uC6A9
+5. **\uB9C1\uD06C \uC815\uB9AC**: \uB9C8\uD06C\uB2E4\uC6B4 \uB9C1\uD06C \uD615\uC2DD [\uD14D\uC2A4\uD2B8](URL)\uB85C \uBCC0\uD658
+6. **\uC774\uBBF8\uC9C0 \uC815\uB9AC**: \uC774\uBBF8\uC9C0 \uB9C8\uD06C\uB2E4\uC6B4 \uD615\uC2DD \uC815\uB9AC \uBC0F \uCEA1\uC158 \uCD94\uAC00
+7. **\uCF54\uB4DC \uC815\uB9AC**: \uCF54\uB4DC \uBE14\uB85D\uC774 \uC788\uB2E4\uBA74 \uC801\uC808\uD55C \uC5B8\uC5B4 \uD0DC\uADF8\uC640 \uD568\uAED8 \`\`\` \uD615\uC2DD\uC73C\uB85C
+8. **\uBD88\uD544\uC694\uD55C \uC694\uC18C \uC81C\uAC70**: \uAD11\uACE0\uC131 \uD14D\uC2A4\uD2B8, \uC911\uBCF5 \uC904\uBC14\uAFC8, \uC774\uC0C1\uD55C \uAE30\uD638 \uC81C\uAC70
+
+**\uC808\uB300 \uC6D0\uBB38 \uB0B4\uC6A9\uC744 \uBC14\uAFB8\uAC70\uB098 \uC0AD\uC81C\uD558\uC9C0 \uB9C8\uC138\uC694. \uC624\uC9C1 \uD615\uC2DD\uACFC \uB808\uC774\uC544\uC6C3\uB9CC \uAC1C\uC120\uD574\uC8FC\uC138\uC694.**
+
+\uB0B4\uC6A9:`,
+  tagGeneration: `\uB2E4\uC74C \uBE14\uB85C\uADF8 \uAE00 \uB0B4\uC6A9\uC744 \uBC14\uD0D5\uC73C\uB85C \uC801\uC808\uD55C \uD0DC\uADF8\uB97C 3-7\uAC1C \uC815\uB3C4 \uC0DD\uC131\uD574\uC8FC\uC138\uC694. 
+\uD0DC\uADF8\uB294 \uAE00\uC758 \uC8FC\uC81C, \uAE30\uC220, \uD0A4\uC6CC\uB4DC \uB4F1\uC744 \uD3EC\uD568\uD574\uC57C \uD558\uBA70, \uD55C\uAD6D\uC5B4\uB85C \uC791\uC131\uD574\uC8FC\uC138\uC694.
+\uC751\uB2F5\uC740 \uC27C\uD45C\uB85C \uAD6C\uBD84\uB41C \uD0DC\uADF8 \uBAA9\uB85D\uB9CC \uC81C\uACF5\uD574\uC8FC\uC138\uC694. (\uC608: \uAC1C\uBC1C, \uD504\uB85C\uADF8\uB798\uBC0D, \uC790\uBC14\uC2A4\uD06C\uB9BD\uD2B8)
+
+\uB0B4\uC6A9:`,
+  excerptGeneration: `\uB2E4\uC74C \uBE14\uB85C\uADF8 \uAE00\uC758 \uD575\uC2EC \uB0B4\uC6A9\uC744 1-2\uBB38\uC7A5\uC73C\uB85C \uC694\uC57D\uD574\uC8FC\uC138\uC694.
+\uC751\uB2F5\uC740 \uC694\uC57D\uBB38\uB9CC \uC81C\uACF5\uD574\uC8FC\uC138\uC694.
+
+\uB0B4\uC6A9:`
+};
+var PLACEHOLDERS = {
+  blogId: "Blog ID (e.g., yonofbooks)",
+  postUrl: "Enter Naver blog post URL...",
+  apiKey: {
+    openai: "sk-...",
+    anthropic: "sk-ant-...",
+    google: "AIza...",
+    ollama: "http://localhost:11434"
+  },
+  folder: {
+    default: "Naver Blog Posts",
+    image: "Naver Blog Posts/attachments"
+  },
+  postLimit: "0"
+};
+
+// src/constants/regex-patterns.ts
+var SKIP_IMAGE_PATTERNS = [
+  // Naver blog editor assets
+  /se-sticker/i,
+  /se-emoticon/i,
+  /editor/i,
+  /naverblog_pc/i,
+  // Common animation and GIF patterns
+  /\.gif$/i,
+  /loading/i,
+  /spinner/i,
+  /animation/i,
+  /thumb/i,
+  // Profile and background images
+  /profile/i,
+  /defaultimg/i,
+  /bg_/i,
+  /background/i,
+  /_bg/i,
+  // Naver UI elements
+  /icon/i,
+  /logo/i,
+  /button/i,
+  // Size indicators (very small images are likely UI elements)
+  /1x1/,
+  /spacer/i,
+  /dot\./i,
+  // Common UI image names
+  /arrow/i,
+  /bullet/i,
+  /divider/i
+];
+var SKIP_ALT_TEXT_PATTERNS = [
+  /이모티콘/i,
+  /스티커/i,
+  /애니메이션/i,
+  /로딩/i,
+  /아이콘/i,
+  /profile/i,
+  /background/i,
+  /프로필/i,
+  /배경/i
+];
+var NAVER_CDN_PATTERNS = {
+  year2018: /\/MjAxOA%3D%3D\//g,
+  year2019: /\/MjAxOQ%3D%3D\//g,
+  year2020: /\/MjAyMA%3D%3D\//g,
+  year2021: /\/MjAyMQ%3D%3D\//g,
+  year2022: /\/MjAyMg%3D%3D\//g,
+  year2023: /\/MjAyMw%3D%3D\//g,
+  year2024: /\/MjAyNA%3D%3D\//g,
+  year2025: /\/MjAyNQ%3D%3D\//g
+};
+
+// src/api/openai-client.ts
+var OpenAIClient = class {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
   }
-  async callAI(messages, maxTokens = 150) {
-    const apiKey = this.getApiKey();
-    if (!apiKey) {
-      throw new Error("No API key configured for selected AI provider");
+  async fetchModels() {
+    if (!this.apiKey) {
+      return [];
     }
-    const model = this.getModelName();
-    switch (this.settings.aiProvider) {
-      case "openai":
-        return await this.callOpenAI(messages, maxTokens, model, apiKey);
-      case "anthropic":
-        return await this.callAnthropic(messages, maxTokens, model, apiKey);
-      case "google":
-        return await this.callGoogle(messages, maxTokens, model, apiKey);
-      case "ollama":
-        return await this.callOllama(messages, maxTokens, model);
-      default:
-        throw new Error(`Unsupported AI provider: ${this.settings.aiProvider}`);
+    try {
+      const response = await (0, import_obsidian.requestUrl)({
+        url: OPENAI_MODELS_ENDPOINT,
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": CONTENT_TYPES.json
+        }
+      });
+      if (response.status === 200) {
+        const models = response.json.data.map((model) => model.id).filter(
+          (id) => OPENAI_MODEL_PREFIXES.some((prefix) => id.startsWith(prefix))
+        ).sort();
+        console.log(`Fetched ${models.length} OpenAI models`);
+        return models;
+      }
+    } catch (error) {
+      console.error("OpenAI models fetch error:", error);
+    }
+    return [];
+  }
+  async chat(messages, maxTokens, model) {
+    const response = await (0, import_obsidian.requestUrl)({
+      url: OPENAI_CHAT_ENDPOINT,
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${this.apiKey}`,
+        "Content-Type": CONTENT_TYPES.json
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: maxTokens,
+        temperature: 0.3
+      })
+    });
+    if (response.status === 200) {
+      return response.json.choices[0].message.content.trim();
+    } else {
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
   }
-  getApiKey() {
-    switch (this.settings.aiProvider) {
+};
+
+// src/api/anthropic-client.ts
+var import_obsidian2 = require("obsidian");
+var AnthropicClient = class {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+  }
+  async fetchModels() {
+    if (!this.apiKey) {
+      return [];
+    }
+    try {
+      const response = await (0, import_obsidian2.requestUrl)({
+        url: ANTHROPIC_MODELS_ENDPOINT,
+        method: "GET",
+        headers: {
+          "x-api-key": this.apiKey,
+          "Content-Type": CONTENT_TYPES.json,
+          "anthropic-version": API_VERSIONS.anthropic
+        }
+      });
+      if (response.status === 200) {
+        const models = response.json.data.map((model) => model.id).filter((id) => id.startsWith("claude-")).sort();
+        console.log(`Fetched ${models.length} Anthropic models`);
+        return models;
+      }
+    } catch (error) {
+      console.error("Anthropic models fetch error:", error);
+    }
+    return [];
+  }
+  async chat(messages, maxTokens, model) {
+    var _a5;
+    const systemMessage = ((_a5 = messages.find((m) => m.role === "system")) == null ? void 0 : _a5.content) || "";
+    const userMessages = messages.filter((m) => m.role !== "system");
+    const response = await (0, import_obsidian2.requestUrl)({
+      url: ANTHROPIC_MESSAGES_ENDPOINT,
+      method: "POST",
+      headers: {
+        "x-api-key": this.apiKey,
+        "Content-Type": CONTENT_TYPES.json,
+        "anthropic-version": API_VERSIONS.anthropic
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        system: systemMessage,
+        messages: userMessages
+      })
+    });
+    if (response.status === 200) {
+      return response.json.content[0].text.trim();
+    } else {
+      throw new Error(`Anthropic API error: ${response.status}`);
+    }
+  }
+};
+
+// src/api/google-client.ts
+var import_obsidian3 = require("obsidian");
+var GoogleClient = class {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+  }
+  async fetchModels() {
+    if (!this.apiKey) {
+      return [];
+    }
+    try {
+      const response = await (0, import_obsidian3.requestUrl)({
+        url: `${GOOGLE_MODELS_ENDPOINT}?key=${this.apiKey}`,
+        method: "GET",
+        headers: {
+          "Content-Type": CONTENT_TYPES.json
+        }
+      });
+      if (response.status === 200) {
+        const models = response.json.models.filter((model) => {
+          const supportedMethods = model.supportedGenerationMethods || [];
+          const hasGenerateContent = supportedMethods.includes("generateContent");
+          const modelName = model.name.toLowerCase();
+          const isGeminiModel = modelName.includes("gemini");
+          const isTextModel = !modelName.includes("embedding") && !modelName.includes("vision") && !modelName.includes("code") && !modelName.includes("image");
+          console.log(`Google model: ${model.name}, supports generateContent: ${hasGenerateContent}, is gemini: ${isGeminiModel}, is text: ${isTextModel}`);
+          return hasGenerateContent && isGeminiModel && isTextModel;
+        }).map((model) => {
+          const cleanName = model.name.replace("models/", "");
+          return cleanName;
+        }).sort();
+        console.log(`Fetched ${models.length} Google models:`, models);
+        return models;
+      }
+    } catch (error) {
+      console.error("Google models fetch error:", error);
+    }
+    return [];
+  }
+  async chat(messages, maxTokens, model) {
+    const contents2 = messages.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }]
+    }));
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await (0, import_obsidian3.requestUrl)({
+          url: `${GOOGLE_GENERATE_CONTENT_ENDPOINT(model)}?key=${this.apiKey}`,
+          method: "POST",
+          headers: {
+            "Content-Type": CONTENT_TYPES.json
+          },
+          body: JSON.stringify({
+            contents: contents2,
+            generationConfig: {
+              maxOutputTokens: maxTokens,
+              temperature: 0.3
+            },
+            systemInstruction: {
+              parts: [{ text: "You are a helpful assistant. Respond directly and concisely without showing your thinking process or reasoning. Give only the final answer." }]
+            }
+          })
+        });
+        if (response.status === 200) {
+          const data2 = response.json;
+          console.log("Google API full response:", JSON.stringify(data2, null, 2));
+          if (!data2.candidates || data2.candidates.length === 0) {
+            console.error("Google API response missing candidates:", data2);
+            throw new Error("Google API response missing candidates");
+          }
+          const candidate = data2.candidates[0];
+          console.log("Google API candidate:", JSON.stringify(candidate, null, 2));
+          if (!candidate.content) {
+            console.error("Google API candidate missing content:", candidate);
+            throw new Error("Google API candidate missing content");
+          }
+          if (candidate.finishReason === "MAX_TOKENS") {
+            console.warn("Google API response was truncated due to MAX_TOKENS");
+            if (!candidate.content.parts || candidate.content.parts.length === 0) {
+              console.error("Google API response completely truncated - no usable content");
+              throw new Error("Google API response completely truncated - try increasing maxTokens or reducing input size");
+            }
+          }
+          if (!candidate.content.parts || candidate.content.parts.length === 0) {
+            console.error("Google API candidate content missing parts:", candidate.content);
+            throw new Error("Google API candidate content missing parts");
+          }
+          const text3 = candidate.content.parts[0].text;
+          if (!text3) {
+            console.error("Google API content missing text:", candidate.content.parts[0]);
+            throw new Error("Google API content missing text");
+          }
+          return text3.trim();
+        } else if (response.status === 503 && attempt < maxRetries) {
+          const delay = calculateBackoffDelay(attempt);
+          console.warn(`Google API 503 error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+          const retryNotice = new import_obsidian3.Notice(`API \uC11C\uBC84 \uACFC\uBD80\uD558, ${delay / 1e3}\uCD08 \uD6C4 \uC7AC\uC2DC\uB3C4... (${attempt}/${RETRY_DELAYS.maxRetries})`, delay);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        } else {
+          console.error("Google API error:", response.status, response.text);
+          throw new Error(`Google API error: ${response.status} - ${response.text}`);
+        }
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        console.warn(`Google API request failed (attempt ${attempt}/${maxRetries}):`, error);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS.base * attempt));
+      }
+    }
+    throw new Error("Google API: Maximum retries exceeded");
+  }
+};
+
+// src/api/ollama-client.ts
+var import_obsidian4 = require("obsidian");
+var OllamaClient = class {
+  constructor(endpoint) {
+    this.endpoint = endpoint;
+  }
+  async chat(messages, maxTokens, model) {
+    const response = await (0, import_obsidian4.requestUrl)({
+      url: `${this.endpoint}/api/chat`,
+      method: "POST",
+      headers: {
+        "Content-Type": CONTENT_TYPES.json
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        options: {
+          num_predict: maxTokens,
+          temperature: 0.3
+        }
+      })
+    });
+    if (response.status === 200) {
+      return response.json.message.content.trim();
+    } else {
+      throw new Error(`Ollama API error: ${response.status}`);
+    }
+  }
+};
+
+// src/utils/ai-provider-utils.ts
+var AIProviderUtils = class {
+  /**
+   * Gets the API key for the current AI provider
+   * @param settings Plugin settings containing API keys
+   * @returns The appropriate API key or empty string for providers that don't need keys
+   */
+  static getApiKey(settings) {
+    switch (settings.aiProvider) {
       case "openai":
-        return this.settings.openaiApiKey;
+        return settings.openaiApiKey;
       case "anthropic":
-        return this.settings.anthropicApiKey;
+        return settings.anthropicApiKey;
       case "google":
-        return this.settings.googleApiKey;
+        return settings.googleApiKey;
       case "ollama":
         return "";
       default:
         return "";
     }
   }
-  getModelName() {
-    if (this.settings.aiModel) {
-      return this.settings.aiModel;
-    }
-    return this.getDefaultModelForProvider(this.settings.aiProvider);
-  }
-  getDefaultModelForProvider(provider) {
+  /**
+   * Gets the default model for a specific AI provider
+   * @param provider The AI provider name
+   * @returns Default model name for the provider
+   */
+  static getDefaultModelForProvider(provider) {
     switch (provider) {
       case "openai":
         return "gpt-4o-mini";
@@ -396,16 +823,24 @@ var AIService = class {
         return "gpt-4o-mini";
     }
   }
-  getAvailableModels(cachedModels) {
-    const cacheKey = `${this.settings.aiProvider}_models`;
-    const cached = cachedModels == null ? void 0 : cachedModels[cacheKey];
-    if (cached && cached.length > 0) {
-      return cached;
+  /**
+   * Gets the current model name from settings or fallback to default
+   * @param settings Plugin settings
+   * @returns Current model name
+   */
+  static getModelName(settings) {
+    if (settings.aiModel) {
+      return settings.aiModel;
     }
-    return this.getStaticModels();
+    return AIProviderUtils.getDefaultModelForProvider(settings.aiProvider);
   }
-  getStaticModels() {
-    switch (this.settings.aiProvider) {
+  /**
+   * Gets static list of available models for a provider
+   * @param provider The AI provider name
+   * @returns Array of model names
+   */
+  static getStaticModels(provider) {
+    switch (provider) {
       case "openai":
         return [
           "gpt-4o",
@@ -455,148 +890,142 @@ var AIService = class {
         return ["gpt-4o-mini"];
     }
   }
+  /**
+   * Gets available models from cache and static fallback
+   * @param cache Cached models from API calls
+   * @param provider Current AI provider
+   * @returns Combined list of available models
+   */
+  static getAvailableModels(cache, provider) {
+    switch (provider) {
+      case "openai":
+        return cache.openai_models.length > 0 ? cache.openai_models : AIProviderUtils.getStaticModels("openai");
+      case "anthropic":
+        return cache.anthropic_models.length > 0 ? cache.anthropic_models : AIProviderUtils.getStaticModels("anthropic");
+      case "google":
+        return cache.google_models.length > 0 ? cache.google_models : AIProviderUtils.getStaticModels("google");
+      case "ollama":
+        return AIProviderUtils.getStaticModels("ollama");
+      default:
+        return AIProviderUtils.getStaticModels("openai");
+    }
+  }
+  /**
+   * Validates if an AI provider is supported
+   * @param provider The provider to validate
+   * @returns True if the provider is supported
+   */
+  static isSupportedProvider(provider) {
+    return ["openai", "anthropic", "google", "ollama"].includes(provider);
+  }
+  /**
+   * Gets the base URL for a provider's API
+   * @param provider The AI provider
+   * @param ollamaEndpoint Custom Ollama endpoint (if applicable)
+   * @returns API base URL
+   */
+  static getProviderBaseUrl(provider, ollamaEndpoint) {
+    switch (provider) {
+      case "openai":
+        return "https://api.openai.com/v1";
+      case "anthropic":
+        return "https://api.anthropic.com/v1";
+      case "google":
+        return "https://generativelanguage.googleapis.com/v1beta";
+      case "ollama":
+        return ollamaEndpoint || "http://localhost:11434";
+      default:
+        throw new Error(`Unsupported AI provider: ${provider}`);
+    }
+  }
+};
+
+// src/api/api-client-factory.ts
+var APIClientFactory = class {
+  static createClient(settings) {
+    const provider = settings.aiProvider;
+    switch (provider) {
+      case "openai":
+        return new OpenAIClient(settings.openaiApiKey);
+      case "anthropic":
+        return new AnthropicClient(settings.anthropicApiKey);
+      case "google":
+        return new GoogleClient(settings.googleApiKey);
+      case "ollama":
+        return new OllamaClient(settings.ollamaEndpoint);
+      default:
+        throw new Error(`Unsupported AI provider: ${provider}`);
+    }
+  }
+  static async fetchModels(settings, provider) {
+    const targetProvider = provider || settings.aiProvider;
+    if (targetProvider === "ollama") {
+      return [];
+    }
+    const client = this.createClient({
+      ...settings,
+      aiProvider: targetProvider
+    });
+    if (!client.fetchModels) {
+      return [];
+    }
+    return await client.fetchModels();
+  }
+  static getApiKey(settings) {
+    return AIProviderUtils.getApiKey(settings);
+  }
+  static getModelName(settings) {
+    return AIProviderUtils.getModelName(settings);
+  }
+};
+
+// src/services/ai-service.ts
+var AIService = class {
+  constructor(settings) {
+    this.settings = settings;
+  }
+  async callAI(messages, maxTokens = 150) {
+    const apiKey = APIClientFactory.getApiKey(this.settings);
+    if (!apiKey) {
+      throw new Error("No API key configured for selected AI provider");
+    }
+    const model = APIClientFactory.getModelName(this.settings);
+    const client = APIClientFactory.createClient(this.settings);
+    return await client.chat(messages, maxTokens, model);
+  }
+  getModelName() {
+    return APIClientFactory.getModelName(this.settings);
+  }
+  getAvailableModels(cachedModels, provider) {
+    const cache = {
+      openai_models: (cachedModels == null ? void 0 : cachedModels.openai_models) || [],
+      anthropic_models: (cachedModels == null ? void 0 : cachedModels.anthropic_models) || [],
+      google_models: (cachedModels == null ? void 0 : cachedModels.google_models) || []
+    };
+    return AIProviderUtils.getAvailableModels(cache, provider || this.settings.aiProvider);
+  }
+  getStaticModels(provider) {
+    return AIProviderUtils.getStaticModels(provider || this.settings.aiProvider);
+  }
   async fetchModelsFromAPI(provider) {
     try {
-      switch (provider) {
-        case "openai":
-          return await this.fetchOpenAIModels();
-        case "anthropic":
-          return await this.fetchAnthropicModels();
-        case "google":
-          return await this.fetchGoogleModels();
-        default:
-          return [];
-      }
+      return await APIClientFactory.fetchModels(this.settings, provider);
     } catch (error) {
       console.error(`Failed to fetch models from ${provider}:`, error);
       return [];
     }
-  }
-  async fetchOpenAIModels() {
-    const apiKey = this.settings.openaiApiKey;
-    if (!apiKey) {
-      return [];
-    }
-    try {
-      const response = await (0, import_obsidian.requestUrl)({
-        url: "https://api.openai.com/v1/models",
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        }
-      });
-      if (response.status === 200) {
-        const models = response.json.data.map((model) => model.id).filter(
-          (id) => id.startsWith("gpt-") || id.startsWith("o1-") || id.startsWith("text-davinci") || id.startsWith("text-curie") || id.startsWith("text-babbage") || id.startsWith("text-ada")
-        ).sort();
-        console.log(`Fetched ${models.length} OpenAI models`);
-        return models;
-      }
-    } catch (error) {
-      console.error("OpenAI models fetch error:", error);
-    }
-    return [];
-  }
-  async fetchAnthropicModels() {
-    const apiKey = this.settings.anthropicApiKey;
-    if (!apiKey) {
-      return [];
-    }
-    try {
-      const response = await (0, import_obsidian.requestUrl)({
-        url: "https://api.anthropic.com/v1/models",
-        method: "GET",
-        headers: {
-          "x-api-key": apiKey,
-          "Content-Type": "application/json",
-          "anthropic-version": "2023-06-01"
-        }
-      });
-      if (response.status === 200) {
-        const models = response.json.data.map((model) => model.id).filter((id) => id.startsWith("claude-")).sort();
-        console.log(`Fetched ${models.length} Anthropic models`);
-        return models;
-      }
-    } catch (error) {
-      console.error("Anthropic models fetch error:", error);
-    }
-    return [];
-  }
-  async fetchGoogleModels() {
-    const apiKey = this.settings.googleApiKey;
-    if (!apiKey) {
-      return [];
-    }
-    try {
-      const response = await (0, import_obsidian.requestUrl)({
-        url: `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json"
-        }
-      });
-      if (response.status === 200) {
-        const models = response.json.models.filter((model) => {
-          const supportedMethods = model.supportedGenerationMethods || [];
-          const hasGenerateContent = supportedMethods.includes("generateContent");
-          const modelName = model.name.toLowerCase();
-          const isGeminiModel = modelName.includes("gemini");
-          const isTextModel = !modelName.includes("embedding") && !modelName.includes("vision") && !modelName.includes("code") && !modelName.includes("image");
-          console.log(`Google model: ${model.name}, supports generateContent: ${hasGenerateContent}, is gemini: ${isGeminiModel}, is text: ${isTextModel}`);
-          return hasGenerateContent && isGeminiModel && isTextModel;
-        }).map((model) => {
-          const cleanName = model.name.replace("models/", "");
-          return cleanName;
-        }).sort();
-        console.log(`Fetched ${models.length} Google models:`, models);
-        return models;
-      }
-    } catch (error) {
-      console.error("Google models fetch error:", error);
-    }
-    return [];
-  }
-  async refreshModels(provider, modelCache) {
-    const providersToRefresh = provider ? [provider] : ["openai", "anthropic", "google"];
-    const cache = modelCache || {};
-    for (const p of providersToRefresh) {
-      const models = await this.fetchModelsFromAPI(p);
-      if (models.length > 0) {
-        const cacheKey = `${p}_models`;
-        cache[cacheKey] = models;
-      }
-    }
-    return cache;
   }
   async callAIForLayoutFix(content) {
     try {
       const messages = [
         {
           role: "user",
-          content: `\uB2E4\uC74C\uC740 \uB124\uC774\uBC84 \uBE14\uB85C\uADF8\uC5D0\uC11C HTML \uD30C\uC2F1\uC73C\uB85C \uAC00\uC838\uC628 \uD14D\uC2A4\uD2B8\uC785\uB2C8\uB2E4. HTML \uD30C\uC2F1 \uACFC\uC815\uC5D0\uC11C \uB808\uC774\uC544\uC6C3\uC774 \uAE68\uC9C0\uACE0 \uD615\uC2DD\uC774 \uB9DD\uAC00\uC9C4 \uBD80\uBD84\uC744 \uC218\uC815\uD574\uC8FC\uC138\uC694.
+          content: `${AI_PROMPTS.layoutFix}
 
-\u26A0\uFE0F **\uC911\uC694**: \uC6D0\uBB38\uC758 \uB0B4\uC6A9\uC740 100% \uADF8\uB300\uB85C \uC720\uC9C0\uD558\uACE0, \uC624\uC9C1 \uB9C8\uD06C\uB2E4\uC6B4 \uD615\uC2DD\uACFC \uB808\uC774\uC544\uC6C3\uB9CC \uC218\uC815\uD574\uC8FC\uC138\uC694.
-
-**\uC218\uC815 \uC0AC\uD56D**:
-1. \uC904\uBC14\uAFC8\uACFC \uBB38\uB2E8 \uAD6C\uBD84\uC744 \uC790\uC5F0\uC2A4\uB7FD\uAC8C \uC815\uB9AC
-2. \uC81C\uBAA9\uC774 \uD544\uC694\uD55C \uBD80\uBD84\uC5D0 \uC801\uC808\uD55C ## \uB610\uB294 ### \uCD94\uAC00  
-3. \uBAA9\uB85D \uD615\uD0DC\uC758 \uB0B4\uC6A9\uC740 - \uB610\uB294 1. \uD615\uC2DD\uC73C\uB85C \uC815\uB9AC
-4. \uAC15\uC870\uAC00 \uD544\uC694\uD55C \uBD80\uBD84\uB9CC **\uBCFC\uB4DC** \uCC98\uB9AC
-5. \uC804\uCCB4\uC801\uC778 \uB9C8\uD06C\uB2E4\uC6B4 \uD615\uC2DD \uC815\uB9AC
-
-**\uC808\uB300 \uD558\uC9C0 \uB9D0 \uAC83**:
-- \uB0B4\uC6A9 \uCD94\uAC00, \uC0AD\uC81C, \uBCC0\uACBD \uAE08\uC9C0
-- \uC758\uBBF8\uB098 \uB258\uC559\uC2A4 \uBCC0\uACBD \uAE08\uC9C0  
-- \uC0C8\uB85C\uC6B4 \uC815\uBCF4\uB098 \uD574\uC11D \uCD94\uAC00 \uAE08\uC9C0
-
-\uC6D0\uBB38:
-${content}
-
-\uC704 \uB0B4\uC6A9\uC758 \uD615\uC2DD\uB9CC \uAE54\uB054\uD558\uAC8C \uC218\uC815\uD574\uC11C \uB9C8\uD06C\uB2E4\uC6B4\uC73C\uB85C \uCD9C\uB825\uD574\uC8FC\uC138\uC694.`
+${content}`
         }
       ];
-      let fixedContent = await this.callAI(messages, 4e3);
+      let fixedContent = await this.callAI(messages, AI_TOKEN_LIMITS.default);
       if (fixedContent.startsWith("```markdown\n") && fixedContent.endsWith("\n```")) {
         fixedContent = fixedContent.substring(12, fixedContent.length - 4).trim();
       } else if (fixedContent.startsWith("```\n") && fixedContent.endsWith("\n```")) {
@@ -612,160 +1041,17 @@ ${content}
       } else if (error.message.includes("network") || error.message.includes("fetch")) {
         throw new Error("Network error. Please check your internet connection.");
       } else {
-        throw new Error(`AI formatting failed: ${error.message}`);
+        throw error;
       }
-    }
-  }
-  async callOpenAI(messages, maxTokens, model, apiKey) {
-    const response = await (0, import_obsidian.requestUrl)({
-      url: "https://api.openai.com/v1/chat/completions",
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: maxTokens,
-        temperature: 0.3
-      })
-    });
-    if (response.status === 200) {
-      return response.json.choices[0].message.content.trim();
-    } else {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-  }
-  async callAnthropic(messages, maxTokens, model, apiKey) {
-    var _a5;
-    const systemMessage = ((_a5 = messages.find((m) => m.role === "system")) == null ? void 0 : _a5.content) || "";
-    const userMessages = messages.filter((m) => m.role !== "system");
-    const response = await (0, import_obsidian.requestUrl)({
-      url: "https://api.anthropic.com/v1/messages",
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        system: systemMessage,
-        messages: userMessages
-      })
-    });
-    if (response.status === 200) {
-      return response.json.content[0].text.trim();
-    } else {
-      throw new Error(`Anthropic API error: ${response.status}`);
-    }
-  }
-  async callGoogle(messages, maxTokens, model, apiKey) {
-    const contents2 = messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }]
-    }));
-    const maxRetries = 3;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const response = await (0, import_obsidian.requestUrl)({
-          url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            contents: contents2,
-            generationConfig: {
-              maxOutputTokens: maxTokens,
-              temperature: 0.3
-            },
-            systemInstruction: {
-              parts: [{ text: "You are a helpful assistant. Respond directly and concisely without showing your thinking process or reasoning. Give only the final answer." }]
-            }
-          })
-        });
-        if (response.status === 200) {
-          const data2 = response.json;
-          console.log("Google API full response:", JSON.stringify(data2, null, 2));
-          if (!data2.candidates || data2.candidates.length === 0) {
-            console.error("Google API response missing candidates:", data2);
-            throw new Error("Google API response missing candidates");
-          }
-          const candidate = data2.candidates[0];
-          console.log("Google API candidate:", JSON.stringify(candidate, null, 2));
-          if (!candidate.content) {
-            console.error("Google API candidate missing content:", candidate);
-            throw new Error("Google API candidate missing content");
-          }
-          if (candidate.finishReason === "MAX_TOKENS") {
-            console.warn("Google API response was truncated due to MAX_TOKENS");
-            if (!candidate.content.parts || candidate.content.parts.length === 0) {
-              console.error("Google API response completely truncated - no usable content");
-              throw new Error("Google API response completely truncated - try increasing maxTokens or reducing input size");
-            }
-          }
-          if (!candidate.content.parts || candidate.content.parts.length === 0) {
-            console.error("Google API candidate content missing parts:", candidate.content);
-            throw new Error("Google API candidate content missing parts");
-          }
-          const text3 = candidate.content.parts[0].text;
-          if (!text3) {
-            console.error("Google API content missing text:", candidate.content.parts[0]);
-            throw new Error("Google API content missing text");
-          }
-          return text3.trim();
-        } else if (response.status === 503 && attempt < maxRetries) {
-          const delay = Math.pow(2, attempt) * 1e3;
-          console.warn(`Google API 503 error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          continue;
-        } else {
-          console.error("Google API error:", response.status, response.text);
-          throw new Error(`Google API error: ${response.status} - ${response.text}`);
-        }
-      } catch (error) {
-        if (attempt === maxRetries) {
-          throw error;
-        }
-        console.warn(`Google API request failed (attempt ${attempt}/${maxRetries}):`, error);
-        await new Promise((resolve) => setTimeout(resolve, 1e3 * attempt));
-      }
-    }
-    throw new Error("Google API: Maximum retries exceeded");
-  }
-  async callOllama(messages, maxTokens, model) {
-    const response = await (0, import_obsidian.requestUrl)({
-      url: `${this.settings.ollamaEndpoint}/api/chat`,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        options: {
-          num_predict: maxTokens,
-          temperature: 0.3
-        }
-      })
-    });
-    if (response.status === 200) {
-      return response.json.message.content.trim();
-    } else {
-      throw new Error(`Ollama API error: ${response.status}`);
     }
   }
 };
 
 // src/services/blog-service.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian6 = require("obsidian");
 
 // naver-blog-fetcher.ts
-var import_obsidian2 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 
 // node_modules/cheerio/dist/browser/static.js
 var static_exports = {};
@@ -15479,7 +15765,7 @@ var NaverBlogFetcher = class {
         let foundPostsOnPage = false;
         for (const url of urlsToTry) {
           try {
-            const response = await (0, import_obsidian2.requestUrl)({
+            const response = await (0, import_obsidian5.requestUrl)({
               url,
               method: "GET",
               headers: {
@@ -15517,7 +15803,7 @@ var NaverBlogFetcher = class {
       if (posts.length === 0) {
         console.log("No posts found via pagination, trying main page...");
         const mainPageUrl = `https://blog.naver.com/${this.blogId}`;
-        const response = await (0, import_obsidian2.requestUrl)({
+        const response = await (0, import_obsidian5.requestUrl)({
           url: mainPageUrl,
           method: "GET",
           headers: {
@@ -15693,7 +15979,7 @@ var NaverBlogFetcher = class {
       for (const postUrl of urlFormats) {
         try {
           console.log(`Trying URL: ${postUrl}`);
-          const response = await (0, import_obsidian2.requestUrl)({
+          const response = await (0, import_obsidian5.requestUrl)({
             url: postUrl,
             method: "GET",
             headers: {
@@ -16800,7 +17086,7 @@ var BlogService = class {
   async fetchNaverBlogPosts(blogId, maxPosts) {
     let fetchNotice = null;
     try {
-      fetchNotice = new import_obsidian3.Notice("Fetching blog posts...", 0);
+      fetchNotice = new import_obsidian6.Notice("Fetching blog posts...", 0);
       const effectiveMaxPosts = maxPosts || (this.settings.postImportLimit > 0 ? this.settings.postImportLimit : void 0);
       const fetcher = new NaverBlogFetcher(blogId);
       const posts = await fetcher.fetchPosts(effectiveMaxPosts);
@@ -16812,11 +17098,11 @@ var BlogService = class {
       if (this.settings.enableDuplicateCheck) {
         const existingLogNos = await this.getExistingLogNos();
         filteredPosts = posts.filter((post) => !existingLogNos.has(post.logNo));
-        new import_obsidian3.Notice(`Found ${posts.length} posts, ${filteredPosts.length} new posts after duplicate check`, 4e3);
+        new import_obsidian6.Notice(`Found ${posts.length} posts, ${filteredPosts.length} new posts after duplicate check`, 4e3);
       } else {
-        new import_obsidian3.Notice(`Found ${posts.length} posts`, 4e3);
+        new import_obsidian6.Notice(`Found ${posts.length} posts`, 4e3);
       }
-      new import_obsidian3.Notice(`Processing ${filteredPosts.length} posts...`, 3e3);
+      new import_obsidian6.Notice(`Processing ${filteredPosts.length} posts...`, 3e3);
       const processedPosts = filteredPosts.map((post) => ({
         ...post,
         title: post.title.replace(/^\[.*?\]\s*/, "").replace(/\s*\[.*?\]$/, "").trim(),
@@ -16831,7 +17117,7 @@ var BlogService = class {
         fetchNotice = null;
       }
       console.error(`Error fetching posts from ${blogId}:`, error);
-      new import_obsidian3.Notice(`\u274C Failed to fetch posts from ${blogId}: ${error.message}`, 5e3);
+      new import_obsidian6.Notice(`\u274C Failed to fetch posts from ${blogId}: ${error.message}`, 5e3);
       throw error;
     }
   }
@@ -16854,7 +17140,7 @@ var BlogService = class {
   async syncSubscribedBlogs() {
     if (this.settings.subscribedBlogs.length === 0)
       return;
-    const syncNotice = new import_obsidian3.Notice("Syncing subscribed blogs...", 0);
+    const syncNotice = new import_obsidian6.Notice("Syncing subscribed blogs...", 0);
     let totalNewPosts = 0;
     let totalErrors = 0;
     const totalBlogs = this.settings.subscribedBlogs.length;
@@ -16865,7 +17151,7 @@ var BlogService = class {
         const blogSubscription = this.settings.blogSubscriptions.find((sub) => sub.blogId === blogId);
         const postCount = (blogSubscription == null ? void 0 : blogSubscription.postCount) || 10;
         try {
-          new import_obsidian3.Notice(`Syncing blog ${blogProgress}: ${blogId} (${postCount} posts)`, 5e3);
+          new import_obsidian6.Notice(`Syncing blog ${blogProgress}: ${blogId} (${postCount} posts)`, 5e3);
           const posts = await this.fetchNaverBlogPosts(blogId, postCount);
           let blogSuccessCount = 0;
           let blogErrorLogCount = 0;
@@ -16875,7 +17161,7 @@ var BlogService = class {
             const postProgress = `${blogProgress} post (${j + 1}/${posts.length})`;
             const isErrorPost = post.title.startsWith("[\uC624\uB958]");
             try {
-              new import_obsidian3.Notice(`Creating ${postProgress}: ${post.title}`, 3e3);
+              new import_obsidian6.Notice(`Creating ${postProgress}: ${post.title}`, 3e3);
               await this.createMarkdownFile(post);
               if (isErrorPost) {
                 blogErrorLogCount++;
@@ -16900,15 +17186,15 @@ var BlogService = class {
     } finally {
       syncNotice.hide();
       if (totalNewPosts > 0 || totalErrors > 0) {
-        new import_obsidian3.Notice(`\u2705 Sync completed: ${totalNewPosts} posts imported, ${totalErrors} errors`, 5e3);
+        new import_obsidian6.Notice(`\u2705 Sync completed: ${totalNewPosts} posts imported, ${totalErrors} errors`, 5e3);
       } else {
-        new import_obsidian3.Notice("\u2705 Sync completed: No new posts found", 5e3);
+        new import_obsidian6.Notice("\u2705 Sync completed: No new posts found", 5e3);
       }
     }
   }
   async importSinglePost(blogId, logNo) {
     try {
-      new import_obsidian3.Notice(`Importing post ${logNo} from ${blogId}...`, 3e3);
+      new import_obsidian6.Notice(`Importing post ${logNo} from ${blogId}...`, 3e3);
       const fetcher = new NaverBlogFetcher(blogId);
       const post = await fetcher.fetchSinglePost(logNo);
       if (!post) {
@@ -16921,10 +17207,10 @@ var BlogService = class {
         excerpt: ""
       };
       await this.createMarkdownFile(processedPost);
-      new import_obsidian3.Notice(`\u2705 Post imported successfully: ${processedPost.title}`, 4e3);
+      new import_obsidian6.Notice(`\u2705 Post imported successfully: ${processedPost.title}`, 4e3);
     } catch (error) {
       console.error("Error importing single post:", error);
-      new import_obsidian3.Notice(`\u274C Failed to import post: ${error.message}`, 5e3);
+      new import_obsidian6.Notice(`\u274C Failed to import post: ${error.message}`, 5e3);
       throw error;
     }
   }
@@ -16935,7 +17221,7 @@ var BlogService = class {
 };
 
 // src/services/image-service.ts
-var import_obsidian4 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 
 // src/types/settings.ts
 var DEFAULT_SETTINGS = {
@@ -16956,197 +17242,6 @@ var DEFAULT_SETTINGS = {
   blogSubscriptions: [],
   postImportLimit: 0
   // 0 means no limit
-};
-
-// src/constants/api-endpoints.ts
-var OPENAI_BASE_URL = "https://api.openai.com/v1";
-var OPENAI_MODELS_ENDPOINT = `${OPENAI_BASE_URL}/models`;
-var OPENAI_CHAT_ENDPOINT = `${OPENAI_BASE_URL}/chat/completions`;
-var ANTHROPIC_BASE_URL = "https://api.anthropic.com/v1";
-var ANTHROPIC_MODELS_ENDPOINT = `${ANTHROPIC_BASE_URL}/models`;
-var ANTHROPIC_MESSAGES_ENDPOINT = `${ANTHROPIC_BASE_URL}/messages`;
-var GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-var GOOGLE_MODELS_ENDPOINT = `${GOOGLE_BASE_URL}/models`;
-var GOOGLE_GENERATE_CONTENT_ENDPOINT = (model) => `${GOOGLE_BASE_URL}/models/${model}:generateContent`;
-var NAVER_BLOG_BASE_URL = "https://blog.naver.com";
-var NAVER_BLOG_POST_LIST_URL = `${NAVER_BLOG_BASE_URL}/PostList.naver`;
-var NAVER_PROFILE_IMAGE_PATH = "ssl.pstatic.net/static/blog/profile/";
-
-// src/constants/ai-models.ts
-var OPENAI_MODEL_PREFIXES = ["gpt-", "o1-", "text-", "davinci-", "curie-", "babbage-", "ada-"];
-
-// src/constants/default-values.ts
-var DEFAULT_BLOG_POST_COUNT = 10;
-var MAX_POST_IMPORT_LIMIT = 1e3;
-var MAX_SUBSCRIPTION_POST_COUNT = 100;
-var MAX_FILENAME_LENGTH = 100;
-var MIN_CONTENT_LENGTH_FOR_AI = 50;
-var AI_TOKEN_LIMITS = {
-  default: 4e3,
-  pro: 1e4
-};
-var DEFAULT_IMAGE_EXTENSION = "jpg";
-var UI_DEFAULTS = {
-  modalInputWidth: "100%",
-  modalInputMargin: "10px",
-  modalGap: "10px",
-  modalPadding: "10px",
-  dropdownZIndex: 1e3,
-  modalTimeout: 100,
-  blurDelay: 150
-};
-
-// src/constants/timeouts.ts
-var NOTICE_TIMEOUTS = {
-  short: 2e3,
-  // Brief notifications
-  medium: 5e3,
-  // Standard notifications
-  long: 1e4
-  // Important notifications
-};
-var RETRY_DELAYS = {
-  base: 1e3,
-  // Base delay for retries
-  multiplier: 2,
-  // Exponential backoff multiplier
-  maxRetries: 3
-  // Maximum number of retries
-};
-var UI_DELAYS = {
-  focus: 100,
-  // Delay before focusing inputs
-  blur: 150,
-  // Delay before hiding dropdowns
-  autoSync: 5e3
-  // Auto-sync delay after plugin load
-};
-var API_DELAYS = {
-  betweenPosts: 1e3,
-  // Delay between processing posts
-  betweenBlogs: 1e3
-  // Delay between processing blogs
-};
-var calculateBackoffDelay = (attempt) => {
-  return Math.pow(RETRY_DELAYS.multiplier, attempt) * RETRY_DELAYS.base;
-};
-
-// src/constants/http-headers.ts
-var USER_AGENTS = {
-  default: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-  chrome: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  images: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-};
-var NAVER_HEADERS = {
-  referer: "https://blog.naver.com/",
-  userAgent: USER_AGENTS.chrome
-};
-var API_VERSIONS = {
-  anthropic: "2023-06-01",
-  openai: "v1"
-};
-var CONTENT_TYPES = {
-  json: "application/json",
-  formData: "multipart/form-data",
-  urlEncoded: "application/x-www-form-urlencoded"
-};
-
-// src/constants/messages.ts
-var AI_PROMPTS = {
-  layoutFix: `\u26A0\uFE0F **\uC911\uC694**: \uC6D0\uBB38\uC758 \uB0B4\uC6A9\uC740 100% \uADF8\uB300\uB85C \uC720\uC9C0\uD558\uACE0, \uC624\uC9C1 \uB9C8\uD06C\uB2E4\uC6B4 \uD615\uC2DD\uACFC \uB808\uC774\uC544\uC6C3\uB9CC \uC218\uC815\uD574\uC8FC\uC138\uC694.
-
-\uB2E4\uC74C \uB124\uC774\uBC84 \uBE14\uB85C\uADF8 \uAE00\uC744 Obsidian\uC6A9 \uB9C8\uD06C\uB2E4\uC6B4\uC73C\uB85C \uAC1C\uC120\uD574\uC8FC\uC138\uC694:
-
-1. **\uC81C\uBAA9 \uC815\uB9AC**: \uC801\uC808\uD55C \uD5E4\uB529 \uB808\uBCA8(#, ##, ###)\uB85C \uAD6C\uC870\uD654
-2. **\uBB38\uB2E8 \uC815\uB9AC**: \uAE34 \uBB38\uB2E8\uC744 \uC77D\uAE30 \uC27D\uAC8C \uBD84\uD560\uD558\uACE0 \uC801\uC808\uD55C \uC904\uBC14\uAFC8 \uCD94\uAC00
-3. **\uBAA9\uB85D \uC815\uB9AC**: \uBAA9\uB85D\uC740 \uAE54\uB054\uD55C - \uB610\uB294 1. \uD615\uC2DD\uC73C\uB85C \uBCC0\uD658
-4. **\uAC15\uC870 \uC815\uB9AC**: \uC911\uC694\uD55C \uBD80\uBD84\uC5D0 **\uAD75\uAC8C** \uB610\uB294 *\uAE30\uC6B8\uC784* \uC801\uC6A9
-5. **\uB9C1\uD06C \uC815\uB9AC**: \uB9C8\uD06C\uB2E4\uC6B4 \uB9C1\uD06C \uD615\uC2DD [\uD14D\uC2A4\uD2B8](URL)\uB85C \uBCC0\uD658
-6. **\uC774\uBBF8\uC9C0 \uC815\uB9AC**: \uC774\uBBF8\uC9C0 \uB9C8\uD06C\uB2E4\uC6B4 \uD615\uC2DD \uC815\uB9AC \uBC0F \uCEA1\uC158 \uCD94\uAC00
-7. **\uCF54\uB4DC \uC815\uB9AC**: \uCF54\uB4DC \uBE14\uB85D\uC774 \uC788\uB2E4\uBA74 \uC801\uC808\uD55C \uC5B8\uC5B4 \uD0DC\uADF8\uC640 \uD568\uAED8 \`\`\` \uD615\uC2DD\uC73C\uB85C
-8. **\uBD88\uD544\uC694\uD55C \uC694\uC18C \uC81C\uAC70**: \uAD11\uACE0\uC131 \uD14D\uC2A4\uD2B8, \uC911\uBCF5 \uC904\uBC14\uAFC8, \uC774\uC0C1\uD55C \uAE30\uD638 \uC81C\uAC70
-
-**\uC808\uB300 \uC6D0\uBB38 \uB0B4\uC6A9\uC744 \uBC14\uAFB8\uAC70\uB098 \uC0AD\uC81C\uD558\uC9C0 \uB9C8\uC138\uC694. \uC624\uC9C1 \uD615\uC2DD\uACFC \uB808\uC774\uC544\uC6C3\uB9CC \uAC1C\uC120\uD574\uC8FC\uC138\uC694.**
-
-\uB0B4\uC6A9:`,
-  tagGeneration: `\uB2E4\uC74C \uBE14\uB85C\uADF8 \uAE00 \uB0B4\uC6A9\uC744 \uBC14\uD0D5\uC73C\uB85C \uC801\uC808\uD55C \uD0DC\uADF8\uB97C 3-7\uAC1C \uC815\uB3C4 \uC0DD\uC131\uD574\uC8FC\uC138\uC694. 
-\uD0DC\uADF8\uB294 \uAE00\uC758 \uC8FC\uC81C, \uAE30\uC220, \uD0A4\uC6CC\uB4DC \uB4F1\uC744 \uD3EC\uD568\uD574\uC57C \uD558\uBA70, \uD55C\uAD6D\uC5B4\uB85C \uC791\uC131\uD574\uC8FC\uC138\uC694.
-\uC751\uB2F5\uC740 \uC27C\uD45C\uB85C \uAD6C\uBD84\uB41C \uD0DC\uADF8 \uBAA9\uB85D\uB9CC \uC81C\uACF5\uD574\uC8FC\uC138\uC694. (\uC608: \uAC1C\uBC1C, \uD504\uB85C\uADF8\uB798\uBC0D, \uC790\uBC14\uC2A4\uD06C\uB9BD\uD2B8)
-
-\uB0B4\uC6A9:`,
-  excerptGeneration: `\uB2E4\uC74C \uBE14\uB85C\uADF8 \uAE00\uC758 \uD575\uC2EC \uB0B4\uC6A9\uC744 1-2\uBB38\uC7A5\uC73C\uB85C \uC694\uC57D\uD574\uC8FC\uC138\uC694.
-\uC751\uB2F5\uC740 \uC694\uC57D\uBB38\uB9CC \uC81C\uACF5\uD574\uC8FC\uC138\uC694.
-
-\uB0B4\uC6A9:`
-};
-var PLACEHOLDERS = {
-  blogId: "Blog ID (e.g., yonofbooks)",
-  postUrl: "Enter Naver blog post URL...",
-  apiKey: {
-    openai: "sk-...",
-    anthropic: "sk-ant-...",
-    google: "AIza...",
-    ollama: "http://localhost:11434"
-  },
-  folder: {
-    default: "Naver Blog Posts",
-    image: "Naver Blog Posts/attachments"
-  },
-  postLimit: "0"
-};
-
-// src/constants/regex-patterns.ts
-var SKIP_IMAGE_PATTERNS = [
-  // Naver blog editor assets
-  /se-sticker/i,
-  /se-emoticon/i,
-  /editor/i,
-  /naverblog_pc/i,
-  // Common animation and GIF patterns
-  /\.gif$/i,
-  /loading/i,
-  /spinner/i,
-  /animation/i,
-  /thumb/i,
-  // Profile and background images
-  /profile/i,
-  /defaultimg/i,
-  /bg_/i,
-  /background/i,
-  /_bg/i,
-  // Naver UI elements
-  /icon/i,
-  /logo/i,
-  /button/i,
-  // Size indicators (very small images are likely UI elements)
-  /1x1/,
-  /spacer/i,
-  /dot\./i,
-  // Common UI image names
-  /arrow/i,
-  /bullet/i,
-  /divider/i
-];
-var SKIP_ALT_TEXT_PATTERNS = [
-  /이모티콘/i,
-  /스티커/i,
-  /애니메이션/i,
-  /로딩/i,
-  /아이콘/i,
-  /profile/i,
-  /background/i,
-  /프로필/i,
-  /배경/i
-];
-var NAVER_CDN_PATTERNS = {
-  year2018: /\/MjAxOA%3D%3D\//g,
-  year2019: /\/MjAxOQ%3D%3D\//g,
-  year2020: /\/MjAyMA%3D%3D\//g,
-  year2021: /\/MjAyMQ%3D%3D\//g,
-  year2022: /\/MjAyMg%3D%3D\//g,
-  year2023: /\/MjAyMw%3D%3D\//g,
-  year2024: /\/MjAyNA%3D%3D\//g,
-  year2025: /\/MjAyNQ%3D%3D\//g
 };
 
 // src/services/image-service.ts
@@ -17174,9 +17269,6 @@ var ImageService = class {
         return this.shouldDownloadImage(imageUrl, altText);
       });
       const totalImages = filteredMatches.length;
-      if (totalImages > 0) {
-        console.log(`Found ${totalImages} valid images to download for post ${logNo} (filtered from ${allMatches.length})`);
-      }
       for (let i = 0; i < filteredMatches.length; i++) {
         const [fullMatch, altText, imageUrl] = filteredMatches[i];
         if (imageUrl.startsWith("attachments/") || imageUrl.startsWith("./") || imageUrl.startsWith("../")) {
@@ -17185,9 +17277,8 @@ var ImageService = class {
         try {
           let directUrl = this.convertToDirectImageUrl(imageUrl);
           const imageProgress = `(${imageCount + 1}/${totalImages})`;
-          console.log(`Processing image ${imageProgress}: ${imageUrl} -> ${directUrl}`);
-          new import_obsidian4.Notice(`Downloading image ${imageProgress} for post ${logNo}`, 2e3);
-          const response = await (0, import_obsidian4.requestUrl)({
+          new import_obsidian7.Notice(`Downloading image ${imageProgress} for post ${logNo}`, 2e3);
+          const response = await (0, import_obsidian7.requestUrl)({
             url: directUrl,
             method: "GET",
             headers: {
@@ -17209,12 +17300,10 @@ var ImageService = class {
             }
             filename = `${logNo}_${imageCount}_${filename}`;
             filename = this.sanitizeFilename(filename);
-            console.log(`Generated filename: ${filename}`);
             const imagePath = `${attachmentsFolder}/${filename}`;
             try {
               await this.app.vault.adapter.writeBinary(imagePath, response.arrayBuffer);
               const fileExists = await this.app.vault.adapter.exists(imagePath);
-              console.log(`File saved successfully: ${fileExists} at ${imagePath}`);
               if (!fileExists) {
                 throw new Error("File was not saved properly");
               }
@@ -17227,12 +17316,8 @@ var ImageService = class {
             const newImageMd = `![${altText}](${localImagePath})`;
             const cleanOriginalUrl = imageUrl.split("?")[0];
             processedContent = processedContent.replace(fullMatch, newImageMd);
-            console.log(`Updated markdown: ${fullMatch} -> ${newImageMd}`);
             imageCount++;
-            console.log(`\u2713 Downloaded image ${imageProgress}: ${filename}`);
           } else {
-            console.log(`\u2717 Failed to download image ${imageProgress}: ${directUrl} (Status: ${response.status})`);
-            console.log(`Response headers:`, response.headers);
           }
         } catch (imageError) {
           const imageProgress = `(${imageCount + 1}/${totalImages})`;
@@ -17242,7 +17327,7 @@ var ImageService = class {
           if (imageUrl.includes("postfiles.pstatic.net")) {
             console.log(`Trying alternative method for postfiles.pstatic.net...`);
             try {
-              const altResponse = await (0, import_obsidian4.requestUrl)({
+              const altResponse = await (0, import_obsidian7.requestUrl)({
                 url: imageUrl,
                 // Use original URL
                 method: "GET",
@@ -17364,8 +17449,8 @@ var ImageService = class {
 };
 
 // src/ui/modals/import-modal.ts
-var import_obsidian5 = require("obsidian");
-var NaverBlogImportModal = class extends import_obsidian5.Modal {
+var import_obsidian8 = require("obsidian");
+var NaverBlogImportModal = class extends import_obsidian8.Modal {
   constructor(app, plugin) {
     super(app);
     // NaverBlogPlugin type
@@ -17377,7 +17462,7 @@ var NaverBlogImportModal = class extends import_obsidian5.Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: this.plugin.i18n.t("modals.import_blog_url.title") });
     let inputElement;
-    new import_obsidian5.Setting(contentEl).setName(this.plugin.i18n.t("modals.import_blog_url.url_label")).setDesc(this.plugin.i18n.t("modals.import_blog_url.url_placeholder")).addText((text3) => {
+    new import_obsidian8.Setting(contentEl).setName(this.plugin.i18n.t("modals.import_blog_url.url_label")).setDesc(this.plugin.i18n.t("modals.import_blog_url.url_placeholder")).addText((text3) => {
       inputElement = text3.inputEl;
       text3.setPlaceholder(this.plugin.i18n.t("modals.import_blog_url.url_label")).setValue(this.blogId).onChange(async (value) => {
         this.blogId = value;
@@ -17389,7 +17474,7 @@ var NaverBlogImportModal = class extends import_obsidian5.Modal {
         }
       });
     });
-    new import_obsidian5.Setting(contentEl).addButton((btn) => btn.setButtonText(this.plugin.i18n.t("modals.import_blog_url.import_button")).setCta().onClick(async () => {
+    new import_obsidian8.Setting(contentEl).addButton((btn) => btn.setButtonText(this.plugin.i18n.t("modals.import_blog_url.import_button")).setCta().onClick(async () => {
       this.handleImport();
     }));
     setTimeout(() => {
@@ -17400,7 +17485,7 @@ var NaverBlogImportModal = class extends import_obsidian5.Modal {
   }
   async handleImport() {
     if (!this.blogId.trim()) {
-      new import_obsidian5.Notice("Please enter a blog ID");
+      new import_obsidian8.Notice("Please enter a blog ID");
       return;
     }
     this.close();
@@ -17408,18 +17493,18 @@ var NaverBlogImportModal = class extends import_obsidian5.Modal {
   }
   async importPosts() {
     let importCancelled = false;
-    const cancelNotice = new import_obsidian5.Notice("Click here to cancel import", 0);
+    const cancelNotice = new import_obsidian8.Notice("Click here to cancel import", 0);
     cancelNotice.noticeEl.addEventListener("click", () => {
       importCancelled = true;
       cancelNotice.hide();
-      new import_obsidian5.Notice("Import cancelled by user", NOTICE_TIMEOUTS.medium);
+      new import_obsidian8.Notice("Import cancelled by user", NOTICE_TIMEOUTS.medium);
     });
     try {
-      new import_obsidian5.Notice("Starting import...");
+      new import_obsidian8.Notice("Starting import...");
       const posts = await this.plugin.fetchNaverBlogPosts(this.blogId);
       if (posts.length === 0) {
         cancelNotice.hide();
-        new import_obsidian5.Notice("No posts found or failed to fetch posts");
+        new import_obsidian8.Notice("No posts found or failed to fetch posts");
         return;
       }
       let successCount = 0;
@@ -17435,7 +17520,7 @@ var NaverBlogImportModal = class extends import_obsidian5.Modal {
         const progress = `(${i + 1}/${totalPosts})`;
         const isErrorPost = post.title.startsWith("[\uC624\uB958]");
         try {
-          new import_obsidian5.Notice(`Creating file ${progress}: ${post.title}`, 3e3);
+          new import_obsidian8.Notice(`Creating file ${progress}: ${post.title}`, 3e3);
           await this.plugin.createMarkdownFile(post);
           if (isErrorPost) {
             errorLogCount++;
@@ -17465,11 +17550,11 @@ var NaverBlogImportModal = class extends import_obsidian5.Modal {
       } else if (!importCancelled) {
         summary += ` \u2705`;
       }
-      new import_obsidian5.Notice(summary, 8e3);
+      new import_obsidian8.Notice(summary, 8e3);
     } catch (error) {
       cancelNotice.hide();
       console.error("Import error:", error);
-      new import_obsidian5.Notice("Import failed. Please check the console for details.");
+      new import_obsidian8.Notice("Import failed. Please check the console for details.");
     }
   }
   onClose() {
@@ -17479,8 +17564,8 @@ var NaverBlogImportModal = class extends import_obsidian5.Modal {
 };
 
 // src/ui/modals/subscribe-modal.ts
-var import_obsidian6 = require("obsidian");
-var NaverBlogSubscribeModal = class extends import_obsidian6.Modal {
+var import_obsidian9 = require("obsidian");
+var NaverBlogSubscribeModal = class extends import_obsidian9.Modal {
   constructor(app, plugin) {
     super(app);
     // NaverBlogPlugin type
@@ -17492,7 +17577,7 @@ var NaverBlogSubscribeModal = class extends import_obsidian6.Modal {
     contentEl.empty();
     contentEl.createEl("h2", { text: this.plugin.i18n.t("modals.subscribe_blog.title") });
     let inputElement;
-    new import_obsidian6.Setting(contentEl).setName(this.plugin.i18n.t("modals.subscribe_blog.blog_id_label")).setDesc(this.plugin.i18n.t("modals.subscribe_blog.blog_id_desc")).addText((text3) => {
+    new import_obsidian9.Setting(contentEl).setName(this.plugin.i18n.t("modals.subscribe_blog.blog_id_label")).setDesc(this.plugin.i18n.t("modals.subscribe_blog.blog_id_desc")).addText((text3) => {
       inputElement = text3.inputEl;
       text3.setPlaceholder(this.plugin.i18n.t("modals.subscribe_blog.blog_id_placeholder")).setValue(this.blogId).onChange(async (value) => {
         this.blogId = value;
@@ -17504,7 +17589,7 @@ var NaverBlogSubscribeModal = class extends import_obsidian6.Modal {
         }
       });
     });
-    new import_obsidian6.Setting(contentEl).addButton((btn) => btn.setButtonText(this.plugin.i18n.t("modals.subscribe_blog.subscribe_button")).setCta().onClick(async () => {
+    new import_obsidian9.Setting(contentEl).addButton((btn) => btn.setButtonText(this.plugin.i18n.t("modals.subscribe_blog.subscribe_button")).setCta().onClick(async () => {
       this.handleSubscribe();
     }));
     setTimeout(() => {
@@ -17515,11 +17600,11 @@ var NaverBlogSubscribeModal = class extends import_obsidian6.Modal {
   }
   async handleSubscribe() {
     if (!this.blogId.trim()) {
-      new import_obsidian6.Notice("Please enter a blog ID");
+      new import_obsidian9.Notice("Please enter a blog ID");
       return;
     }
     if (this.plugin.settings.subscribedBlogs.includes(this.blogId)) {
-      new import_obsidian6.Notice("Already subscribed to this blog");
+      new import_obsidian9.Notice("Already subscribed to this blog");
       return;
     }
     this.plugin.settings.subscribedBlogs.push(this.blogId);
@@ -17528,7 +17613,7 @@ var NaverBlogSubscribeModal = class extends import_obsidian6.Modal {
       postCount: DEFAULT_BLOG_POST_COUNT
     });
     await this.plugin.saveSettings();
-    new import_obsidian6.Notice(`Subscribed to ${this.blogId}`);
+    new import_obsidian9.Notice(`Subscribed to ${this.blogId}`);
     this.close();
     this.plugin.blogService.syncSubscribedBlogs();
   }
@@ -17539,8 +17624,8 @@ var NaverBlogSubscribeModal = class extends import_obsidian6.Modal {
 };
 
 // src/ui/modals/single-post-modal.ts
-var import_obsidian7 = require("obsidian");
-var NaverBlogSinglePostModal = class extends import_obsidian7.Modal {
+var import_obsidian10 = require("obsidian");
+var NaverBlogSinglePostModal = class extends import_obsidian10.Modal {
   // NaverBlogPlugin type
   constructor(app, plugin) {
     super(app);
@@ -17550,36 +17635,25 @@ var NaverBlogSinglePostModal = class extends import_obsidian7.Modal {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.createEl("h2", { text: this.plugin.i18n.t("modals.import_single_post.title") });
-    const inputContainer = contentEl.createDiv();
-    inputContainer.style.marginBottom = "20px";
+    const inputContainer = contentEl.createDiv({ cls: "naver-blog-input-container" });
     const inputLabel = inputContainer.createEl("label", {
       text: this.plugin.i18n.t("modals.import_single_post.log_no_label") + ":",
-      cls: "setting-item-name"
+      cls: "setting-item-name naver-blog-input-label"
     });
-    inputLabel.style.display = "block";
-    inputLabel.style.marginBottom = "8px";
     const input = inputContainer.createEl("input", {
       type: "text",
-      placeholder: this.plugin.i18n.t("modals.import_single_post.log_no_placeholder")
+      placeholder: this.plugin.i18n.t("modals.import_single_post.log_no_placeholder"),
+      cls: "naver-blog-input"
     });
-    input.style.width = UI_DEFAULTS.modalInputWidth;
-    input.style.padding = "8px";
-    input.style.border = "1px solid var(--background-modifier-border)";
-    input.style.borderRadius = "4px";
-    const exampleDiv = inputContainer.createDiv();
-    exampleDiv.style.marginTop = "8px";
-    exampleDiv.style.fontSize = "0.9em";
-    exampleDiv.style.color = "var(--text-muted)";
-    exampleDiv.innerHTML = `
-			<strong>Examples:</strong><br>
-			\u2022 Desktop URL: https://blog.naver.com/yonofbooks/220883239733<br>
-			\u2022 Mobile URL: https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265<br>
-			\u2022 LogNo only: 220883239733
-		`;
-    const buttonContainer = contentEl.createDiv();
-    buttonContainer.style.display = "flex";
-    buttonContainer.style.gap = UI_DEFAULTS.modalGap;
-    buttonContainer.style.justifyContent = "flex-end";
+    const exampleDiv = inputContainer.createDiv({ cls: "naver-blog-example" });
+    const exampleTitle = exampleDiv.createEl("strong", { text: "Examples:" });
+    exampleDiv.createEl("br");
+    exampleDiv.appendText("\u2022 Desktop URL: https://blog.naver.com/yonofbooks/220883239733");
+    exampleDiv.createEl("br");
+    exampleDiv.appendText("\u2022 Mobile URL: https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265");
+    exampleDiv.createEl("br");
+    exampleDiv.appendText("\u2022 LogNo only: 220883239733");
+    const buttonContainer = contentEl.createDiv({ cls: "naver-blog-button-container" });
     const cancelButton = buttonContainer.createEl("button", {
       text: this.plugin.i18n.t("modals.import_single_post.cancel_button")
     });
@@ -17591,7 +17665,7 @@ var NaverBlogSinglePostModal = class extends import_obsidian7.Modal {
     importButton.addEventListener("click", async () => {
       const inputValue = input.value.trim();
       if (!inputValue) {
-        new import_obsidian7.Notice("Please enter a post URL or LogNo");
+        new import_obsidian10.Notice("Please enter a post URL or LogNo");
         return;
       }
       let blogId = "";
@@ -17607,20 +17681,20 @@ var NaverBlogSinglePostModal = class extends import_obsidian7.Modal {
           blogId = urlMatch[1];
           logNo = urlMatch[2];
         } else {
-          new import_obsidian7.Notice("Invalid Naver blog URL format");
+          new import_obsidian10.Notice("Invalid Naver blog URL format");
           return;
         }
       } else if (/^\d{8,15}$/.test(inputValue)) {
         blogId = "yonofbooks";
         logNo = inputValue;
-        new import_obsidian7.Notice(`Using default blog ID: ${blogId}`, 3e3);
+        new import_obsidian10.Notice(`Using default blog ID: ${blogId}`, 3e3);
       } else {
-        new import_obsidian7.Notice("Please enter a valid URL or LogNo (8-15 digits)");
+        new import_obsidian10.Notice("Please enter a valid URL or LogNo (8-15 digits)");
         return;
       }
       this.close();
       try {
-        new import_obsidian7.Notice(`Importing post ${logNo} from ${blogId}...`, 3e3);
+        new import_obsidian10.Notice(`Importing post ${logNo} from ${blogId}...`, 3e3);
         const fetcher = new NaverBlogFetcher(blogId);
         const post = await fetcher.fetchSinglePost(logNo);
         console.log("Single post import result:", post);
@@ -17629,10 +17703,10 @@ var NaverBlogSinglePostModal = class extends import_obsidian7.Modal {
           tags: ["imported"],
           excerpt: post.content.substring(0, 150) + "..."
         });
-        new import_obsidian7.Notice(`\u2713 Successfully imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
+        new import_obsidian10.Notice(`\u2713 Successfully imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
       } catch (error) {
         console.error("Single post import failed:", error);
-        new import_obsidian7.Notice(`\u2717 Failed to import post: ${error.message}`, NOTICE_TIMEOUTS.medium);
+        new import_obsidian10.Notice(`\u2717 Failed to import post: ${error.message}`, NOTICE_TIMEOUTS.medium);
       }
     });
     input.addEventListener("keydown", (e) => {
@@ -17649,8 +17723,8 @@ var NaverBlogSinglePostModal = class extends import_obsidian7.Modal {
 };
 
 // src/ui/settings-tab.ts
-var import_obsidian8 = require("obsidian");
-var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
+var import_obsidian11 = require("obsidian");
+var NaverBlogSettingTab = class extends import_obsidian11.PluginSettingTab {
   // NaverBlogPlugin type
   constructor(app, plugin) {
     super(app, plugin);
@@ -17661,7 +17735,7 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
     containerEl.empty();
     containerEl.createEl("h2", { text: this.plugin.i18n.t("settings.title") });
     containerEl.createEl("h3", { text: this.plugin.i18n.t("settings.ai_configuration") });
-    new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.ai_provider")).setDesc(this.plugin.i18n.t("settings.ai_provider_desc")).addDropdown((dropdown) => dropdown.addOption("openai", this.plugin.i18n.t("providers.openai")).addOption("anthropic", this.plugin.i18n.t("providers.anthropic")).addOption("google", this.plugin.i18n.t("providers.google")).addOption("ollama", this.plugin.i18n.t("providers.ollama")).setValue(this.plugin.settings.aiProvider).onChange(async (value) => {
+    new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.ai_provider")).setDesc(this.plugin.i18n.t("settings.ai_provider_desc")).addDropdown((dropdown) => dropdown.addOption("openai", this.plugin.i18n.t("providers.openai")).addOption("anthropic", this.plugin.i18n.t("providers.anthropic")).addOption("google", this.plugin.i18n.t("providers.google")).addOption("ollama", this.plugin.i18n.t("providers.ollama")).setValue(this.plugin.settings.aiProvider).onChange(async (value) => {
       this.plugin.settings.aiProvider = value;
       this.plugin.settings.aiModel = this.plugin.getDefaultModelForProvider(value);
       await this.plugin.saveSettings();
@@ -17672,7 +17746,7 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
       }
       this.display();
     }));
-    const modelSetting = new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.ai_model")).setDesc(this.plugin.i18n.t("settings.ai_model_desc")).addDropdown((dropdown) => {
+    const modelSetting = new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.ai_model")).setDesc(this.plugin.i18n.t("settings.ai_model_desc")).addDropdown((dropdown) => {
       const availableModels = this.plugin.getAvailableModels();
       availableModels.forEach((model) => {
         dropdown.addOption(model, model);
@@ -17686,31 +17760,31 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
     });
     switch (this.plugin.settings.aiProvider) {
       case "openai":
-        new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.openai_api_key")).setDesc(this.plugin.i18n.t("settings.openai_api_key_desc")).addText((text3) => text3.setPlaceholder("sk-...").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
+        new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.openai_api_key")).setDesc(this.plugin.i18n.t("settings.openai_api_key_desc")).addText((text3) => text3.setPlaceholder("sk-...").setValue(this.plugin.settings.openaiApiKey).onChange(async (value) => {
           this.plugin.settings.openaiApiKey = value;
           await this.plugin.saveSettings();
         }));
         break;
       case "anthropic":
-        new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.anthropic_api_key")).setDesc(this.plugin.i18n.t("settings.anthropic_api_key_desc")).addText((text3) => text3.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.anthropicApiKey).onChange(async (value) => {
+        new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.anthropic_api_key")).setDesc(this.plugin.i18n.t("settings.anthropic_api_key_desc")).addText((text3) => text3.setPlaceholder("sk-ant-...").setValue(this.plugin.settings.anthropicApiKey).onChange(async (value) => {
           this.plugin.settings.anthropicApiKey = value;
           await this.plugin.saveSettings();
         }));
         break;
       case "google":
-        new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.google_api_key")).setDesc(this.plugin.i18n.t("settings.google_api_key_desc")).addText((text3) => text3.setPlaceholder("AIza...").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
+        new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.google_api_key")).setDesc(this.plugin.i18n.t("settings.google_api_key_desc")).addText((text3) => text3.setPlaceholder("AIza...").setValue(this.plugin.settings.googleApiKey).onChange(async (value) => {
           this.plugin.settings.googleApiKey = value;
           await this.plugin.saveSettings();
         }));
         break;
       case "ollama":
-        new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.ollama_endpoint")).setDesc(this.plugin.i18n.t("settings.ollama_endpoint_desc")).addText((text3) => text3.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaEndpoint).onChange(async (value) => {
+        new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.ollama_endpoint")).setDesc(this.plugin.i18n.t("settings.ollama_endpoint_desc")).addText((text3) => text3.setPlaceholder("http://localhost:11434").setValue(this.plugin.settings.ollamaEndpoint).onChange(async (value) => {
           this.plugin.settings.ollamaEndpoint = value;
           await this.plugin.saveSettings();
         }));
         break;
     }
-    new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.default_folder")).setDesc(this.plugin.i18n.t("settings.default_folder_desc")).addText((text3) => {
+    new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.default_folder")).setDesc(this.plugin.i18n.t("settings.default_folder_desc")).addText((text3) => {
       const input = text3.setPlaceholder(PLACEHOLDERS.folder.default).setValue(this.plugin.settings.defaultFolder).onChange(async (value) => {
         this.plugin.settings.defaultFolder = value;
         await this.plugin.saveSettings();
@@ -17726,24 +17800,24 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
       });
       return input;
     });
-    new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_ai_tags")).setDesc(this.plugin.i18n.t("settings.enable_ai_tags_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableAiTags).onChange(async (value) => {
+    new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_ai_tags")).setDesc(this.plugin.i18n.t("settings.enable_ai_tags_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableAiTags).onChange(async (value) => {
       this.plugin.settings.enableAiTags = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_ai_excerpt")).setDesc(this.plugin.i18n.t("settings.enable_ai_excerpt_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableAiExcerpt).onChange(async (value) => {
+    new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_ai_excerpt")).setDesc(this.plugin.i18n.t("settings.enable_ai_excerpt_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableAiExcerpt).onChange(async (value) => {
       this.plugin.settings.enableAiExcerpt = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_duplicate_check")).setDesc(this.plugin.i18n.t("settings.enable_duplicate_check_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableDuplicateCheck).onChange(async (value) => {
+    new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_duplicate_check")).setDesc(this.plugin.i18n.t("settings.enable_duplicate_check_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableDuplicateCheck).onChange(async (value) => {
       this.plugin.settings.enableDuplicateCheck = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_image_download")).setDesc(this.plugin.i18n.t("settings.enable_image_download_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableImageDownload).onChange(async (value) => {
+    new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.enable_image_download")).setDesc(this.plugin.i18n.t("settings.enable_image_download_desc")).addToggle((toggle) => toggle.setValue(this.plugin.settings.enableImageDownload).onChange(async (value) => {
       this.plugin.settings.enableImageDownload = value;
       await this.plugin.saveSettings();
       this.display();
     }));
-    new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.post_import_limit")).setDesc(this.plugin.i18n.t("settings.post_import_limit_desc")).addText((text3) => text3.setPlaceholder(PLACEHOLDERS.postLimit).setValue(this.plugin.settings.postImportLimit.toString()).onChange(async (value) => {
+    new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.post_import_limit")).setDesc(this.plugin.i18n.t("settings.post_import_limit_desc")).addText((text3) => text3.setPlaceholder(PLACEHOLDERS.postLimit).setValue(this.plugin.settings.postImportLimit.toString()).onChange(async (value) => {
       let numValue = parseInt(value) || 0;
       if (numValue < 0) {
         numValue = 0;
@@ -17751,13 +17825,13 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
       } else if (numValue > MAX_POST_IMPORT_LIMIT) {
         numValue = MAX_POST_IMPORT_LIMIT;
         text3.setValue(MAX_POST_IMPORT_LIMIT.toString());
-        new import_obsidian8.Notice(this.plugin.i18n.t("notices.post_limit_exceeded"));
+        new import_obsidian11.Notice(this.plugin.i18n.t("notices.post_limit_exceeded"));
       }
       this.plugin.settings.postImportLimit = numValue;
       await this.plugin.saveSettings();
     }));
     if (this.plugin.settings.enableImageDownload) {
-      new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.image_folder")).setDesc(this.plugin.i18n.t("settings.image_folder_desc")).addText((text3) => {
+      new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.image_folder")).setDesc(this.plugin.i18n.t("settings.image_folder_desc")).addText((text3) => {
         const input = text3.setPlaceholder(PLACEHOLDERS.folder.image).setValue(this.plugin.settings.imageFolder).onChange(async (value) => {
           this.plugin.settings.imageFolder = value;
           await this.plugin.saveSettings();
@@ -17777,7 +17851,7 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
     containerEl.createEl("h3", { text: this.plugin.i18n.t("settings.subscribed_blogs") });
     const subscriptionDiv = containerEl.createDiv();
     this.displaySubscriptions(subscriptionDiv);
-    new import_obsidian8.Setting(containerEl).setName(this.plugin.i18n.t("settings.add_blog_id")).setDesc(this.plugin.i18n.t("settings.add_blog_id_desc")).addText((text3) => {
+    new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.add_blog_id")).setDesc(this.plugin.i18n.t("settings.add_blog_id_desc")).addText((text3) => {
       text3.setPlaceholder(PLACEHOLDERS.blogId);
       return text3;
     }).addButton((button) => button.setButtonText(this.plugin.i18n.t("settings.add_button")).onClick(async () => {
@@ -17802,32 +17876,20 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
       return;
     }
     this.plugin.settings.subscribedBlogs.forEach((blogId, index2) => {
-      const blogDiv = containerEl.createDiv();
-      blogDiv.style.display = "grid";
-      blogDiv.style.gridTemplateColumns = "1fr auto auto auto";
-      blogDiv.style.gap = UI_DEFAULTS.modalGap;
-      blogDiv.style.alignItems = "center";
-      blogDiv.style.padding = UI_DEFAULTS.modalPadding;
-      blogDiv.style.border = "1px solid var(--background-modifier-border)";
-      blogDiv.style.borderRadius = "4px";
-      blogDiv.style.marginBottom = "5px";
+      const blogDiv = containerEl.createDiv({ cls: "naver-blog-item" });
       blogDiv.createEl("span", { text: blogId });
-      const countDiv = blogDiv.createDiv();
-      countDiv.style.display = "flex";
-      countDiv.style.alignItems = "center";
-      countDiv.style.gap = "5px";
-      const countLabel = countDiv.createEl("span", { text: this.plugin.i18n.t("settings.posts_label") + ":" });
-      countLabel.style.fontSize = "0.9em";
-      countLabel.style.color = "var(--text-muted)";
+      const countDiv = blogDiv.createDiv({ cls: "naver-blog-count-container" });
+      const countLabel = countDiv.createEl("span", {
+        text: this.plugin.i18n.t("settings.posts_label") + ":",
+        cls: "naver-blog-count-label"
+      });
       const blogSubscription = this.plugin.settings.blogSubscriptions.find((sub) => sub.blogId === blogId);
       const currentCount = (blogSubscription == null ? void 0 : blogSubscription.postCount) || DEFAULT_BLOG_POST_COUNT;
       const countInput = countDiv.createEl("input", {
         type: "number",
-        value: currentCount.toString()
+        value: currentCount.toString(),
+        cls: "naver-blog-count-input"
       });
-      countInput.style.width = "60px";
-      countInput.style.padding = "2px 4px";
-      countInput.style.fontSize = "0.9em";
       countInput.min = "1";
       countInput.max = MAX_SUBSCRIPTION_POST_COUNT.toString();
       countInput.onchange = async () => {
@@ -17843,12 +17905,13 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
         }
         await this.plugin.saveSettings();
       };
-      const syncButton = blogDiv.createEl("button", { text: this.plugin.i18n.t("settings.sync_button") });
-      syncButton.style.fontSize = "0.8em";
-      syncButton.style.padding = "4px 8px";
+      const syncButton = blogDiv.createEl("button", {
+        text: this.plugin.i18n.t("settings.sync_button"),
+        cls: "naver-blog-sync-button"
+      });
       syncButton.onclick = async () => {
         try {
-          new import_obsidian8.Notice(`Syncing ${blogId}...`);
+          new import_obsidian11.Notice(`Syncing ${blogId}...`);
           const posts = await this.plugin.fetchNaverBlogPosts(blogId, currentCount);
           let successCount = 0;
           for (const post of posts) {
@@ -17859,17 +17922,16 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
               console.error(`Failed to save post ${post.logNo}:`, error);
             }
           }
-          new import_obsidian8.Notice(`\u2713 Synced ${successCount} posts from ${blogId}`);
+          new import_obsidian11.Notice(`\u2713 Synced ${successCount} posts from ${blogId}`);
         } catch (error) {
-          new import_obsidian8.Notice(`\u2717 Failed to sync ${blogId}: ${error.message}`);
+          new import_obsidian11.Notice(`\u2717 Failed to sync ${blogId}: ${error.message}`);
           console.error("Sync error:", error);
         }
       };
-      const removeButton = blogDiv.createEl("button", { text: this.plugin.i18n.t("settings.remove_button") });
-      removeButton.style.fontSize = "0.8em";
-      removeButton.style.padding = "4px 8px";
-      removeButton.style.backgroundColor = "var(--interactive-accent)";
-      removeButton.style.color = "var(--text-on-accent)";
+      const removeButton = blogDiv.createEl("button", {
+        text: this.plugin.i18n.t("settings.remove_button"),
+        cls: "naver-blog-remove-button"
+      });
       removeButton.onclick = async () => {
         this.plugin.settings.subscribedBlogs.splice(index2, 1);
         const subIndex = this.plugin.settings.blogSubscriptions.findIndex((sub) => sub.blogId === blogId);
@@ -17885,7 +17947,7 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
     const folders = [""];
     const abstractFiles = this.app.vault.getAllLoadedFiles();
     for (const file of abstractFiles) {
-      if (file instanceof import_obsidian8.TFolder) {
+      if (file instanceof import_obsidian11.TFolder) {
         folders.push(file.path);
       }
     }
@@ -17898,26 +17960,14 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
     let searchIcon = null;
     let clearButton = null;
     const wrapper = document.createElement("div");
-    wrapper.style.cssText = `
-			position: relative;
-			display: flex;
-			align-items: center;
-		`;
+    wrapper.className = "naver-blog-search-wrapper";
     (_a5 = inputEl.parentNode) == null ? void 0 : _a5.insertBefore(wrapper, inputEl);
     wrapper.appendChild(inputEl);
     searchIcon = document.createElement("div");
-    searchIcon.innerHTML = "\u{1F50D}";
-    searchIcon.style.cssText = `
-			position: absolute;
-			left: 8px;
-			top: 50%;
-			transform: translateY(-50%);
-			color: var(--text-muted);
-			pointer-events: none;
-			z-index: 1;
-		`;
+    searchIcon.textContent = "\u{1F50D}";
+    searchIcon.className = "naver-blog-search-icon";
     wrapper.appendChild(searchIcon);
-    inputEl.style.paddingLeft = "32px";
+    inputEl.className = "naver-blog-search-input";
     const updateClearButton = () => {
       if (clearButton) {
         clearButton.remove();
@@ -17925,37 +17975,8 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
       }
       if (inputEl.value.trim() && onClear) {
         clearButton = document.createElement("div");
-        clearButton.innerHTML = "\xD7";
-        clearButton.style.cssText = `
-					position: absolute;
-					right: 8px;
-					top: 50%;
-					transform: translateY(-50%);
-					color: var(--text-muted);
-					cursor: pointer;
-					font-size: 16px;
-					font-weight: bold;
-					z-index: 1;
-					width: 16px;
-					height: 16px;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					border-radius: 50%;
-					transition: all 0.1s;
-				`;
-        clearButton.addEventListener("mouseenter", () => {
-          if (clearButton) {
-            clearButton.style.backgroundColor = "var(--background-modifier-hover)";
-            clearButton.style.color = "var(--text-normal)";
-          }
-        });
-        clearButton.addEventListener("mouseleave", () => {
-          if (clearButton) {
-            clearButton.style.backgroundColor = "";
-            clearButton.style.color = "var(--text-muted)";
-          }
-        });
+        clearButton.textContent = "\xD7";
+        clearButton.className = "naver-blog-search-clear";
         clearButton.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -17965,9 +17986,6 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
           updateClearButton();
         });
         wrapper.appendChild(clearButton);
-        inputEl.style.paddingRight = "28px";
-      } else {
-        inputEl.style.paddingRight = "";
       }
     };
     updateClearButton();
@@ -17980,45 +17998,12 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
       if (filteredFolders.length === 0)
         return;
       dropdownEl = document.createElement("div");
-      dropdownEl.className = "folder-dropdown";
-      dropdownEl.style.cssText = `
-				position: absolute;
-				top: '100%';
-				left: 0;
-				width: ${inputEl.offsetWidth}px;
-				max-height: 200px;
-				overflow-y: auto;
-				background: var(--background-primary);
-				border: 1px solid var(--background-modifier-border);
-				border-radius: 6px;
-				box-shadow: var(--shadow-s);
-				z-index: ${UI_DEFAULTS.dropdownZIndex};
-				margin-top: 2px;
-			`;
+      dropdownEl.className = "naver-blog-dropdown";
+      dropdownEl.style.width = `${inputEl.offsetWidth}px`;
       filteredFolders.forEach((folder, index2) => {
         const itemEl = document.createElement("div");
-        itemEl.className = "folder-dropdown-item";
+        itemEl.className = "naver-blog-dropdown-item";
         itemEl.textContent = folder || "(Root)";
-        itemEl.style.cssText = `
-					padding: 8px 12px;
-					cursor: pointer;
-					border-bottom: 1px solid var(--background-modifier-border);
-					transition: background-color 0.1s;
-					white-space: nowrap;
-					overflow: hidden;
-					text-overflow: ellipsis;
-					font-size: 13px;
-					line-height: 1.3;
-				`;
-        if (index2 === filteredFolders.length - 1) {
-          itemEl.style.borderBottom = "none";
-        }
-        itemEl.addEventListener("mouseenter", () => {
-          itemEl.style.backgroundColor = "var(--background-modifier-hover)";
-        });
-        itemEl.addEventListener("mouseleave", () => {
-          itemEl.style.backgroundColor = "";
-        });
         itemEl.addEventListener("click", () => {
           onSelect(folder);
           this.hideDropdown();
@@ -18026,7 +18011,6 @@ var NaverBlogSettingTab = class extends import_obsidian8.PluginSettingTab {
         });
         dropdownEl.appendChild(itemEl);
       });
-      wrapper.style.position = "relative";
       wrapper.appendChild(dropdownEl);
       isDropdownVisible = true;
     };
@@ -18214,163 +18198,6 @@ ${body}`;
   }
 };
 
-// src/utils/ai-provider-utils.ts
-var AIProviderUtils = class {
-  /**
-   * Gets the API key for the current AI provider
-   * @param settings Plugin settings containing API keys
-   * @returns The appropriate API key or empty string for providers that don't need keys
-   */
-  static getApiKey(settings) {
-    switch (settings.aiProvider) {
-      case "openai":
-        return settings.openaiApiKey;
-      case "anthropic":
-        return settings.anthropicApiKey;
-      case "google":
-        return settings.googleApiKey;
-      case "ollama":
-        return "";
-      default:
-        return "";
-    }
-  }
-  /**
-   * Gets the default model for a specific AI provider
-   * @param provider The AI provider name
-   * @returns Default model name for the provider
-   */
-  static getDefaultModelForProvider(provider) {
-    switch (provider) {
-      case "openai":
-        return "gpt-4o-mini";
-      case "anthropic":
-        return "claude-3-haiku-20240307";
-      case "google":
-        return "gemini-2.5-flash";
-      case "ollama":
-        return "llama3.2:3b";
-      default:
-        return "gpt-4o-mini";
-    }
-  }
-  /**
-   * Gets the current model name from settings or fallback to default
-   * @param settings Plugin settings
-   * @returns Current model name
-   */
-  static getModelName(settings) {
-    if (settings.aiModel) {
-      return settings.aiModel;
-    }
-    return AIProviderUtils.getDefaultModelForProvider(settings.aiProvider);
-  }
-  /**
-   * Gets static list of available models for a provider
-   * @param provider The AI provider name
-   * @returns Array of model names
-   */
-  static getStaticModels(provider) {
-    switch (provider) {
-      case "openai":
-        return [
-          "gpt-4o",
-          "gpt-4o-mini",
-          "gpt-4-turbo",
-          "gpt-4",
-          "gpt-3.5-turbo",
-          "gpt-3.5-turbo-16k",
-          "o1-preview",
-          "o1-mini"
-        ];
-      case "anthropic":
-        return [
-          "claude-3-5-sonnet-20241022",
-          "claude-3-5-haiku-20241022",
-          "claude-3-opus-20240229",
-          "claude-3-sonnet-20240229",
-          "claude-3-haiku-20240307"
-        ];
-      case "google":
-        return [
-          "gemini-2.5-pro",
-          "gemini-2.5-flash",
-          "gemini-2.5-flash-lite-preview-06-17",
-          "gemini-2.0-flash",
-          "gemini-2.0-flash-lite",
-          "gemini-1.5-pro",
-          "gemini-1.5-pro-002",
-          "gemini-1.5-flash",
-          "gemini-1.5-flash-002",
-          "gemini-1.5-flash-8b",
-          "gemini-1.0-pro",
-          "gemini-1.0-pro-001",
-          "gemini-pro"
-        ];
-      case "ollama":
-        return [
-          "llama3.2:3b",
-          "llama3.2:1b",
-          "llama3.1:8b",
-          "mistral:7b",
-          "codellama:7b",
-          "phi3:mini",
-          "qwen2:7b"
-        ];
-      default:
-        return ["gpt-4o-mini"];
-    }
-  }
-  /**
-   * Gets available models from cache and static fallback
-   * @param cache Cached models from API calls
-   * @param provider Current AI provider
-   * @returns Combined list of available models
-   */
-  static getAvailableModels(cache, provider) {
-    switch (provider) {
-      case "openai":
-        return cache.openai_models.length > 0 ? cache.openai_models : AIProviderUtils.getStaticModels("openai");
-      case "anthropic":
-        return cache.anthropic_models.length > 0 ? cache.anthropic_models : AIProviderUtils.getStaticModels("anthropic");
-      case "google":
-        return cache.google_models.length > 0 ? cache.google_models : AIProviderUtils.getStaticModels("google");
-      case "ollama":
-        return AIProviderUtils.getStaticModels("ollama");
-      default:
-        return AIProviderUtils.getStaticModels("openai");
-    }
-  }
-  /**
-   * Validates if an AI provider is supported
-   * @param provider The provider to validate
-   * @returns True if the provider is supported
-   */
-  static isSupportedProvider(provider) {
-    return ["openai", "anthropic", "google", "ollama"].includes(provider);
-  }
-  /**
-   * Gets the base URL for a provider's API
-   * @param provider The AI provider
-   * @param ollamaEndpoint Custom Ollama endpoint (if applicable)
-   * @returns API base URL
-   */
-  static getProviderBaseUrl(provider, ollamaEndpoint) {
-    switch (provider) {
-      case "openai":
-        return "https://api.openai.com/v1";
-      case "anthropic":
-        return "https://api.anthropic.com/v1";
-      case "google":
-        return "https://generativelanguage.googleapis.com/v1beta";
-      case "ollama":
-        return ollamaEndpoint || "http://localhost:11434";
-      default:
-        throw new Error(`Unsupported AI provider: ${provider}`);
-    }
-  }
-};
-
 // src/utils/settings-utils.ts
 var SettingsUtils = class {
   /**
@@ -18495,7 +18322,7 @@ var SettingsUtils = class {
 };
 
 // main.ts
-var NaverBlogPlugin = class extends import_obsidian9.Plugin {
+var NaverBlogPlugin = class extends import_obsidian12.Plugin {
   constructor() {
     super(...arguments);
     // Cached API models
@@ -18546,17 +18373,17 @@ var NaverBlogPlugin = class extends import_obsidian9.Plugin {
         try {
           this.aiService.getModelName();
         } catch (error) {
-          new import_obsidian9.Notice(this.i18n.t("notices.api_key_required", { provider: this.settings.aiProvider.toUpperCase() }), 8e3);
-          new import_obsidian9.Notice(this.i18n.t("notices.set_api_key"), NOTICE_TIMEOUTS.medium);
+          new import_obsidian12.Notice(this.i18n.t("notices.api_key_required", { provider: this.settings.aiProvider.toUpperCase() }), 8e3);
+          new import_obsidian12.Notice(this.i18n.t("notices.set_api_key"), NOTICE_TIMEOUTS.medium);
           return;
         }
         const activeFile = this.app.workspace.getActiveFile();
         if (!activeFile) {
-          new import_obsidian9.Notice(this.i18n.t("notices.no_active_file"));
+          new import_obsidian12.Notice(this.i18n.t("notices.no_active_file"));
           return;
         }
         if (!activeFile.path.endsWith(".md")) {
-          new import_obsidian9.Notice("Please select a markdown file");
+          new import_obsidian12.Notice("Please select a markdown file");
           return;
         }
         await this.rewriteCurrentNote(activeFile);
@@ -18583,32 +18410,16 @@ var NaverBlogPlugin = class extends import_obsidian9.Plugin {
     return await this.blogService.fetchNaverBlogPosts(blogId, maxPosts);
   }
   async callAI(messages, maxTokens = 150) {
-    const apiKey = this.getApiKey();
+    const apiKey = APIClientFactory.getApiKey(this.settings);
     if (!apiKey) {
       throw new Error("No API key configured for selected AI provider");
     }
-    const model = this.getModelName();
-    switch (this.settings.aiProvider) {
-      case "openai":
-        return await this.callOpenAI(messages, maxTokens, model, apiKey);
-      case "anthropic":
-        return await this.callAnthropic(messages, maxTokens, model, apiKey);
-      case "google":
-        return await this.callGoogle(messages, maxTokens, model, apiKey);
-      case "ollama":
-        return await this.callOllama(messages, maxTokens, model);
-      default:
-        throw new Error(`Unsupported AI provider: ${this.settings.aiProvider}`);
-    }
-  }
-  getApiKey() {
-    return AIProviderUtils.getApiKey(this.settings);
+    const model = APIClientFactory.getModelName(this.settings);
+    const client = APIClientFactory.createClient(this.settings);
+    return await client.chat(messages, maxTokens, model);
   }
   getModelName() {
-    return AIProviderUtils.getModelName(this.settings);
-  }
-  getDefaultModelForProvider(provider) {
-    return AIProviderUtils.getDefaultModelForProvider(provider);
+    return APIClientFactory.getModelName(this.settings);
   }
   getAvailableModels() {
     const cache = {
@@ -18616,273 +18427,49 @@ var NaverBlogPlugin = class extends import_obsidian9.Plugin {
       anthropic_models: this.anthropic_models,
       google_models: this.google_models
     };
-    return AIProviderUtils.getAvailableModels(cache, this.settings.aiProvider);
+    return this.aiService.getAvailableModels(cache, this.settings.aiProvider);
   }
   getStaticModels() {
-    return AIProviderUtils.getStaticModels(this.settings.aiProvider);
+    return this.aiService.getStaticModels(this.settings.aiProvider);
   }
   async fetchModelsFromAPI(provider) {
     try {
-      switch (provider) {
-        case "openai":
-          return await this.fetchOpenAIModels();
-        case "anthropic":
-          return await this.fetchAnthropicModels();
-        case "google":
-          return await this.fetchGoogleModels();
-        default:
-          return [];
-      }
+      return await APIClientFactory.fetchModels(this.settings, provider);
     } catch (error) {
       console.error(`Failed to fetch models from ${provider}:`, error);
       return [];
     }
   }
-  async fetchOpenAIModels() {
-    const apiKey = this.settings.openaiApiKey;
-    if (!apiKey) {
-      return [];
-    }
-    try {
-      const response = await (0, import_obsidian9.requestUrl)({
-        url: OPENAI_MODELS_ENDPOINT,
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": CONTENT_TYPES.json
-        }
-      });
-      if (response.status === 200) {
-        const models = response.json.data.map((model) => model.id).filter(
-          (id) => OPENAI_MODEL_PREFIXES.some((prefix) => id.startsWith(prefix))
-        ).sort();
-        console.log(`Fetched ${models.length} OpenAI models`);
-        return models;
-      }
-    } catch (error) {
-      console.error("OpenAI models fetch error:", error);
-    }
-    return [];
-  }
-  async fetchAnthropicModels() {
-    const apiKey = this.settings.anthropicApiKey;
-    if (!apiKey) {
-      return [];
-    }
-    try {
-      const response = await (0, import_obsidian9.requestUrl)({
-        url: ANTHROPIC_MODELS_ENDPOINT,
-        method: "GET",
-        headers: {
-          "x-api-key": apiKey,
-          "Content-Type": CONTENT_TYPES.json,
-          "anthropic-version": API_VERSIONS.anthropic
-        }
-      });
-      if (response.status === 200) {
-        const models = response.json.data.map((model) => model.id).filter((id) => id.startsWith("claude-")).sort();
-        console.log(`Fetched ${models.length} Anthropic models`);
-        return models;
-      }
-    } catch (error) {
-      console.error("Anthropic models fetch error:", error);
-    }
-    return [];
-  }
-  async fetchGoogleModels() {
-    const apiKey = this.settings.googleApiKey;
-    if (!apiKey) {
-      return [];
-    }
-    try {
-      const response = await (0, import_obsidian9.requestUrl)({
-        url: `${GOOGLE_MODELS_ENDPOINT}?key=${apiKey}`,
-        method: "GET",
-        headers: {
-          "Content-Type": CONTENT_TYPES.json
-        }
-      });
-      if (response.status === 200) {
-        const models = response.json.models.filter((model) => {
-          const supportedMethods = model.supportedGenerationMethods || [];
-          const hasGenerateContent = supportedMethods.includes("generateContent");
-          const modelName = model.name.toLowerCase();
-          const isGeminiModel = modelName.includes("gemini");
-          const isTextModel = !modelName.includes("embedding") && !modelName.includes("vision") && !modelName.includes("code") && !modelName.includes("image");
-          console.log(`Google model: ${model.name}, supports generateContent: ${hasGenerateContent}, is gemini: ${isGeminiModel}, is text: ${isTextModel}`);
-          return hasGenerateContent && isGeminiModel && isTextModel;
-        }).map((model) => {
-          const cleanName = model.name.replace("models/", "");
-          return cleanName;
-        }).sort();
-        console.log(`Fetched ${models.length} Google models:`, models);
-        return models;
-      }
-    } catch (error) {
-      console.error("Google models fetch error:", error);
-    }
-    return [];
-  }
   async refreshModels(provider) {
-    const cache = {
-      openai_models: this.openai_models,
-      anthropic_models: this.anthropic_models,
-      google_models: this.google_models
-    };
-    const updatedCache = await this.aiService.refreshModels(provider, cache);
-    this.openai_models = updatedCache.openai_models || [];
-    this.anthropic_models = updatedCache.anthropic_models || [];
-    this.google_models = updatedCache.google_models || [];
-  }
-  async callOpenAI(messages, maxTokens, model, apiKey) {
-    const response = await (0, import_obsidian9.requestUrl)({
-      url: OPENAI_CHAT_ENDPOINT,
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": CONTENT_TYPES.json
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: maxTokens,
-        temperature: 0.3
-      })
-    });
-    if (response.status === 200) {
-      return response.json.choices[0].message.content.trim();
-    } else {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-  }
-  async callAnthropic(messages, maxTokens, model, apiKey) {
-    var _a5;
-    const systemMessage = ((_a5 = messages.find((m) => m.role === "system")) == null ? void 0 : _a5.content) || "";
-    const userMessages = messages.filter((m) => m.role !== "system");
-    const response = await (0, import_obsidian9.requestUrl)({
-      url: ANTHROPIC_MESSAGES_ENDPOINT,
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "Content-Type": CONTENT_TYPES.json,
-        "anthropic-version": API_VERSIONS.anthropic
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        system: systemMessage,
-        messages: userMessages
-      })
-    });
-    if (response.status === 200) {
-      return response.json.content[0].text.trim();
-    } else {
-      throw new Error(`Anthropic API error: ${response.status}`);
-    }
-  }
-  async callGoogle(messages, maxTokens, model, apiKey) {
-    const contents2 = messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }]
-    }));
-    const maxRetries = 3;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const response = await (0, import_obsidian9.requestUrl)({
-          url: `${GOOGLE_GENERATE_CONTENT_ENDPOINT(model)}?key=${apiKey}`,
-          method: "POST",
-          headers: {
-            "Content-Type": CONTENT_TYPES.json
-          },
-          body: JSON.stringify({
-            contents: contents2,
-            generationConfig: {
-              maxOutputTokens: maxTokens,
-              temperature: 0.3
-            },
-            systemInstruction: {
-              parts: [{ text: "You are a helpful assistant. Respond directly and concisely without showing your thinking process or reasoning. Give only the final answer." }]
-            }
-          })
-        });
-        if (response.status === 200) {
-          const data2 = response.json;
-          console.log("Google API full response:", JSON.stringify(data2, null, 2));
-          if (!data2.candidates || data2.candidates.length === 0) {
-            console.error("Google API response missing candidates:", data2);
-            throw new Error("Google API response missing candidates");
-          }
-          const candidate = data2.candidates[0];
-          console.log("Google API candidate:", JSON.stringify(candidate, null, 2));
-          if (!candidate.content) {
-            console.error("Google API candidate missing content:", candidate);
-            throw new Error("Google API candidate missing content");
-          }
-          if (candidate.finishReason === "MAX_TOKENS") {
-            console.warn("Google API response was truncated due to MAX_TOKENS");
-            if (!candidate.content.parts || candidate.content.parts.length === 0) {
-              console.error("Google API response completely truncated - no usable content");
-              throw new Error("Google API response completely truncated - try increasing maxTokens or reducing input size");
-            }
-          }
-          if (!candidate.content.parts || candidate.content.parts.length === 0) {
-            console.error("Google API candidate content missing parts:", candidate.content);
-            throw new Error("Google API candidate content missing parts");
-          }
-          const text3 = candidate.content.parts[0].text;
-          if (!text3) {
-            console.error("Google API content missing text:", candidate.content.parts[0]);
-            throw new Error("Google API content missing text");
-          }
-          return text3.trim();
-        } else if (response.status === 503 && attempt < maxRetries) {
-          const delay = calculateBackoffDelay(attempt);
-          console.warn(`Google API 503 error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
-          const retryNotice = new import_obsidian9.Notice(`API \uC11C\uBC84 \uACFC\uBD80\uD558, ${delay / 1e3}\uCD08 \uD6C4 \uC7AC\uC2DC\uB3C4... (${attempt}/${RETRY_DELAYS.maxRetries})`, delay);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          continue;
-        } else {
-          console.error("Google API error:", response.status, response.text);
-          throw new Error(`Google API error: ${response.status} - ${response.text}`);
-        }
-      } catch (error) {
-        if (attempt === maxRetries) {
-          throw error;
-        }
-        console.warn(`Google API request failed (attempt ${attempt}/${maxRetries}):`, error);
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS.base * attempt));
+    if (provider) {
+      const models = await this.fetchModelsFromAPI(provider);
+      switch (provider) {
+        case "openai":
+          this.openai_models = models;
+          break;
+        case "anthropic":
+          this.anthropic_models = models;
+          break;
+        case "google":
+          this.google_models = models;
+          break;
       }
-    }
-    throw new Error("Google API: Maximum retries exceeded");
-  }
-  async callOllama(messages, maxTokens, model) {
-    const response = await (0, import_obsidian9.requestUrl)({
-      url: `${this.settings.ollamaEndpoint}/api/chat`,
-      method: "POST",
-      headers: {
-        "Content-Type": CONTENT_TYPES.json
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        stream: false,
-        options: {
-          num_predict: maxTokens,
-          temperature: 0.3
-        }
-      })
-    });
-    if (response.status === 200) {
-      return response.json.message.content.trim();
     } else {
-      throw new Error(`Ollama API error: ${response.status}`);
+      const [openaiModels, anthropicModels, googleModels] = await Promise.all([
+        this.fetchModelsFromAPI("openai"),
+        this.fetchModelsFromAPI("anthropic"),
+        this.fetchModelsFromAPI("google")
+      ]);
+      this.openai_models = openaiModels;
+      this.anthropic_models = anthropicModels;
+      this.google_models = googleModels;
     }
   }
   async generateAITags(title, content) {
     if (!this.settings.enableAiTags) {
       return [];
     }
-    const notice = new import_obsidian9.Notice(this.i18n.t("notices.generating_ai_tags"), 0);
+    const notice = new import_obsidian12.Notice(this.i18n.t("notices.generating_ai_tags"), 0);
     try {
       const messages = [
         {
@@ -18932,7 +18519,7 @@ JSON \uBC30\uC5F4\uB85C\uB9CC \uC751\uB2F5\uD558\uC138\uC694. \uC608: ["\uB9AC\u
     if (!this.settings.enableAiExcerpt) {
       return "";
     }
-    const notice = new import_obsidian9.Notice(this.i18n.t("notices.generating_ai_excerpt"), 0);
+    const notice = new import_obsidian12.Notice(this.i18n.t("notices.generating_ai_excerpt"), 0);
     try {
       const messages = [
         {
@@ -18983,73 +18570,46 @@ ${processedContent}`;
         return;
       }
       await this.app.vault.create(filepath, fullContent);
-      new import_obsidian9.Notice(`Created: ${filename}`);
+      new import_obsidian12.Notice(`Created: ${filename}`);
     } catch (error) {
       console.error("Error creating markdown file:", error);
-      new import_obsidian9.Notice(`Failed to create file for: ${post.title}`);
+      new import_obsidian12.Notice(`Failed to create file for: ${post.title}`);
     }
   }
   async rewriteCurrentNote(file) {
     try {
-      new import_obsidian9.Notice("\u{1F916} AI layout fixing in progress...", NOTICE_TIMEOUTS.medium);
+      new import_obsidian12.Notice("\u{1F916} AI layout fixing in progress...", NOTICE_TIMEOUTS.medium);
       const content = await this.app.vault.read(file);
       const { frontmatter, body } = ContentUtils.extractFrontmatter(content);
       const cleanBody = ContentUtils.cleanContentForAI(body);
       if (!ContentUtils.isContentValidForAI(cleanBody)) {
-        new import_obsidian9.Notice("Content too short for AI formatting (minimum 50 characters)");
+        new import_obsidian12.Notice("Content too short for AI formatting (minimum 50 characters)");
         return;
       }
       const fixedContent = await this.aiService.callAIForLayoutFix(cleanBody);
       if (!fixedContent) {
-        new import_obsidian9.Notice("\u274C AI formatting failed. Please try again.");
+        new import_obsidian12.Notice("\u274C AI formatting failed. Please try again.");
         return;
       }
       const newContent = ContentUtils.reconstructMarkdown(frontmatter, fixedContent);
       await this.app.vault.modify(file, newContent);
-      new import_obsidian9.Notice("\u2705 Layout and formatting fixed by AI!", NOTICE_TIMEOUTS.medium);
+      new import_obsidian12.Notice("\u2705 Layout and formatting fixed by AI!", NOTICE_TIMEOUTS.medium);
     } catch (error) {
       console.error("AI layout fix error:", error);
       if (error.message.includes("401")) {
-        new import_obsidian9.Notice("\u274C Invalid OpenAI API Key", 8e3);
-        new import_obsidian9.Notice("\u{1F4A1} Please check your API key in plugin settings", NOTICE_TIMEOUTS.medium);
+        new import_obsidian12.Notice("\u274C Invalid OpenAI API Key", 8e3);
+        new import_obsidian12.Notice("\u{1F4A1} Please check your API key in plugin settings", NOTICE_TIMEOUTS.medium);
       } else if (error.message.includes("quota")) {
-        new import_obsidian9.Notice("\u274C OpenAI API quota exceeded", 8e3);
-        new import_obsidian9.Notice("\u{1F4A1} Please check your OpenAI billing settings", NOTICE_TIMEOUTS.medium);
+        new import_obsidian12.Notice("\u274C OpenAI API quota exceeded", 8e3);
+        new import_obsidian12.Notice("\u{1F4A1} Please check your OpenAI billing settings", NOTICE_TIMEOUTS.medium);
       } else if (error.message.includes("network")) {
-        new import_obsidian9.Notice("\u274C Network error - please check your connection", NOTICE_TIMEOUTS.medium);
+        new import_obsidian12.Notice("\u274C Network error - please check your connection", NOTICE_TIMEOUTS.medium);
       } else {
-        new import_obsidian9.Notice(`\u274C AI formatting failed: ${error.message}`, 8e3);
+        new import_obsidian12.Notice(`\u274C AI formatting failed: ${error.message}`, 8e3);
       }
     }
   }
   async callAIForLayoutFix(content) {
-    try {
-      const messages = [
-        {
-          role: "user",
-          content: `${AI_PROMPTS.layoutFix}
-
-${content}`
-        }
-      ];
-      let fixedContent = await this.callAI(messages, AI_TOKEN_LIMITS.default);
-      if (fixedContent.startsWith("```markdown\n") && fixedContent.endsWith("\n```")) {
-        fixedContent = fixedContent.substring(12, fixedContent.length - 4).trim();
-      } else if (fixedContent.startsWith("```\n") && fixedContent.endsWith("\n```")) {
-        fixedContent = fixedContent.substring(4, fixedContent.length - 4).trim();
-      }
-      return fixedContent;
-    } catch (error) {
-      console.error("AI formatting call failed:", error);
-      if (error.message.includes("401") || error.message.includes("Invalid")) {
-        throw new Error(`Invalid API key. Please check your ${this.settings.aiProvider.toUpperCase()} API key in settings.`);
-      } else if (error.message.includes("quota") || error.message.includes("billing")) {
-        throw new Error(`API quota exceeded. Please check your ${this.settings.aiProvider.toUpperCase()} billing.`);
-      } else if (error.message.includes("network") || error.message.includes("fetch")) {
-        throw new Error("Network error. Please check your internet connection.");
-      } else {
-        throw error;
-      }
-    }
+    return await this.aiService.callAIForLayoutFix(content);
   }
 };
