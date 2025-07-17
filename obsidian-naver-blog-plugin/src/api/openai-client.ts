@@ -32,7 +32,6 @@ export class OpenAIClient {
 					)
 					.sort();
 				
-				console.log(`Fetched ${models.length} OpenAI models`);
 				return models;
 			}
 		} catch (error) {

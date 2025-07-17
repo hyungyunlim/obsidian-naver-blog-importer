@@ -126,7 +126,6 @@ export class BlogService {
 						await new Promise(resolve => setTimeout(resolve, 500));
 					}
 					
-					console.log(`Blog ${blogId}: ${blogSuccessCount} success, ${blogErrorLogCount} error logs, ${blogErrorCount} errors`);
 				} catch (error) {
 					console.error(`Error syncing blog ${blogId}:`, error);
 					totalErrors++;

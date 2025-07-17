@@ -77,7 +77,7 @@ export default class NaverBlogPlugin extends Plugin {
 
 		// Fetch models from APIs in background
 		this.refreshModels().catch(error => {
-			console.log('Failed to refresh models on startup:', error);
+			console.error('Failed to refresh models on startup:', error);
 		});
 
 		// Add ribbon icon
@@ -385,7 +385,6 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			// Check if file already exists
 			if (await this.app.vault.adapter.exists(filepath)) {
-				console.log(`File already exists: ${filename}`);
 				return;
 			}
 			

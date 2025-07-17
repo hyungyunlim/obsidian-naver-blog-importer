@@ -44,7 +44,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 						try {
 							await this.plugin.refreshModels(value as 'openai' | 'anthropic' | 'google');
 						} catch (error) {
-							console.log(`Failed to refresh models for ${value}:`, error);
+							console.error(`Failed to refresh models for ${value}:`, error);
 						}
 					}
 					

@@ -39,9 +39,6 @@ export class GoogleClient {
 							!modelName.includes('code') && 
 							!modelName.includes('image');
 						
-						// Debug logging for all models to see what's available
-						console.log(`Google model: ${model.name}, supports generateContent: ${hasGenerateContent}, is gemini: ${isGeminiModel}, is text: ${isTextModel}`);
-						
 						return hasGenerateContent && isGeminiModel && isTextModel;
 					})
 					.map((model: any) => {
@@ -51,7 +48,6 @@ export class GoogleClient {
 					})
 					.sort();
 				
-				console.log(`Fetched ${models.length} Google models:`, models);
 				return models;
 			}
 		} catch (error) {
@@ -97,9 +93,6 @@ export class GoogleClient {
 				if (response.status === 200) {
 					const data = response.json;
 					
-					// Debug log the full response
-					console.log('Google API full response:', JSON.stringify(data, null, 2));
-					
 					// Check if response has candidates
 					if (!data.candidates || data.candidates.length === 0) {
 						console.error('Google API response missing candidates:', data);
@@ -107,7 +100,6 @@ export class GoogleClient {
 					}
 					
 					const candidate = data.candidates[0];
-					console.log('Google API candidate:', JSON.stringify(candidate, null, 2));
 					
 					// Check if candidate has content
 					if (!candidate.content) {

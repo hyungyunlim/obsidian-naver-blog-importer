@@ -94,7 +94,6 @@ export class NaverBlogImportModal extends Modal {
 			
 			for (let i = 0; i < posts.length; i++) {
 				if (importCancelled) {
-					console.log(`Import cancelled at ${i}/${totalPosts}`);
 					break;
 				}
 
@@ -108,10 +107,8 @@ export class NaverBlogImportModal extends Modal {
 					
 					if (isErrorPost) {
 						errorLogCount++;
-						console.log(`📝 Created error log ${progress}: ${post.title}`);
 					} else {
 						successCount++;
-						console.log(`✓ Created file ${progress}: ${post.title}`);
 					}
 				} catch (error) {
 					console.error(`✗ Error creating file for post ${post.logNo} ${progress}:`, error);

@@ -100,8 +100,6 @@ export class NaverBlogSinglePostModal extends Modal {
 				const fetcher = new NaverBlogFetcher(blogId);
 				const post = await fetcher.fetchSinglePost(logNo);
 				
-				console.log('Single post import result:', post);
-				
 				// Create the file
 				await this.plugin.createMarkdownFile({
 					...post,

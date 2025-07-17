@@ -548,7 +548,6 @@ var OpenAIClient = class {
         const models = response.json.data.map((model) => model.id).filter(
           (id) => OPENAI_MODEL_PREFIXES.some((prefix) => id.startsWith(prefix))
         ).sort();
-        console.log(`Fetched ${models.length} OpenAI models`);
         return models;
       }
     } catch (error) {
@@ -601,7 +600,6 @@ var AnthropicClient = class {
       });
       if (response.status === 200) {
         const models = response.json.data.map((model) => model.id).filter((id) => id.startsWith("claude-")).sort();
-        console.log(`Fetched ${models.length} Anthropic models`);
         return models;
       }
     } catch (error) {
@@ -661,13 +659,11 @@ var GoogleClient = class {
           const modelName = model.name.toLowerCase();
           const isGeminiModel = modelName.includes("gemini");
           const isTextModel = !modelName.includes("embedding") && !modelName.includes("vision") && !modelName.includes("code") && !modelName.includes("image");
-          console.log(`Google model: ${model.name}, supports generateContent: ${hasGenerateContent}, is gemini: ${isGeminiModel}, is text: ${isTextModel}`);
           return hasGenerateContent && isGeminiModel && isTextModel;
         }).map((model) => {
           const cleanName = model.name.replace("models/", "");
           return cleanName;
         }).sort();
-        console.log(`Fetched ${models.length} Google models:`, models);
         return models;
       }
     } catch (error) {
@@ -702,13 +698,11 @@ var GoogleClient = class {
         });
         if (response.status === 200) {
           const data2 = response.json;
-          console.log("Google API full response:", JSON.stringify(data2, null, 2));
           if (!data2.candidates || data2.candidates.length === 0) {
             console.error("Google API response missing candidates:", data2);
             throw new Error("Google API response missing candidates");
           }
           const candidate = data2.candidates[0];
-          console.log("Google API candidate:", JSON.stringify(candidate, null, 2));
           if (!candidate.content) {
             console.error("Google API candidate missing content:", candidate);
             throw new Error("Google API candidate missing content");
@@ -17176,7 +17170,6 @@ var BlogService = class {
             }
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
-          console.log(`Blog ${blogId}: ${blogSuccessCount} success, ${blogErrorLogCount} error logs, ${blogErrorCount} errors`);
         } catch (error) {
           console.error(`Error syncing blog ${blogId}:`, error);
           totalErrors++;
@@ -17513,7 +17506,6 @@ var NaverBlogImportModal = class extends import_obsidian8.Modal {
       const totalPosts = posts.length;
       for (let i = 0; i < posts.length; i++) {
         if (importCancelled) {
-          console.log(`Import cancelled at ${i}/${totalPosts}`);
           break;
         }
         const post = posts[i];
@@ -17524,10 +17516,8 @@ var NaverBlogImportModal = class extends import_obsidian8.Modal {
           await this.plugin.createMarkdownFile(post);
           if (isErrorPost) {
             errorLogCount++;
-            console.log(`\u{1F4DD} Created error log ${progress}: ${post.title}`);
           } else {
             successCount++;
-            console.log(`\u2713 Created file ${progress}: ${post.title}`);
           }
         } catch (error) {
           console.error(`\u2717 Error creating file for post ${post.logNo} ${progress}:`, error);
@@ -17697,7 +17687,6 @@ var NaverBlogSinglePostModal = class extends import_obsidian10.Modal {
         new import_obsidian10.Notice(`Importing post ${logNo} from ${blogId}...`, 3e3);
         const fetcher = new NaverBlogFetcher(blogId);
         const post = await fetcher.fetchSinglePost(logNo);
-        console.log("Single post import result:", post);
         await this.plugin.createMarkdownFile({
           ...post,
           tags: ["imported"],
@@ -17743,7 +17732,7 @@ var NaverBlogSettingTab = class extends import_obsidian11.PluginSettingTab {
         try {
           await this.plugin.refreshModels(value);
         } catch (error) {
-          console.log(`Failed to refresh models for ${value}:`, error);
+          console.error(`Failed to refresh models for ${value}:`, error);
         }
       }
       this.display();
@@ -18343,7 +18332,7 @@ var NaverBlogPlugin = class extends import_obsidian12.Plugin {
     this.imageService = new ImageService(this.app, this.settings);
     LocaleUtils.setupLanguageChangeListener(this.app, this.i18n, this.register.bind(this));
     this.refreshModels().catch((error) => {
-      console.log("Failed to refresh models on startup:", error);
+      console.error("Failed to refresh models on startup:", error);
     });
     this.addRibbonIcon("download", "Import Naver Blog", (evt) => {
       new NaverBlogImportModal(this.app, this).open();
@@ -18572,7 +18561,6 @@ JSON \uBC30\uC5F4\uB85C\uB9CC \uC751\uB2F5\uD558\uC138\uC694. \uC608: ["\uB9AC\u
       const fullContent = `${frontmatter}
 ${processedContent}`;
       if (await this.app.vault.adapter.exists(filepath)) {
-        console.log(`File already exists: ${filename}`);
         return;
       }
       await this.app.vault.create(filepath, fullContent);
