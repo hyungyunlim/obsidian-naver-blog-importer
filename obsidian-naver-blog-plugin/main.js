@@ -17749,6 +17749,7 @@ var NaverBlogSettingTab = class extends import_obsidian11.PluginSettingTab {
       this.display();
     }));
     const modelSetting = new import_obsidian11.Setting(containerEl).setName(this.plugin.i18n.t("settings.ai_model")).setDesc(this.plugin.i18n.t("settings.ai_model_desc")).addDropdown((dropdown) => {
+      dropdown.selectEl.empty();
       const availableModels = this.plugin.getAvailableModels();
       availableModels.forEach((model) => {
         dropdown.addOption(model, model);
@@ -18433,6 +18434,9 @@ var NaverBlogPlugin = class extends import_obsidian12.Plugin {
   }
   getStaticModels() {
     return this.aiService.getStaticModels(this.settings.aiProvider);
+  }
+  getDefaultModelForProvider(provider) {
+    return AIProviderUtils.getDefaultModelForProvider(provider);
   }
   async fetchModelsFromAPI(provider) {
     try {

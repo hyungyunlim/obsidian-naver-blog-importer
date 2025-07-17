@@ -55,6 +55,9 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.setName(this.plugin.i18n.t('settings.ai_model'))
 			.setDesc(this.plugin.i18n.t('settings.ai_model_desc'))
 			.addDropdown(dropdown => {
+				// Clear existing options first
+				dropdown.selectEl.empty();
+				
 				const availableModels = this.plugin.getAvailableModels();
 				
 				// Add available models to dropdown

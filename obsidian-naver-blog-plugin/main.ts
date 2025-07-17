@@ -24,6 +24,7 @@ import { NaverBlogSettingTab } from './src/ui/settings-tab';
 import { LocaleUtils } from './src/utils/locale-utils';
 import { ContentUtils } from './src/utils/content-utils';
 import { SettingsUtils } from './src/utils/settings-utils';
+import { AIProviderUtils } from './src/utils/ai-provider-utils';
 import { APIClientFactory } from './src/api';
 import { 
 	Translations, 
@@ -198,6 +199,10 @@ export default class NaverBlogPlugin extends Plugin {
 	
 	getStaticModels(): string[] {
 		return this.aiService.getStaticModels(this.settings.aiProvider);
+	}
+
+	getDefaultModelForProvider(provider: 'openai' | 'anthropic' | 'google' | 'ollama'): string {
+		return AIProviderUtils.getDefaultModelForProvider(provider);
 	}
 
 	async fetchModelsFromAPI(provider: 'openai' | 'anthropic' | 'google'): Promise<string[]> {
