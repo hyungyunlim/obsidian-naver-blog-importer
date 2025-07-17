@@ -39,11 +39,13 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					this.plugin.settings.aiModel = this.plugin.getDefaultModelForProvider(value);
 					await this.plugin.saveSettings();
 					
-					// Refresh models for the new provider
+					// Refresh models for the new provider before redisplaying
 					if (value !== 'ollama') {
-						this.plugin.refreshModels(value as 'openai' | 'anthropic' | 'google').catch((error: any) => {
+						try {
+							await this.plugin.refreshModels(value as 'openai' | 'anthropic' | 'google');
+						} catch (error) {
 							console.log(`Failed to refresh models for ${value}:`, error);
-						});
+						}
 					}
 					
 					this.display(); // Refresh settings to show appropriate API key field and model

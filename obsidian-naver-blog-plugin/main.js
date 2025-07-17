@@ -17740,9 +17740,11 @@ var NaverBlogSettingTab = class extends import_obsidian11.PluginSettingTab {
       this.plugin.settings.aiModel = this.plugin.getDefaultModelForProvider(value);
       await this.plugin.saveSettings();
       if (value !== "ollama") {
-        this.plugin.refreshModels(value).catch((error) => {
+        try {
+          await this.plugin.refreshModels(value);
+        } catch (error) {
           console.log(`Failed to refresh models for ${value}:`, error);
-        });
+        }
       }
       this.display();
     }));
