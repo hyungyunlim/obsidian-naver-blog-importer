@@ -215,8 +215,7 @@ obsidian-translations/
 textgenerator-ref/
 naver_blog_md/
 
-# Keep the original plugin subfolder for reference
-obsidian-naver-blog-plugin/
+# Original plugin subfolder has been moved to root (no longer needed)
 
 # Temporary files
 *.tmp
