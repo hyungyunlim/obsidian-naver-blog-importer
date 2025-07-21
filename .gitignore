@@ -174,3 +174,50 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
+
+# Obsidian Plugin specific
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+*.tgz
+*.tar.gz
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Archives and backups (project specific)
+yonofbooks_blog_backup_*/
+backup_y2kdarky*.py
+test_y2kdarky.py
+combine_backups.py
+README_Y2KDARKY.md
+
+# Reference projects (archived in subfolder)
+obsidian-enveloppe/
+obsidian-releases-fork/
+obsidian-translations/
+textgenerator-ref/
+naver_blog_md/
+
+# Keep the original plugin subfolder for reference
+obsidian-naver-blog-plugin/
+
+# Temporary files
+*.tmp
+*.temp
