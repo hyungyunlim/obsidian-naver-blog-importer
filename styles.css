@@ -162,8 +162,7 @@
 /* Search Input Wrapper */
 .naver-blog-search-wrapper {
     position: relative;
-    display: flex;
-    align-items: center;
+    display: block;
     border: 1px solid var(--background-modifier-border);
     border-radius: 4px;
     margin-bottom: 10px;
@@ -178,14 +177,24 @@
     opacity: 0.7;
     pointer-events: none;
     z-index: 1;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .naver-blog-search-input {
-    padding-left: 32px;
-    border: none;
-    background: transparent;
-    outline: none;
-    width: 100%;
+    padding: 8px 40px 8px 32px !important;
+    border: none !important;
+    background: transparent !important;
+    outline: none !important;
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.naver-blog-search-input::placeholder {
+    padding-left: 0;
+    text-indent: 0;
 }
 
 .naver-blog-search-clear {
