@@ -7,7 +7,7 @@
   },
   "settings": {
     "title": "Naver Blog Importer settings",
-    "ai_configuration": "AI configuration",
+    "ai_configuration": "AI",
     "ai_provider": "AI provider",
     "ai_provider_desc": "Choose your AI service provider",
     "ai_model": "AI model",

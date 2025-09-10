@@ -20,7 +20,6 @@ export class NaverBlogFetcher {
     // Test method for specific post URL
     async fetchSinglePost(logNo: string): Promise<NaverBlogPost> {
         try {
-            console.log(`Testing single post: ${logNo}`);
             const parsed = await this.fetchPostContent(logNo);
             
             return {
@@ -43,7 +42,6 @@ export class NaverBlogFetcher {
             
             // If no posts found, try with some test logNo values for debugging
             if (posts.length === 0) {
-                console.log('No posts found, trying with test logNo values...');
                 // Try some common logNo patterns for testing
                 const testLogNos = ['220883239733', '223435041536', '223434985552', '223434866456'];
                 for (const logNo of testLogNos) {
@@ -60,7 +58,6 @@ export class NaverBlogFetcher {
                             break; // Found one working post, that's enough for testing
                         }
                     } catch (e) {
-                        console.log(`Test logNo ${logNo} failed:`, e);
                         continue;
                     }
                 }
@@ -80,7 +77,6 @@ export class NaverBlogFetcher {
                 const progress = `(${i + 1}/${totalPosts})`;
                 
                 try {
-                    console.log(`Fetching post content ${progress}: ${post.logNo}`);
                     const parsed = await this.fetchPostContent(post.logNo);
                     postsWithContent.push({
                         title: parsed.title !== 'Untitled' ? parsed.title : post.title,
@@ -91,7 +87,6 @@ export class NaverBlogFetcher {
                         content: parsed.content
                     });
                     
-                    console.log(`✓ Successfully fetched ${progress}: ${parsed.title || post.logNo}`);
                     
                     // Add delay to be respectful to the server
                     await this.delay(1000);
@@ -109,7 +104,6 @@ export class NaverBlogFetcher {
                         content: errorContent
                     });
                     
-                    console.log(`📝 Created error log for post ${post.logNo} ${progress}`);
                     
                     // Add delay to be respectful to the server
                     await this.delay(500);
@@ -127,7 +121,6 @@ export class NaverBlogFetcher {
         const posts: Omit<NaverBlogPost, 'content'>[] = [];
 
         try {
-            console.log(`Fetching posts from blog: ${this.blogId}`);
             
             // Try multiple pages to get more posts
             let currentPage = 1;
@@ -136,7 +129,6 @@ export class NaverBlogFetcher {
             const postLimit = maxPosts || 1000; // Default to 1000 if no limit specified
             
             while (hasMore && currentPage <= maxPages && posts.length < postLimit) {
-                console.log(`Fetching page ${currentPage}...`);
                 
                 // Try different URL patterns for pagination
                 const urlsToTry = [
@@ -162,7 +154,6 @@ export class NaverBlogFetcher {
                         if (response.text) {
                             const pagePosts = this.parsePostListFromHTML(response.text);
                             if (pagePosts.length > 0) {
-                                console.log(`Found ${pagePosts.length} posts on page ${currentPage} with URL: ${url}`);
                                 
                                 // Add only new posts (avoid duplicates)
                                 for (const post of pagePosts) {
@@ -176,13 +167,11 @@ export class NaverBlogFetcher {
                             }
                         }
                     } catch (error) {
-                        console.log(`Failed to fetch ${url}:`, error.message);
                         continue;
                     }
                 }
                 
                 if (!foundPostsOnPage) {
-                    console.log(`No posts found on page ${currentPage}, stopping pagination`);
                     hasMore = false;
                 } else {
                     currentPage++;
@@ -193,7 +182,6 @@ export class NaverBlogFetcher {
             
             // If still no posts, try the main page as fallback
             if (posts.length === 0) {
-                console.log('No posts found via pagination, trying main page...');
                 const mainPageUrl = `https://blog.naver.com/${this.blogId}`;
                 
                 const response = await requestUrl({
@@ -215,7 +203,6 @@ export class NaverBlogFetcher {
             throw new Error(`Failed to fetch post list: ${error.message}`);
         }
 
-        console.log(`Found ${posts.length} posts total across all pages`);
         return posts;
     }
 
@@ -223,7 +210,6 @@ export class NaverBlogFetcher {
         const posts: Omit<NaverBlogPost, 'content'>[] = [];
         
         try {
-            console.log('Parsing HTML for post links...');
             const $ = cheerio.load(html);
             
             // Look for various post link patterns more aggressively
@@ -260,7 +246,6 @@ export class NaverBlogFetcher {
                             const logNo = match[1];
                             // Filter for modern Naver blog logNo format (usually 12+ digits)
                             if (logNo && logNo.length >= 12 && logNo.length <= 15 && !posts.find(p => p.logNo === logNo)) {
-                                console.log(`Found logNo in script: ${logNo}`);
                                 posts.push({
                                     title: `Post ${logNo}`,
                                     date: new Date().toISOString().split('T')[0],
@@ -285,7 +270,6 @@ export class NaverBlogFetcher {
                     // Get logNo from data attribute
                     if (dataLogNo && dataLogNo.length >= 12 && dataLogNo.length <= 15) {
                         const title = $element.text().trim() || $element.attr('title') || `Post ${dataLogNo}`;
-                        console.log(`Found logNo in data attribute: ${dataLogNo}, title: ${title}`);
                         if (!posts.find(p => p.logNo === dataLogNo)) {
                             posts.push({
                                 title: title,
@@ -315,7 +299,6 @@ export class NaverBlogFetcher {
                                 // Filter for modern Naver blog logNo format (usually 12+ digits)
                                 if (logNo.length >= 12 && logNo.length <= 15) {
                                     const title = $element.text().trim() || $element.attr('title') || `Post ${logNo}`;
-                                    console.log(`Found logNo in href: ${logNo}, title: ${title}`);
                                     
                                     if (!posts.find(p => p.logNo === logNo)) {
                                         posts.push({
@@ -348,7 +331,6 @@ export class NaverBlogFetcher {
                                 // Filter for modern Naver blog logNo format (usually 12+ digits)
                                 if (logNo.length >= 12 && logNo.length <= 15) {
                                     const title = $element.text().trim() || $element.attr('title') || `Post ${logNo}`;
-                                    console.log(`Found logNo in onclick: ${logNo}, title: ${title}`);
                                     
                                     if (!posts.find(p => p.logNo === logNo)) {
                                         posts.push({
@@ -367,7 +349,6 @@ export class NaverBlogFetcher {
                 });
             }
             
-            console.log(`Parsed ${posts.length} posts from HTML`);
         } catch (error) {
             console.error('Error parsing HTML:', error);
         }
@@ -387,7 +368,6 @@ export class NaverBlogFetcher {
 
             for (const postUrl of urlFormats) {
                 try {
-                    console.log(`Trying URL: ${postUrl}`);
                     const response = await requestUrl({
                         url: postUrl,
                         method: 'GET',
@@ -401,12 +381,10 @@ export class NaverBlogFetcher {
                     if (response.status === 200 && response.text) {
                         const parsed = this.parsePostContent(response.text);
                         if (parsed.content && parsed.content.trim() && !parsed.content.includes('[No content could be extracted]')) {
-                            console.log(`Success with URL: ${postUrl}`);
                             return parsed;
                         }
                     }
                 } catch (error) {
-                    console.log(`Failed with URL ${postUrl}:`, error.message);
                     continue;
                 }
             }
@@ -473,14 +451,12 @@ export class NaverBlogFetcher {
                             title = title.replace(/\[([^\]]+)\]$/, '$1').trim();
                         }
                         
-                        console.log(`Found title with selector ${selector}: "${title}"`);
                         if (title && title !== 'Untitled') break;
                     }
                 }
             }
 
             // First, try to extract from meta tags (like Python script)
-            console.log('Searching for date in meta tags...');
             
             // Debug: list all meta tags
             $('meta').each((_, meta) => {
@@ -489,7 +465,6 @@ export class NaverBlogFetcher {
                 const property = $meta.attr('property');
                 const content = $meta.attr('content');
                 if ((name || property) && content) {
-                    console.log(`Meta tag found: ${name || property} = ${content}`);
                 }
             });
 
@@ -514,14 +489,11 @@ export class NaverBlogFetcher {
                 const metaElement = $(selector);
                 if (metaElement.length > 0) {
                     const metaContent = metaElement.attr('content');
-                    console.log(`Checking ${selector}: ${metaContent}`);
                     if (metaContent) {
                         date = this.parseDate(metaContent);
                         if (date) {
-                            console.log(`✓ Found date in meta tag ${selector}: ${date}`);
                             break;
                         } else {
-                            console.log(`✗ Failed to parse date from: ${metaContent}`);
                         }
                     }
                 }
@@ -529,7 +501,6 @@ export class NaverBlogFetcher {
 
             // If no meta date found, try visible elements
             if (!date) {
-                console.log('No date in meta tags, searching in HTML elements...');
                 
                 const dateSelectors = [
                     '.se_publishDate',  // This is what naver_blog_md uses!
@@ -566,12 +537,10 @@ export class NaverBlogFetcher {
                         const dateText = dateElement.text().trim();
                         const dateAttr = dateElement.attr('datetime') || dateElement.attr('data-date');
                         
-                        console.log(`Checking element ${selector}: text="${dateText}", attr="${dateAttr}"`);
                         
                         if (dateAttr) {
                             date = this.parseDate(dateAttr);
                             if (date) {
-                                console.log(`✓ Found date in element ${selector} attribute: ${date}`);
                                 break;
                             }
                         }
@@ -579,7 +548,6 @@ export class NaverBlogFetcher {
                         if (dateText) {
                             date = this.parseDate(dateText);
                             if (date) {
-                                console.log(`✓ Found date in element ${selector} text: ${date}`);
                                 break;
                             }
                         }
@@ -589,7 +557,6 @@ export class NaverBlogFetcher {
 
             // If still no date found, try to extract from script tags
             if (!date) {
-                console.log('No date in HTML elements, searching in script tags...');
                 
                 $('script').each((_, script) => {
                     const scriptContent = $(script).html();
@@ -626,10 +593,8 @@ export class NaverBlogFetcher {
                                         dateStr = extractMatch[1] || extractMatch[2] || extractMatch[3];
                                     }
                                     
-                                    console.log(`Found potential date in script: "${dateStr}"`);
                                     const parsedDate = this.parseDate(dateStr);
                                     if (parsedDate) {
-                                        console.log(`✓ Successfully parsed date from script: ${parsedDate}`);
                                         date = parsedDate;
                                         return false; // Break from each loop
                                     }
@@ -690,19 +655,15 @@ export class NaverBlogFetcher {
         let content = '';
         
         // Use Python library approach: find .se-main-container first, then .se-component
-        console.log('Looking for .se-main-container...');
         const mainContainer = $('.se-main-container');
         
         let components;
         if (mainContainer.length > 0) {
-            console.log('Found .se-main-container, getting components from it');
             components = mainContainer.find('.se-component').toArray();
         } else {
-            console.log('No .se-main-container found, falling back to all .se-component elements');
             components = $('.se-component').toArray();
         }
         
-        console.log(`Found ${components.length} components to process`);
         
         // Process components in document order to maintain text-image flow
         const allComponents = components;
@@ -718,14 +679,12 @@ export class NaverBlogFetcher {
                     if (textModule.length > 0) {
                         // Check for lists first (ul/ol) - improved detection
                         const lists = textModule.find('ul, ol');
-                        console.log(`Found ${lists.length} lists in text module`);
                         
                         if (lists.length > 0) {
                             lists.each((_: any, list: any) => {
                                 const $list = $(list);
                                 const isOrdered = list.tagName.toLowerCase() === 'ol';
                                 const listItems = $list.find('li');
-                                console.log(`Processing ${isOrdered ? 'ordered' : 'unordered'} list with ${listItems.length} items`);
                                 
                                 listItems.each((index: any, li: any) => {
                                     const $li = $(li);
@@ -736,7 +695,6 @@ export class NaverBlogFetcher {
                                         } else {
                                             content += `- ${listItemText}\n`;
                                         }
-                                        console.log(`Added list item: ${listItemText.substring(0, 50)}...`);
                                     }
                                 });
                                 content += '\n'; // Add space after list
@@ -846,14 +804,11 @@ export class NaverBlogFetcher {
                                 if (caption) {
                                     content += `*${caption}*\n`;
                                 }
-                                console.log(`Found image: ${imgSrc}`);
                             } else {
-                                console.log(`Filtered out UI/profile image: ${imgSrc}`);
                             }
                         } else {
                             // Fallback to placeholder
                             content += caption ? `[이미지: ${caption}]\n` : `[이미지]\n`;
-                            console.log(`No image source found for element:`, imgElement.html());
                         }
                     } else {
                         // Check for background-image styles, inline styles, or other image containers
@@ -899,11 +854,9 @@ export class NaverBlogFetcher {
                             if (caption) {
                                 content += `*${caption}*\n`;
                             }
-                            console.log(`Found background image: ${bgImageSrc}`);
                         } else {
                             // No img element found
                             content += caption ? `[이미지: ${caption}]\n` : `[이미지]\n`;
-                            console.log(`No image source found in se-image component`);
                         }
                     }
                 } else if ($el.hasClass('se-code')) {
@@ -1195,7 +1148,6 @@ export class NaverBlogFetcher {
                 
                 // Skip if it's metadata or very short, but don't skip empty lines
                 if (line.length > 0 && (isMetadata || isShortLine)) {
-                    console.log(`Removing metadata line: "${line}"`);
                     continue;
                 }
                 
@@ -1244,7 +1196,6 @@ export class NaverBlogFetcher {
 
     private parseDate(dateText: string): string {
         try {
-            console.log(`Attempting to parse date: "${dateText}"`);
             
             // Clean up the input
             const cleanText = dateText.trim().replace(/\s+/g, ' ');
@@ -1291,7 +1242,6 @@ export class NaverBlogFetcher {
                             dateObj.getMonth() == parseInt(month) - 1 && 
                             dateObj.getDate() == parseInt(day)) {
                             const result = `${year}-${month}-${day}`;
-                            console.log(`✓ Successfully parsed date: ${result}`);
                             return result;
                         }
                     }
@@ -1302,7 +1252,6 @@ export class NaverBlogFetcher {
             const date = new Date(cleanText);
             if (!isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100) {
                 const result = date.toISOString().split('T')[0];
-                console.log(`✓ Successfully parsed ISO date: ${result}`);
                 return result;
             }
 
@@ -1330,10 +1279,8 @@ export class NaverBlogFetcher {
                 }
             }
 
-            console.log(`✗ Failed to parse date from: "${dateText}"`);
             return '';
         } catch (error) {
-            console.log(`✗ Error parsing date "${dateText}": ${error}`);
             return '';
         }
     }
@@ -1357,7 +1304,6 @@ export class NaverBlogFetcher {
 
     private extractAdditionalImages(html: string, existingContent: string): string {
         try {
-            console.log('Scanning for additional images in HTML...');
             const $ = cheerio.load(html);
             let additionalImages: string[] = [];
             
@@ -1378,9 +1324,7 @@ export class NaverBlogFetcher {
                         if (this.isContentImage($img, imgSrc)) {
                             const alt = $img.attr('alt') || $img.attr('title') || 'Additional Image';
                             additionalImages.push(`![${alt}](${imgSrc})`);
-                            console.log(`Found additional content image: ${imgSrc}`);
                         } else {
-                            console.log(`Skipping UI/editor image: ${imgSrc}`);
                         }
                     }
                 }
@@ -1397,9 +1341,7 @@ export class NaverBlogFetcher {
                             // Filter out background images using same logic as content images
                             if (this.shouldIncludeImage(imgSrc, 'Background Image')) {
                                 additionalImages.push(`![Background Image](${imgSrc})`);
-                                console.log(`Found additional background image: ${imgSrc}`);
                             } else {
-                                console.log(`Filtered out background image: ${imgSrc}`);
                             }
                         }
                     }
@@ -1408,7 +1350,6 @@ export class NaverBlogFetcher {
             
             // Append additional images to content if found
             if (additionalImages.length > 0) {
-                console.log(`Adding ${additionalImages.length} additional images to content`);
                 return existingContent + '\n\n' + additionalImages.join('\n\n') + '\n';
             }
             
@@ -1572,11 +1513,9 @@ export class NaverBlogFetcher {
                 try {
                     const data = JSON.parse(linkData);
                     if (data.src) {
-                        console.log(`Found original image URL in linkdata: ${data.src}`);
                         return data.src;
                     }
                 } catch (e) {
-                    console.log('Failed to parse linkdata JSON:', e);
                 }
             }
         }
@@ -1589,15 +1528,12 @@ export class NaverBlogFetcher {
                 try {
                     const data = JSON.parse(scriptContent);
                     if (data.data && data.data.src) {
-                        console.log(`Found original image URL in script data: ${data.data.src}`);
                         return data.data.src;
                     }
                     if (data.data && data.data.imageInfo && data.data.imageInfo.src) {
-                        console.log(`Found original image URL in imageInfo: ${data.data.imageInfo.src}`);
                         return data.data.imageInfo.src;
                     }
                 } catch (e) {
-                    console.log('Failed to parse script data JSON:', e);
                 }
             }
         }
@@ -1624,7 +1560,6 @@ export class NaverBlogFetcher {
                                     return current.length > best.length ? current : best;
                                 }, matches[0]);
                                 
-                                console.log(`Found original image URL in data attribute: ${originalUrl}`);
                                 return originalUrl;
                             }
                         } catch (e) {
@@ -1639,7 +1574,6 @@ export class NaverBlogFetcher {
     }
 
     private enhanceImageUrl(imgSrc: string): string {
-        console.log(`Original image URL: ${imgSrc}`);
         
         // Use the same logic as Python naver_blog_md library for getting original images
         let enhancedUrl = imgSrc;
@@ -1664,10 +1598,8 @@ export class NaverBlogFetcher {
         
         // Log the transformation for debugging
         if (enhancedUrl !== imgSrc) {
-            console.log(`Enhanced to original image URL: ${imgSrc} -> ${enhancedUrl}`);
         }
         
-        console.log(`Enhanced image URL: ${enhancedUrl}`);
         
         return enhancedUrl;
     }

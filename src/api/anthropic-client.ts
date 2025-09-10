@@ -31,7 +31,6 @@ export class AnthropicClient {
 					.filter((id: string) => id.startsWith('claude-'))
 					.sort();
 				
-				console.log(`Fetched ${models.length} Anthropic models`);
 				return models;
 			}
 		} catch (error) {

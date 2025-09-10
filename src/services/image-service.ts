@@ -83,7 +83,6 @@ export class ImageService {
 						try {
 							filename = decodeURIComponent(filename);
 						} catch (e) {
-							console.log('Could not decode filename, using as-is');
 						}
 						
 						// If filename is too long or problematic, use a simpler name
@@ -135,11 +134,9 @@ export class ImageService {
 					const imageProgress = `(${imageCount + 1}/${totalImages})`;
 					let directUrl = this.convertToDirectImageUrl(imageUrl);
 					console.error(`✗ Error downloading image ${imageProgress} ${imageUrl}:`, imageError);
-					console.log(`Direct URL attempted: ${directUrl}`);
 					
 					// Try alternative download method for postfiles.pstatic.net
 					if (imageUrl.includes('postfiles.pstatic.net')) {
-						console.log(`Trying alternative method for postfiles.pstatic.net...`);
 						try {
 							const altResponse = await requestUrl({
 								url: imageUrl, // Use original URL
@@ -151,7 +148,6 @@ export class ImageService {
 							});
 							
 							if (altResponse.status === 200 && altResponse.arrayBuffer) {
-								console.log(`✓ Alternative download successful for ${imageUrl}`);
 								// Use same filename logic as above
 								const urlParts = imageUrl.split('/');
 								let filename = urlParts[urlParts.length - 1];
@@ -170,7 +166,6 @@ export class ImageService {
 								const newImageMd = `![${altText}](${localImagePath})`;
 								processedContent = processedContent.replace(fullMatch, newImageMd);
 								imageCount++;
-								console.log(`✓ Downloaded image via alternative method ${imageProgress}: ${filename}`);
 							}
 						} catch (altError) {
 							console.error(`Alternative download also failed:`, altError);
@@ -190,7 +185,6 @@ export class ImageService {
 		// Check URL patterns
 		for (const pattern of SKIP_IMAGE_PATTERNS) {
 			if (pattern.test(imageUrl)) {
-				console.log(`Skipping UI/animation image: ${imageUrl}`);
 				return false;
 			}
 		}
@@ -199,7 +193,6 @@ export class ImageService {
 		if (altText) {
 			for (const pattern of SKIP_ALT_TEXT_PATTERNS) {
 				if (pattern.test(altText)) {
-					console.log(`Skipping image by alt text: ${altText}`);
 					return false;
 				}
 			}
@@ -208,13 +201,11 @@ export class ImageService {
 		// Check if URL looks like a thumbnail (contains size parameters)
 		const thumbnailPattern = /[?&](w|h|width|height)=\d+/i;
 		if (thumbnailPattern.test(imageUrl)) {
-			console.log(`Skipping thumbnail image: ${imageUrl}`);
 			return false;
 		}
 		
 		// Skip ssl.pstatic.net profile images specifically
 		if (imageUrl.includes(NAVER_PROFILE_IMAGE_PATH)) {
-			console.log(`Skipping ssl.pstatic.net profile image: ${imageUrl}`);
 			return false;
 		}
 		
@@ -228,7 +219,6 @@ export class ImageService {
 		
 		const isValidDomain = validDomains.some(domain => imageUrl.includes(domain));
 		if (!isValidDomain && !imageUrl.match(/\.(jpg|jpeg|png|webp)(\?|$)/i)) {
-			console.log(`Skipping non-image URL: ${imageUrl}`);
 			return false;
 		}
 		
@@ -243,7 +233,6 @@ export class ImageService {
 		if (directUrl.includes('postfiles.pstatic.net')) {
 			// Remove only size-related query parameters, keep the URL structure
 			directUrl = directUrl.replace(/\?type=w\d+/i, '').replace(/&type=w\d+/i, '');
-			console.log(`Postfiles URL cleaned: ${url} -> ${directUrl}`);
 			return directUrl;
 		}
 		
@@ -264,7 +253,6 @@ export class ImageService {
 			.replace(NAVER_CDN_PATTERNS.year2024, '/MjAyNA==/')
 			.replace(NAVER_CDN_PATTERNS.year2025, '/MjAyNQ==/'); // 2025 added
 		
-		console.log(`URL conversion: ${url} -> ${directUrl}`);
 		return directUrl;
 	}
 
