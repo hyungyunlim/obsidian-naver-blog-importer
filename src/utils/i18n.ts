@@ -11,23 +11,7 @@ export class I18n {
 	}
 	
 	async loadTranslations(locale: string) {
-		try {
-			// Try to load locale-specific translations from plugin directory
-			const pluginDir = (this.app.vault.adapter as any).basePath;
-			const manifestPath = `${pluginDir}/${this.app.vault.configDir}/plugins/obsidian-naver-blog-plugin/lang/${locale}.json`;
-			
-			// Use Obsidian's file system to read the translation file
-			const translationFile = this.app.vault.adapter.read(manifestPath);
-			if (translationFile) {
-				const translationData = await translationFile;
-				this.translations = JSON.parse(translationData);
-				return;
-			}
-		} catch (error) {
-			// Fall back to built-in translations
-		}
-		
-		// Load built-in translations
+		// Load built-in translations directly
 		if (locale === 'ko' || locale.startsWith('ko')) {
 			this.translations = this.getKoreanTranslations();
 		} else {

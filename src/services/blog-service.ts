@@ -66,10 +66,9 @@ export class BlogService {
 		try {
 			const files = this.app.vault.getMarkdownFiles();
 			for (const file of files) {
-				const content = await this.app.vault.read(file);
-				const logNoMatch = content.match(/logNo: "([^"]+)"/i);
-				if (logNoMatch) {
-					existingLogNos.add(logNoMatch[1]);
+				const cache = this.app.metadataCache.getFileCache(file);
+				if (cache?.frontmatter?.logNo) {
+					existingLogNos.add(cache.frontmatter.logNo);
 				}
 			}
 		} catch (error) {
@@ -126,7 +125,7 @@ export class BlogService {
 						await new Promise(resolve => setTimeout(resolve, 500));
 					}
 					
-					console.log(`Blog ${blogId}: ${blogSuccessCount} success, ${blogErrorLogCount} error logs, ${blogErrorCount} errors`);
+					// Blog sync completed for this blog
 				} catch (error) {
 					console.error(`Error syncing blog ${blogId}:`, error);
 					totalErrors++;

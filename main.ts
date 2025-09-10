@@ -8,7 +8,8 @@ import {
 	TFile,
 	TFolder,
 	requestUrl,
-	RequestUrlParam
+	RequestUrlParam,
+	normalizePath
 } from 'obsidian';
 
 import { NaverBlogFetcher } from './naver-blog-fetcher';
@@ -70,13 +71,10 @@ export default class NaverBlogPlugin extends Plugin {
 
 		// Initialize Image service
 		this.imageService = new ImageService(this.app, this.settings);
-		
-		// Listen for Obsidian language changes
-		LocaleUtils.setupLanguageChangeListener(this.app, this.i18n, this.register.bind(this));
 
 		// Fetch models from APIs in background
 		this.refreshModels().catch(error => {
-			console.log('Failed to refresh models on startup:', error);
+			// Silently ignore startup model refresh errors
 		});
 
 		// Add ribbon icon
@@ -363,14 +361,14 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			// Create filename - just title.md without date prefix and hyphen replacements
 			const filename = this.imageService.sanitizeFilename(`${post.title}.md`);
-			const folder = this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder;
+			const folder = normalizePath(this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder);
 			
 			// Ensure folder exists
 			if (!await this.app.vault.adapter.exists(folder)) {
 				await this.app.vault.createFolder(folder);
 			}
 			
-			const filepath = `${folder}/${filename}`;
+			const filepath = normalizePath(`${folder}/${filename}`);
 
 			// Create frontmatter
 			const frontmatter = ContentUtils.createFrontmatter(post, this.imageService.sanitizeFilename.bind(this.imageService));
@@ -380,7 +378,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			// Check if file already exists
 			if (await this.app.vault.adapter.exists(filepath)) {
-				console.log(`File already exists: ${filename}`);
+				// File already exists, skip silently
 				return;
 			}
 			

@@ -1,4 +1,4 @@
-import { App, Notice, requestUrl } from 'obsidian';
+import { App, Notice, requestUrl, normalizePath } from 'obsidian';
 import { NaverBlogSettings, DEFAULT_SETTINGS } from '../types';
 import { 
 	MAX_FILENAME_LENGTH, 
@@ -24,7 +24,7 @@ export class ImageService {
 
 		try {
 			// Create attachments folder
-			const attachmentsFolder = this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder;
+			const attachmentsFolder = normalizePath(this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder);
 			if (!await this.app.vault.adapter.exists(attachmentsFolder)) {
 				await this.app.vault.createFolder(attachmentsFolder);
 			}
@@ -99,7 +99,7 @@ export class ImageService {
 						// Generated filename for image
 						
 						// Save image
-						const imagePath = `${attachmentsFolder}/${filename}`;
+						const imagePath = normalizePath(`${attachmentsFolder}/${filename}`);
 						try {
 							await this.app.vault.adapter.writeBinary(imagePath, response.arrayBuffer);
 							
@@ -162,7 +162,7 @@ export class ImageService {
 								filename = `${logNo}_${imageCount}_${filename}`;
 								filename = this.sanitizeFilename(filename);
 								
-								const imagePath = `${attachmentsFolder}/${filename}`;
+								const imagePath = normalizePath(`${attachmentsFolder}/${filename}`);
 								await this.app.vault.adapter.writeBinary(imagePath, altResponse.arrayBuffer);
 								
 								const relativePath = this.calculateRelativePath();
@@ -277,8 +277,8 @@ export class ImageService {
 	}
 
 	private calculateRelativePath(): string {
-		const defaultFolderPath = this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder;
-		const imageFolderPath = this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder;
+		const defaultFolderPath = normalizePath(this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder);
+		const imageFolderPath = normalizePath(this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder);
 		
 		// Calculate relative path from default folder to image folder
 		let relativePath = '';

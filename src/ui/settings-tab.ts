@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, Notice, TFolder } from 'obsidian';
+import { App, PluginSettingTab, Setting, Notice, TFolder, normalizePath } from 'obsidian';
 import { FolderSuggestModal } from './modals/folder-suggest-modal';
 import { 
 	DEFAULT_BLOG_POST_COUNT, 
@@ -20,9 +20,10 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: this.plugin.i18n.t('settings.title') });
-
-		containerEl.createEl('h3', { text: this.plugin.i18n.t('settings.ai_configuration') });
+		// AI configuration section
+		new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.ai_configuration'))
+			.setHeading();
 
 		new Setting(containerEl)
 			.setName(this.plugin.i18n.t('settings.ai_provider'))
@@ -42,7 +43,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					// Refresh models for the new provider
 					if (value !== 'ollama') {
 						this.plugin.refreshModels(value as 'openai' | 'anthropic' | 'google').catch((error: any) => {
-							console.log(`Failed to refresh models for ${value}:`, error);
+							// Silently ignore model refresh errors
 						});
 					}
 					
@@ -134,15 +135,16 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					.setPlaceholder(PLACEHOLDERS.folder.default)
 					.setValue(this.plugin.settings.defaultFolder)
 					.onChange(async (value) => {
-						this.plugin.settings.defaultFolder = value;
+						this.plugin.settings.defaultFolder = value ? normalizePath(value) : '';
 						await this.plugin.saveSettings();
 					});
 				
 				// Add folder dropdown functionality
 				this.setupFolderDropdown(input.inputEl, (folder) => {
-					this.plugin.settings.defaultFolder = folder;
+					const normalizedFolder = normalizePath(folder);
+					this.plugin.settings.defaultFolder = normalizedFolder;
 					this.plugin.saveSettings();
-					input.setValue(folder);
+					input.setValue(normalizedFolder);
 				}, () => {
 					this.plugin.settings.defaultFolder = '';
 					this.plugin.saveSettings();
@@ -223,15 +225,16 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 						.setPlaceholder(PLACEHOLDERS.folder.image)
 						.setValue(this.plugin.settings.imageFolder)
 						.onChange(async (value) => {
-							this.plugin.settings.imageFolder = value;
+							this.plugin.settings.imageFolder = value ? normalizePath(value) : '';
 							await this.plugin.saveSettings();
 						});
 					
 					// Add folder dropdown functionality
 					this.setupFolderDropdown(input.inputEl, (folder) => {
-						this.plugin.settings.imageFolder = folder;
+						const normalizedFolder = normalizePath(folder);
+						this.plugin.settings.imageFolder = normalizedFolder;
 						this.plugin.saveSettings();
-						input.setValue(folder);
+						input.setValue(normalizedFolder);
 					}, () => {
 						this.plugin.settings.imageFolder = '';
 						this.plugin.saveSettings();
@@ -243,7 +246,10 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		}
 
 
-		containerEl.createEl('h3', { text: this.plugin.i18n.t('settings.subscribed_blogs') });
+		// Subscribed blogs section
+		new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.subscribed_blogs'))
+			.setHeading();
 		
 		const subscriptionDiv = containerEl.createDiv();
 		this.displaySubscriptions(subscriptionDiv);
@@ -375,16 +381,14 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 	}
 
 	getAllFolders(): string[] {
-		const folders: string[] = [''];
-		const abstractFiles = this.app.vault.getAllLoadedFiles();
+		// Use Obsidian's getAllFolders() API
+		const allFolders = this.app.vault.getAllFolders();
+		const folderPaths = allFolders.map(folder => folder.path);
 		
-		for (const file of abstractFiles) {
-			if (file instanceof TFolder) { // This is a folder
-				folders.push(file.path);
-			}
-		}
+		// Add root folder as empty string
+		folderPaths.unshift('');
 		
-		return folders.sort();
+		return folderPaths.sort();
 	}
 
 	setupFolderDropdown(inputEl: HTMLInputElement, onSelect: (folder: string) => void, onClear?: () => void) {
