@@ -110,7 +110,7 @@ export class GoogleClient {
 					
 					// Handle MAX_TOKENS finish reason - response may be incomplete
 					if (candidate.finishReason === 'MAX_TOKENS') {
-						console.warn('Google API response was truncated due to MAX_TOKENS');
+						// console.warn('Google API response was truncated due to MAX_TOKENS');
 						if (!candidate.content.parts || candidate.content.parts.length === 0) {
 							throw new Error('Google API response completely truncated - try increasing maxTokens or reducing input size');
 						}
@@ -129,7 +129,7 @@ export class GoogleClient {
 				} else if (response.status === 503 && attempt < maxRetries) {
 					// 503 Service Unavailable - retry with exponential backoff
 					const delay = calculateBackoffDelay(attempt); // 2s, 4s, 8s
-					console.warn(`Google API 503 error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+					// console.warn(`Google API 503 error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
 					// Show retry notice
 					const retryNotice = new Notice(`API 서버 과부하, ${delay/1000}초 후 재시도... (${attempt}/${RETRY_DELAYS.maxRetries})`, delay);
 					await new Promise(resolve => setTimeout(resolve, delay));
@@ -141,7 +141,7 @@ export class GoogleClient {
 				if (attempt === maxRetries) {
 					throw error;
 				}
-				console.warn(`Google API request failed (attempt ${attempt}/${maxRetries}):`, error);
+				// console.warn(`Google API request failed (attempt ${attempt}/${maxRetries}):`, error);
 				// Wait before retrying
 				await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS.base * attempt));
 			}

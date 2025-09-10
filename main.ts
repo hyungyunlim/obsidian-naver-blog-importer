@@ -281,7 +281,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 				const tags = JSON.parse(cleanedText.trim());
 				return Array.isArray(tags) ? tags : [];
 			} catch (parseError) {
-				console.warn('Failed to parse tags as JSON:', content_text);
+				// console.warn('Failed to parse tags as JSON:', content_text);
 				// Fallback parsing - extract array from text
 				const matches = content_text.match(/\[(.*?)\]/s);
 				if (matches) {
