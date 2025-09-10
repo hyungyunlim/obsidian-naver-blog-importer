@@ -70,7 +70,9 @@ export class NaverBlogImportModal extends Modal {
 	async importPosts() {
 		let importCancelled = false;
 		const cancelNotice = new Notice("Click here to cancel import", 0);
-		cancelNotice.noticeEl.addEventListener('click', () => {
+		// Use messageEl instead of deprecated noticeEl
+		const messageEl = (cancelNotice as any).messageEl || cancelNotice.noticeEl;
+		messageEl.addEventListener('click', () => {
 			importCancelled = true;
 			cancelNotice.hide();
 			new Notice("Import cancelled by user", NOTICE_TIMEOUTS.medium);
@@ -111,7 +113,6 @@ export class NaverBlogImportModal extends Modal {
 						successCount++;
 					}
 				} catch (error) {
-					console.error(`✗ Error creating file for post ${post.logNo} ${progress}:`, error);
 					errorCount++;
 				}
 				// Add small delay to avoid overwhelming the API
@@ -144,7 +145,6 @@ export class NaverBlogImportModal extends Modal {
 			new Notice(summary, 8000);
 		} catch (error) {
 			cancelNotice.hide();
-			console.error('Import error:', error);
 			new Notice("Import failed. Please check the console for details.");
 		}
 	}

@@ -39,7 +39,6 @@ export class AIService {
 		try {
 			return await APIClientFactory.fetchModels(this.settings, provider);
 		} catch (error) {
-			console.error(`Failed to fetch models from ${provider}:`, error);
 			return [];
 		}
 	}
@@ -71,7 +70,6 @@ ${content}`
 			return fixedContent;
 			
 		} catch (error) {
-			console.error('AI formatting call failed:', error);
 			
 			// Re-throw with more specific error types
 			if (error.message.includes('401') || error.message.includes('Invalid')) {

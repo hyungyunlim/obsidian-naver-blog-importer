@@ -35,7 +35,6 @@ export class OpenAIClient {
 				return models;
 			}
 		} catch (error) {
-			console.error('OpenAI models fetch error:', error);
 		}
 		
 		return [];

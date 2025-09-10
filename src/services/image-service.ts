@@ -110,7 +110,6 @@ export class ImageService {
 								throw new Error('File was not saved properly');
 							}
 						} catch (saveError) {
-							console.error(`Failed to save image file: ${saveError}`);
 							throw saveError;
 						}
 						
@@ -133,7 +132,6 @@ export class ImageService {
 				} catch (imageError) {
 					const imageProgress = `(${imageCount + 1}/${totalImages})`;
 					let directUrl = this.convertToDirectImageUrl(imageUrl);
-					console.error(`✗ Error downloading image ${imageProgress} ${imageUrl}:`, imageError);
 					
 					// Try alternative download method for postfiles.pstatic.net
 					if (imageUrl.includes('postfiles.pstatic.net')) {
@@ -168,7 +166,6 @@ export class ImageService {
 								imageCount++;
 							}
 						} catch (altError) {
-							console.error(`Alternative download also failed:`, altError);
 						}
 					}
 				}
@@ -176,7 +173,6 @@ export class ImageService {
 
 			return processedContent;
 		} catch (error) {
-			console.error('Error processing images:', error);
 			return content; // Return original content on error
 		}
 	}

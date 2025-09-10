@@ -53,7 +53,6 @@ export class GoogleClient {
 				return models;
 			}
 		} catch (error) {
-			console.error('Google models fetch error:', error);
 		}
 		
 		return [];
@@ -99,7 +98,6 @@ export class GoogleClient {
 					
 					// Check if response has candidates
 					if (!data.candidates || data.candidates.length === 0) {
-						console.error('Google API response missing candidates:', data);
 						throw new Error('Google API response missing candidates');
 					}
 					
@@ -107,7 +105,6 @@ export class GoogleClient {
 					
 					// Check if candidate has content
 					if (!candidate.content) {
-						console.error('Google API candidate missing content:', candidate);
 						throw new Error('Google API candidate missing content');
 					}
 					
@@ -115,19 +112,16 @@ export class GoogleClient {
 					if (candidate.finishReason === 'MAX_TOKENS') {
 						console.warn('Google API response was truncated due to MAX_TOKENS');
 						if (!candidate.content.parts || candidate.content.parts.length === 0) {
-							console.error('Google API response completely truncated - no usable content');
 							throw new Error('Google API response completely truncated - try increasing maxTokens or reducing input size');
 						}
 					}
 					
 					if (!candidate.content.parts || candidate.content.parts.length === 0) {
-						console.error('Google API candidate content missing parts:', candidate.content);
 						throw new Error('Google API candidate content missing parts');
 					}
 					
 					const text = candidate.content.parts[0].text;
 					if (!text) {
-						console.error('Google API content missing text:', candidate.content.parts[0]);
 						throw new Error('Google API content missing text');
 					}
 					
@@ -141,7 +135,6 @@ export class GoogleClient {
 					await new Promise(resolve => setTimeout(resolve, delay));
 					continue;
 				} else {
-					console.error('Google API error:', response.status, response.text);
 					throw new Error(`Google API error: ${response.status} - ${response.text}`);
 				}
 			} catch (error) {

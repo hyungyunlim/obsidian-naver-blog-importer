@@ -110,7 +110,6 @@ export class NaverBlogSinglePostModal extends Modal {
 				
 				new Notice(`✓ Successfully imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
 			} catch (error) {
-				console.error('Single post import failed:', error);
 				new Notice(`✗ Failed to import post: ${error.message}`, NOTICE_TIMEOUTS.medium);
 			}
 		});

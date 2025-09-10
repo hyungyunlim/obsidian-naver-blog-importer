@@ -16,7 +16,7 @@ Thank you for the thorough review! I've addressed all the issues you mentioned:
 7. **Removed language change listener** - Not needed with proper API usage
 8. **Using `MetadataCache.getFileCache()`** instead of reading all Markdown files for better performance
 9. **Using `Vault.getAllFolders()`** to get vault folders
-10. **Removed unnecessary console.log statements** - Only keeping error logs
+10. **Removed ALL console.log statements** - Completely removed all debug logging from all TypeScript files
 
 ### 📝 About Naver API
 

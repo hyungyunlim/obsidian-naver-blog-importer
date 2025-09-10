@@ -110,29 +110,29 @@ export default class NaverBlogPlugin extends Plugin {
 		this.addCommand({
 			id: 'rewrite-current-note',
 			name: this.i18n.t('commands.ai-fix-layout'),
-			callback: async () => {
-				// Check API key first - use AI service to verify
-				try {
-					// This will validate API key internally
-					this.aiService.getModelName();
-				} catch (error) {
-					new Notice(this.i18n.t('notices.api_key_required', { provider: this.settings.aiProvider.toUpperCase() }), 8000);
-					new Notice(this.i18n.t('notices.set_api_key'), NOTICE_TIMEOUTS.medium);
-					return;
-				}
-
+			checkCallback: (checking: boolean) => {
 				const activeFile = this.app.workspace.getActiveFile();
-				if (!activeFile) {
-					new Notice(this.i18n.t('notices.no_active_file'));
-					return;
+				const hasMarkdownFile = activeFile && activeFile.path.endsWith('.md');
+				
+				if (checking) {
+					// This is called to check if the command should be available
+					return hasMarkdownFile;
 				}
-
-				if (!activeFile.path.endsWith('.md')) {
-					new Notice('Please select a markdown file');
-					return;
+				
+				// This is called when the command is executed
+				if (hasMarkdownFile) {
+					// Check API key first - use AI service to verify
+					try {
+						// This will validate API key internally
+						this.aiService.getModelName();
+					} catch (error) {
+						new Notice(this.i18n.t('notices.api_key_required', { provider: this.settings.aiProvider.toUpperCase() }), 8000);
+						new Notice(this.i18n.t('notices.set_api_key'), NOTICE_TIMEOUTS.medium);
+						return;
+					}
+					
+					this.rewriteCurrentNote(activeFile);
 				}
-
-				await this.rewriteCurrentNote(activeFile);
 			}
 		});
 
@@ -202,7 +202,6 @@ export default class NaverBlogPlugin extends Plugin {
 		try {
 			return await APIClientFactory.fetchModels(this.settings, provider);
 		} catch (error) {
-			console.error(`Failed to fetch models from ${provider}:`, error);
 			return [];
 		}
 	}
@@ -299,7 +298,6 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 				return [];
 			}
 		} catch (error) {
-			console.error('Error generating AI tags:', error);
 			return [];
 		} finally {
 			notice.hide();
@@ -331,7 +329,6 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const maxTokens = this.settings.aiModel.includes('pro') ? AI_TOKEN_LIMITS.pro : AI_TOKEN_LIMITS.default;
 			return await this.aiService.callAI(messages, maxTokens);
 		} catch (error) {
-			console.error('Error generating AI excerpt:', error);
 			return '';
 		} finally {
 			notice.hide();
@@ -387,7 +384,6 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			
 			new Notice(`Created: ${filename}`);
 		} catch (error) {
-			console.error('Error creating markdown file:', error);
 			new Notice(`Failed to create file for: ${post.title}`);
 		}
 	}
@@ -429,7 +425,6 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			new Notice('✅ Layout and formatting fixed by AI!', NOTICE_TIMEOUTS.medium);
 			
 		} catch (error) {
-			console.error('AI layout fix error:', error);
 			
 			// Provide specific error messages
 			if (error.message.includes('401')) {

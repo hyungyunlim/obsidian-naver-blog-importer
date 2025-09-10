@@ -34,7 +34,6 @@ export class AnthropicClient {
 				return models;
 			}
 		} catch (error) {
-			console.error('Anthropic models fetch error:', error);
 		}
 		
 		return [];

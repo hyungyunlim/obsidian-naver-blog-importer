@@ -91,7 +91,6 @@ export class NaverBlogFetcher {
                     // Add delay to be respectful to the server
                     await this.delay(1000);
                 } catch (error) {
-                    console.error(`✗ Failed to fetch content for post ${post.logNo} ${progress}:`, error);
                     
                     // Create error post for failed fetch
                     const errorContent = this.createErrorContent(post, error);
@@ -112,7 +111,6 @@ export class NaverBlogFetcher {
             
             return postsWithContent;
         } catch (error) {
-            console.error('Error fetching blog posts:', error);
             throw new Error(`Failed to fetch posts from blog: ${this.blogId}`);
         }
     }
@@ -199,7 +197,6 @@ export class NaverBlogFetcher {
                 }
             }
         } catch (error) {
-            console.error('Error fetching post list:', error);
             throw new Error(`Failed to fetch post list: ${error.message}`);
         }
 
@@ -350,7 +347,6 @@ export class NaverBlogFetcher {
             }
             
         } catch (error) {
-            console.error('Error parsing HTML:', error);
         }
         
         return posts;
@@ -1355,7 +1351,6 @@ export class NaverBlogFetcher {
             
             return existingContent;
         } catch (error) {
-            console.error('Error extracting additional images:', error);
             return existingContent;
         }
     }

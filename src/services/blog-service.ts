@@ -55,7 +55,6 @@ export class BlogService {
 				fetchNotice = null;
 			}
 			
-			console.error(`Error fetching posts from ${blogId}:`, error);
 			new Notice(`❌ Failed to fetch posts from ${blogId}: ${error.message}`, 5000);
 			throw error;
 		}
@@ -72,7 +71,6 @@ export class BlogService {
 				}
 			}
 		} catch (error) {
-			console.error('Error reading existing logNos:', error);
 		}
 		return existingLogNos;
 	}
@@ -118,7 +116,6 @@ export class BlogService {
 							}
 							totalNewPosts++;
 						} catch (error) {
-							console.error(`Error creating file for post ${post.logNo} from ${blogId} ${postProgress}:`, error);
 							blogErrorCount++;
 							totalErrors++;
 						}
@@ -127,7 +124,6 @@ export class BlogService {
 					
 					// Blog sync completed for this blog
 				} catch (error) {
-					console.error(`Error syncing blog ${blogId}:`, error);
 					totalErrors++;
 				}
 				
@@ -167,7 +163,6 @@ export class BlogService {
 			new Notice(`✅ Post imported successfully: ${processedPost.title}`, 4000);
 			
 		} catch (error) {
-			console.error('Error importing single post:', error);
 			new Notice(`❌ Failed to import post: ${error.message}`, 5000);
 			throw error;
 		}
