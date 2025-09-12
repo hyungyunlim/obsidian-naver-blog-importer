@@ -15,7 +15,7 @@ export class FolderSuggestModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h3', { text: 'Select Folder' });
+		contentEl.createEl('h3', { text: 'Select folder' });
 
 		const inputEl = contentEl.createEl('input', {
 			type: 'text',
