@@ -3,8 +3,6 @@ import { NaverBlogSettings, DEFAULT_SETTINGS } from '../types';
 import { 
 	MAX_FILENAME_LENGTH, 
 	DEFAULT_IMAGE_EXTENSION, 
-	USER_AGENTS, 
-	NAVER_HEADERS,
 	SKIP_IMAGE_PATTERNS,
 	SKIP_ALT_TEXT_PATTERNS,
 	NAVER_CDN_PATTERNS,
@@ -25,7 +23,8 @@ export class ImageService {
 		try {
 			// Create attachments folder
 			const attachmentsFolder = normalizePath(this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder);
-			if (!await this.app.vault.adapter.exists(attachmentsFolder)) {
+			const folderExists = this.app.vault.getAbstractFileByPath(attachmentsFolder);
+			if (!folderExists) {
 				await this.app.vault.createFolder(attachmentsFolder);
 			}
 
@@ -65,10 +64,7 @@ export class ImageService {
 					// Download image
 					const response = await requestUrl({
 						url: directUrl,
-						method: 'GET',
-						headers: {
-							'User-Agent': USER_AGENTS.images
-						}
+						method: 'GET'
 					});
 
 					if (response.status === 200 && response.arrayBuffer) {
@@ -100,10 +96,10 @@ export class ImageService {
 						// Save image
 						const imagePath = normalizePath(`${attachmentsFolder}/${filename}`);
 						try {
-							await this.app.vault.adapter.writeBinary(imagePath, response.arrayBuffer);
+							await this.app.vault.createBinary(imagePath, response.arrayBuffer);
 							
 							// Verify file was saved
-							const fileExists = await this.app.vault.adapter.exists(imagePath);
+							const fileExists = this.app.vault.getAbstractFileByPath(imagePath);
 							// File saved successfully
 							
 							if (!fileExists) {
@@ -138,11 +134,7 @@ export class ImageService {
 						try {
 							const altResponse = await requestUrl({
 								url: imageUrl, // Use original URL
-								method: 'GET',
-								headers: {
-									'User-Agent': USER_AGENTS.images,
-									'Referer': NAVER_HEADERS.referer
-								}
+								method: 'GET'
 							});
 							
 							if (altResponse.status === 200 && altResponse.arrayBuffer) {
@@ -157,7 +149,7 @@ export class ImageService {
 								filename = this.sanitizeFilename(filename);
 								
 								const imagePath = normalizePath(`${attachmentsFolder}/${filename}`);
-								await this.app.vault.adapter.writeBinary(imagePath, altResponse.arrayBuffer);
+								await this.app.vault.createBinary(imagePath, altResponse.arrayBuffer);
 								
 								const relativePath = this.calculateRelativePath();
 								const localImagePath = `${relativePath}${filename}`;

@@ -22,10 +22,10 @@ export class I18n {
 	
 	t(key: string, variables?: Record<string, string>): string {
 		const keys = key.split('.');
-		let value: any = this.translations;
+		let value: unknown = this.translations;
 		
 		for (const k of keys) {
-			value = value?.[k];
+			value = (value as Record<string, unknown>)?.[k];
 		}
 		
 		if (typeof value !== 'string') {
@@ -45,42 +45,42 @@ export class I18n {
 	private getDefaultTranslations(): Translations {
 		return {
 			commands: {
-				'import-single-post': 'Import Single Post by URL',
-				'import-blog-url': 'Import All Posts from Blog',
-				'sync-subscribed-blogs': 'Sync Subscribed Blogs',
-				'ai-fix-layout': 'AI Fix Layout and Format (Preserve Content 100%)'
+				'import-single-post': 'Import single post by URL',
+				'import-blog-url': 'Import all posts from blog',
+				'sync-subscribed-blogs': 'Sync subscribed blogs',
+				'ai-fix-layout': 'AI fix layout and format (preserve content 100%)'
 			},
 			settings: {
-				title: 'Naver Blog Importer Settings',
-				ai_configuration: 'AI Configuration',
-				ai_provider: 'AI Provider',
+				title: 'Naver blog importer settings',
+				ai_configuration: 'AI settings',
+				ai_provider: 'AI provider',
 				ai_provider_desc: 'Choose your AI service provider',
-				ai_model: 'AI Model',
+				ai_model: 'AI model',
 				ai_model_desc: 'Select the model to use for AI features',
-				openai_api_key: 'OpenAI API Key',
+				openai_api_key: 'OpenAI API key',
 				openai_api_key_desc: 'Enter your OpenAI API key',
-				anthropic_api_key: 'Anthropic API Key',
+				anthropic_api_key: 'Anthropic API key',
 				anthropic_api_key_desc: 'Enter your Anthropic API key',
-				google_api_key: 'Google API Key',
+				google_api_key: 'Google API key',
 				google_api_key_desc: 'Enter your Google Gemini API key',
-				ollama_endpoint: 'Ollama Endpoint',
+				ollama_endpoint: 'Ollama endpoint',
 				ollama_endpoint_desc: 'Ollama server endpoint (default: http://localhost:11434)',
-				default_folder: 'Default Folder',
+				default_folder: 'Default folder',
 				default_folder_desc: 'Folder where imported posts will be saved',
-				image_folder: 'Image Folder',
+				image_folder: 'Image folder',
 				image_folder_desc: 'Folder where images will be saved',
-				enable_ai_tags: 'Enable AI Tags',
+				enable_ai_tags: 'Enable AI tags',
 				enable_ai_tags_desc: 'Generate tags using AI (requires API key for selected provider)',
-				enable_ai_excerpt: 'Enable AI Excerpt',
+				enable_ai_excerpt: 'Enable AI excerpt',
 				enable_ai_excerpt_desc: 'Generate excerpts using AI (requires API key for selected provider)',
-				enable_duplicate_check: 'Enable Duplicate Check',
+				enable_duplicate_check: 'Enable duplicate check',
 				enable_duplicate_check_desc: 'Skip importing posts that already exist (based on logNo)',
-				enable_image_download: 'Enable Image Download',
+				enable_image_download: 'Enable image download',
 				enable_image_download_desc: 'Download images locally and update links',
-				post_import_limit: 'Post Import Limit',
+				post_import_limit: 'Post import limit',
 				post_import_limit_desc: 'Maximum number of posts to import at once (0 = unlimited)',
-				subscribed_blogs: 'Subscribed Blogs',
-				add_blog_id: 'Add Blog ID',
+				subscribed_blogs: 'Subscribed blogs',
+				add_blog_id: 'Add blog ID',
 				add_blog_id_desc: 'Enter a new blog ID and click the add button',
 				add_button: 'Add',
 				remove_button: 'Remove',
@@ -89,7 +89,7 @@ export class I18n {
 				posts_label: 'Posts'
 			},
 			notices: {
-				api_key_required: '{{provider}} API Key required for AI formatting',
+				api_key_required: '{{provider}} API key required for AI formatting',
 				set_api_key: 'Please set your API key in plugin settings',
 				no_active_file: 'No active file selected for formatting',
 				ai_formatting_progress: 'AI layout fixing in progress...',
@@ -116,25 +116,25 @@ export class I18n {
 			},
 			modals: {
 				import_single_post: {
-					title: 'Import Single Post by URL',
+					title: 'Import single post by URL',
 					blog_id_label: 'Blog ID',
 					blog_id_placeholder: 'e.g., myblog',
 					log_no_label: 'Post URL or LogNo',
 					log_no_placeholder: 'URL or LogNo (e.g., https://blog.naver.com/yonofbooks/220883239733)',
-					import_button: 'Import Post',
+					import_button: 'Import post',
 					cancel_button: 'Cancel'
 				},
 				import_blog_url: {
-					title: 'Import All Posts from Blog',
+					title: 'Import all posts from blog',
 					url_label: 'Blog ID',
 					url_placeholder: 'e.g., yonofbooks',
-					import_button: 'Import All Posts',
+					import_button: 'Import all posts',
 					cancel_button: 'Cancel'
 				},
 				subscribe_blog: {
-					title: 'Subscribe to Naver Blog',
+					title: 'Subscribe to Naver blog',
 					blog_id_label: 'Blog ID',
-					blog_id_desc: 'Enter the Naver Blog ID to subscribe to',
+					blog_id_desc: 'Enter the Naver blog ID to subscribe to',
 					blog_id_placeholder: 'Blog ID',
 					subscribe_button: 'Subscribe'
 				}

@@ -25,8 +25,12 @@ export class GoogleClient {
 			});
 
 			if (response.status === 200) {
+				interface ModelInfo {
+					name: string;
+					supportedGenerationMethods?: string[];
+				}
 				const models = response.json.models
-					.filter((model: any) => {
+					.filter((model: ModelInfo) => {
 						// Check if model supports generateContent
 						const supportedMethods = model.supportedGenerationMethods || [];
 						const hasGenerateContent = supportedMethods.includes('generateContent');
@@ -43,7 +47,7 @@ export class GoogleClient {
 						
 						return hasGenerateContent && isGeminiModel && isTextModel;
 					})
-					.map((model: any) => {
+					.map((model: ModelInfo) => {
 						// Remove 'models/' prefix and return clean model name
 						const cleanName = model.name.replace('models/', '');
 						return cleanName;

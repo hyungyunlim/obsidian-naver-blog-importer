@@ -1,11 +1,12 @@
 import { App, Modal, Notice } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
 import { PLACEHOLDERS, UI_DEFAULTS, NOTICE_TIMEOUTS } from '../../constants';
+import type NaverBlogPlugin from '../../../main';
 
 export class NaverBlogSinglePostModal extends Modal {
-	plugin: any; // NaverBlogPlugin type
+	plugin: NaverBlogPlugin;
 
-	constructor(app: App, plugin: any) {
+	constructor(app: App, plugin: NaverBlogPlugin) {
 		super(app);
 		this.plugin = plugin;
 	}

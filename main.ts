@@ -9,7 +9,8 @@ import {
 	TFolder,
 	requestUrl,
 	RequestUrlParam,
-	normalizePath
+	normalizePath,
+	getFrontMatterInfo
 } from 'obsidian';
 
 import { NaverBlogFetcher } from './naver-blog-fetcher';
@@ -361,7 +362,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const folder = normalizePath(this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder);
 			
 			// Ensure folder exists
-			if (!await this.app.vault.adapter.exists(folder)) {
+			const folderExists = this.app.vault.getAbstractFileByPath(folder);
+			if (!folderExists) {
 				await this.app.vault.createFolder(folder);
 			}
 			
@@ -374,7 +376,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const fullContent = `${frontmatter}\n${processedContent}`;
 
 			// Check if file already exists
-			if (await this.app.vault.adapter.exists(filepath)) {
+			const fileExists = this.app.vault.getAbstractFileByPath(filepath);
+			if (fileExists) {
 				// File already exists, skip silently
 				return;
 			}
@@ -397,8 +400,12 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			// Read the current file content
 			const content = await this.app.vault.read(file);
 			
-			// Extract frontmatter and body
-			const { frontmatter, body } = ContentUtils.extractFrontmatter(content);
+			// Extract frontmatter and body using Obsidian API
+			const frontMatterInfo = getFrontMatterInfo(content);
+			const frontmatter = frontMatterInfo.frontmatter;
+			const body = frontMatterInfo.exists 
+				? content.substring(frontMatterInfo.contentStart).trim()
+				: content;
 			
 			// Clean the body content for AI processing
 			const cleanBody = ContentUtils.cleanContentForAI(body);
@@ -417,7 +424,9 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			}
 
 			// Reconstruct the file with fixed content
-			const newContent = ContentUtils.reconstructMarkdown(frontmatter, fixedContent);
+			const newContent = frontMatterInfo.exists
+				? `---\n${frontmatter}\n---\n${fixedContent}`
+				: fixedContent;
 
 			// Write the fixed content back to the file
 			await this.app.vault.modify(file, newContent);

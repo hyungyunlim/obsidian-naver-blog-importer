@@ -7,11 +7,13 @@ import {
 	UI_DEFAULTS,
 	PLACEHOLDERS 
 } from '../constants';
+import { AIProviderUtils } from '../utils/ai-provider-utils';
+import type NaverBlogPlugin from '../../main';
 
 export class NaverBlogSettingTab extends PluginSettingTab {
-	plugin: any; // NaverBlogPlugin type
+	plugin: NaverBlogPlugin;
 
-	constructor(app: App, plugin: any) {
+	constructor(app: App, plugin: NaverBlogPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
@@ -37,12 +39,12 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				.onChange(async (value: 'openai' | 'anthropic' | 'google' | 'ollama') => {
 					this.plugin.settings.aiProvider = value;
 					// Auto-select default model for the new provider
-					this.plugin.settings.aiModel = this.plugin.getDefaultModelForProvider(value);
+					this.plugin.settings.aiModel = AIProviderUtils.getDefaultModelForProvider(value);
 					await this.plugin.saveSettings();
 					
 					// Refresh models for the new provider
 					if (value !== 'ollama') {
-						this.plugin.refreshModels(value as 'openai' | 'anthropic' | 'google').catch((error: any) => {
+						this.plugin.refreshModels(value as 'openai' | 'anthropic' | 'google').catch((error: Error) => {
 							// Silently ignore model refresh errors
 						});
 					}
@@ -304,7 +306,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				cls: 'naver-blog-count-label'
 			});
 			
-			const blogSubscription = this.plugin.settings.blogSubscriptions.find((sub: any) => sub.blogId === blogId);
+			const blogSubscription = this.plugin.settings.blogSubscriptions.find(sub => sub.blogId === blogId);
 			const currentCount = blogSubscription?.postCount || DEFAULT_BLOG_POST_COUNT;
 			
 			const countInput = countDiv.createEl('input', {
@@ -319,7 +321,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				const newCount = parseInt(countInput.value) || DEFAULT_BLOG_POST_COUNT;
 				
 				// Update or create blog subscription
-				const existingIndex = this.plugin.settings.blogSubscriptions.findIndex((sub: any) => sub.blogId === blogId);
+				const existingIndex = this.plugin.settings.blogSubscriptions.findIndex(sub => sub.blogId === blogId);
 				if (existingIndex >= 0) {
 					this.plugin.settings.blogSubscriptions[existingIndex].postCount = newCount;
 				} else {
@@ -367,7 +369,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				this.plugin.settings.subscribedBlogs.splice(index, 1);
 				
 				// Remove from blog subscriptions
-				const subIndex = this.plugin.settings.blogSubscriptions.findIndex((sub: any) => sub.blogId === blogId);
+				const subIndex = this.plugin.settings.blogSubscriptions.findIndex(sub => sub.blogId === blogId);
 				if (subIndex >= 0) {
 					this.plugin.settings.blogSubscriptions.splice(subIndex, 1);
 				}

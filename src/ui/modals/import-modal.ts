@@ -1,11 +1,12 @@
 import { App, Modal, Setting, Notice } from 'obsidian';
 import { UI_DEFAULTS, NOTICE_TIMEOUTS } from '../../constants';
+import type NaverBlogPlugin from '../../../main';
 
 export class NaverBlogImportModal extends Modal {
-	plugin: any; // NaverBlogPlugin type
+	plugin: NaverBlogPlugin;
 	blogId: string = '';
 
-	constructor(app: App, plugin: any) {
+	constructor(app: App, plugin: NaverBlogPlugin) {
 		super(app);
 		this.plugin = plugin;
 	}
@@ -70,13 +71,18 @@ export class NaverBlogImportModal extends Modal {
 	async importPosts() {
 		let importCancelled = false;
 		const cancelNotice = new Notice("Click here to cancel import", 0);
-		// Use messageEl instead of deprecated noticeEl
-		const messageEl = (cancelNotice as any).messageEl || cancelNotice.noticeEl;
-		messageEl.addEventListener('click', () => {
-			importCancelled = true;
-			cancelNotice.hide();
-			new Notice("Import cancelled by user", NOTICE_TIMEOUTS.medium);
-		});
+		// Use setTimeout to access the notice element after it's created
+		setTimeout(() => {
+			const notices = document.querySelectorAll('.notice');
+			const lastNotice = notices[notices.length - 1];
+			if (lastNotice) {
+				lastNotice.addEventListener('click', () => {
+					importCancelled = true;
+					cancelNotice.hide();
+					new Notice("Import cancelled by user", NOTICE_TIMEOUTS.medium);
+				});
+			}
+		}, 100);
 
 		try {
 			new Notice("Starting import...");

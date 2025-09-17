@@ -26,8 +26,11 @@ export class AnthropicClient {
 			});
 
 			if (response.status === 200) {
+				interface ModelData {
+					id: string;
+				}
 				const models = response.json.data
-					.map((model: any) => model.id)
+					.map((model: ModelData) => model.id)
 					.filter((id: string) => id.startsWith('claude-'))
 					.sort();
 				

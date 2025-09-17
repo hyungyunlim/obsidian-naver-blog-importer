@@ -25,8 +25,11 @@ export class OpenAIClient {
 			});
 
 			if (response.status === 200) {
+				interface ModelData {
+					id: string;
+				}
 				const models = response.json.data
-					.map((model: any) => model.id)
+					.map((model: ModelData) => model.id)
 					.filter((id: string) => 
 						OPENAI_MODEL_PREFIXES.some(prefix => id.startsWith(prefix))
 					)

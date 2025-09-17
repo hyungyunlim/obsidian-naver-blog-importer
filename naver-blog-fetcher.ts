@@ -1,5 +1,8 @@
 import { requestUrl } from 'obsidian';
 import * as cheerio from 'cheerio';
+type CheerioAPI = any;
+type Cheerio<T> = any;
+type Element = any;
 
 export interface NaverBlogPost {
     title: string;
@@ -143,9 +146,7 @@ export class NaverBlogFetcher {
                             url: url,
                             method: 'GET',
                             headers: {
-                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                                'Referer': `https://blog.naver.com/${this.blogId}`
+                                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
                             }
                         });
 
@@ -186,7 +187,6 @@ export class NaverBlogFetcher {
                     url: mainPageUrl,
                     method: 'GET',
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
                     }
                 });
@@ -368,9 +368,7 @@ export class NaverBlogFetcher {
                         url: postUrl,
                         method: 'GET',
                         headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                            'Referer': `https://blog.naver.com/${this.blogId}`
+                            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
                         }
                     });
 
@@ -647,7 +645,7 @@ export class NaverBlogFetcher {
         }
     }
 
-    private extractTextFromElement(element: any, $: any): string {
+    private extractTextFromElement(element: Element, $: CheerioAPI): string {
         let content = '';
         
         // Use Python library approach: find .se-main-container first, then .se-component
@@ -664,7 +662,7 @@ export class NaverBlogFetcher {
         // Process components in document order to maintain text-image flow
         const allComponents = components;
         
-        allComponents.forEach((el: any) => {
+        allComponents.forEach((el: Element) => {
             const $el = $(el);
             
             // Handle different component types
@@ -677,12 +675,12 @@ export class NaverBlogFetcher {
                         const lists = textModule.find('ul, ol');
                         
                         if (lists.length > 0) {
-                            lists.each((_: any, list: any) => {
+                            lists.each((_: number, list: Element) => {
                                 const $list = $(list);
                                 const isOrdered = list.tagName.toLowerCase() === 'ol';
                                 const listItems = $list.find('li');
                                 
-                                listItems.each((index: any, li: any) => {
+                                listItems.each((index: number, li: Element) => {
                                     const $li = $(li);
                                     const listItemText = $li.text().trim();
                                     if (listItemText && !listItemText.startsWith('#')) {
@@ -697,7 +695,7 @@ export class NaverBlogFetcher {
                             });
                         } else {
                             // Process regular paragraphs if no lists found
-                            textModule.find('p').each((_: any, p: any) => {
+                            textModule.find('p').each((_: number, p: Element) => {
                                 const $p = $(p);
                                 const paragraphText = $p.text().trim();
                                 if (paragraphText && !paragraphText.startsWith('#')) { // Skip hashtags
@@ -711,7 +709,7 @@ export class NaverBlogFetcher {
                                 if (textContent && !textContent.startsWith('#')) {
                                     // Split by line breaks and create paragraphs
                                     const lines = textContent.split(/\n+/);
-                                    lines.forEach((line: any) => {
+                                    lines.forEach((line: string) => {
                                         const trimmedLine = line.trim();
                                         if (trimmedLine && !trimmedLine.startsWith('#')) {
                                             content += trimmedLine + '\n';
@@ -734,7 +732,7 @@ export class NaverBlogFetcher {
                     
                     if (quoteElements.length > 0) {
                         const quoteParts: string[] = [];
-                        quoteElements.each((_: any, quote: any) => {
+                        quoteElements.each((_: number, quote: Element) => {
                             const quoteText = $(quote).text().trim();
                             if (quoteText) {
                                 quoteParts.push(`> ${quoteText}`);
@@ -818,7 +816,7 @@ export class NaverBlogFetcher {
                         
                         // Check for nested elements that might contain images
                         if (!bgImageSrc) {
-                            $el.find('*').each((_: any, nestedEl: any) => {
+                            $el.find('*').each((_: number, nestedEl: Element) => {
                                 const $nested = $(nestedEl);
                                 const nestedStyle = $nested.attr('style');
                                 if (nestedStyle) {
@@ -860,7 +858,7 @@ export class NaverBlogFetcher {
                     const codeElements = $el.find('.se-code-source');
                     if (codeElements.length > 0) {
                         const codeParts: string[] = [];
-                        codeElements.each((_: any, code: any) => {
+                        codeElements.each((_: number, code: Element) => {
                             let codeContent = $(code).text();
                             // Clean up code like Python script
                             if (codeContent.startsWith('\n')) {
@@ -885,7 +883,7 @@ export class NaverBlogFetcher {
                     const materialElements = $el.find('a.se-module-material');
                     if (materialElements.length > 0) {
                         const materialParts: string[] = [];
-                        materialElements.each((_: any, material: any) => {
+                        materialElements.each((_: number, material: Element) => {
                             const $material = $(material);
                             const linkData = $material.attr('data-linkdata');
                             if (linkData) {
@@ -923,7 +921,7 @@ export class NaverBlogFetcher {
                     if (textContent && textContent.length > 10 && !textContent.startsWith('#')) {
                         // Try to maintain paragraph structure
                         const paragraphs = textContent.split(/\n\s*\n/);
-                        paragraphs.forEach((paragraph: any) => {
+                        paragraphs.forEach((paragraph: Element) => {
                             const trimmed = paragraph.trim();
                             if (trimmed && !trimmed.startsWith('#')) {
                                 content += trimmed + '\n';
@@ -968,7 +966,7 @@ export class NaverBlogFetcher {
         }
     }
 
-    private extractContentFromComponents(components: any[]): string {
+    private extractContentFromComponents(components: Element[]): string {
         let content = '';
         
         for (const component of components) {
@@ -983,7 +981,7 @@ export class NaverBlogFetcher {
                         if (textContent && !textContent.startsWith('#')) {
                             // Split into paragraphs if it's a long text
                             const paragraphs = textContent.split(/\n\s*\n/);
-                            paragraphs.forEach((paragraph: any) => {
+                            paragraphs.forEach((paragraph: Element) => {
                                 const trimmed = paragraph.trim();
                                 if (trimmed && !trimmed.startsWith('#')) {
                                     content += trimmed + '\n';
@@ -1355,9 +1353,9 @@ export class NaverBlogFetcher {
         }
     }
 
-    private createErrorContent(post: Omit<NaverBlogPost, 'content'>, error: any): string {
+    private createErrorContent(post: Omit<NaverBlogPost, 'content'>, error: Error | unknown): string {
         const timestamp = new Date().toISOString();
-        const errorMessage = error?.message || 'Unknown error';
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         
         return `# ⚠️ 콘텐츠 가져오기 실패
 
@@ -1438,7 +1436,7 @@ export class NaverBlogFetcher {
         return true;
     }
 
-    private isContentImage($img: any, imgSrc: string): boolean {
+    private isContentImage($img: Cheerio<Element>, imgSrc: string): boolean {
         // Check if image is likely a content image vs UI element
         
         // Skip ssl.pstatic.net profile images - same as shouldIncludeImage
@@ -1498,7 +1496,7 @@ export class NaverBlogFetcher {
         return true;
     }
 
-    private extractOriginalImageUrl($el: any, imgElement: any): string | null {
+    private extractOriginalImageUrl($el: Cheerio<Element>, imgElement: Element): string | null {
         // Try to extract original image URL from Naver blog's data-linkdata attribute
         const imageLink = $el.find('a.__se_image_link, a.se-module-image-link');
         
@@ -1537,7 +1535,7 @@ export class NaverBlogFetcher {
         const parentComponent = $el.closest('.se-component');
         if (parentComponent.length > 0) {
             // Look for data attributes in parent component
-            const dataAttrs = parentComponent[0]?.attributes;
+            const dataAttrs = (parentComponent[0] as any)?.attribs;
             if (dataAttrs) {
                 for (let i = 0; i < dataAttrs.length; i++) {
                     const attr = dataAttrs[i];

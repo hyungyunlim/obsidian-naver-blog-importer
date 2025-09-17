@@ -1,11 +1,12 @@
 import { App, Modal, Setting, Notice } from 'obsidian';
 import { DEFAULT_BLOG_POST_COUNT, UI_DEFAULTS } from '../../constants';
+import type NaverBlogPlugin from '../../../main';
 
 export class NaverBlogSubscribeModal extends Modal {
-	plugin: any; // NaverBlogPlugin type
+	plugin: NaverBlogPlugin;
 	blogId: string = '';
 
-	constructor(app: App, plugin: any) {
+	constructor(app: App, plugin: NaverBlogPlugin) {
 		super(app);
 		this.plugin = plugin;
 	}
