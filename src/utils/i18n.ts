@@ -51,7 +51,6 @@ export class I18n {
 				'ai-fix-layout': 'AI fix layout and format (preserve content 100%)'
 			},
 			settings: {
-				title: 'Naver blog importer',
 				ai_configuration: 'AI',
 				ai_provider: 'AI provider',
 				ai_provider_desc: 'Choose your AI service provider',
@@ -169,7 +168,6 @@ export class I18n {
 				'ai-fix-layout': 'AI 레이아웃 수정 및 포맷 (내용 100% 보존)'
 			},
 			settings: {
-				title: '네이버 블로그 가져오기',
 				ai_configuration: 'AI',
 				ai_provider: 'AI 제공업체',
 				ai_provider_desc: 'AI 서비스 제공업체를 선택하세요',

@@ -6,7 +6,6 @@ export interface Translations {
 		'ai-fix-layout': string;
 	};
 	settings: {
-		title: string;
 		ai_configuration: string;
 		ai_provider: string;
 		ai_provider_desc: string;
