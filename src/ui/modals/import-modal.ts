@@ -71,18 +71,14 @@ export class NaverBlogImportModal extends Modal {
 	async importPosts() {
 		let importCancelled = false;
 		const cancelNotice = new Notice("Click here to cancel import", 0);
-		// Use setTimeout to access the notice element after it's created
-		setTimeout(() => {
-			const notices = document.querySelectorAll('.notice');
-			const lastNotice = notices[notices.length - 1];
-			if (lastNotice) {
-				lastNotice.addEventListener('click', () => {
-					importCancelled = true;
-					cancelNotice.hide();
-					new Notice("Import cancelled by user", NOTICE_TIMEOUTS.medium);
-				});
-			}
-		}, 100);
+		const messageEl = (cancelNotice as any).messageEl;
+		if (messageEl) {
+			messageEl.addEventListener('click', () => {
+				importCancelled = true;
+				cancelNotice.hide();
+				new Notice("Import cancelled by user", NOTICE_TIMEOUTS.medium);
+			});
+		}
 
 		try {
 			new Notice("Starting import...");
