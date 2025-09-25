@@ -71,7 +71,8 @@ export class NaverBlogImportModal extends Modal {
 	async importPosts() {
 		let importCancelled = false;
 		const cancelNotice = new Notice("Click here to cancel import", 0);
-		const messageEl = (cancelNotice as any).messageEl;
+		// @ts-ignore - accessing private messageEl property as suggested by Obsidian team
+		const messageEl = cancelNotice.messageEl;
 		if (messageEl) {
 			messageEl.addEventListener('click', () => {
 				importCancelled = true;
