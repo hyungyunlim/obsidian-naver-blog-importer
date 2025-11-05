@@ -1,8 +1,31 @@
 import { requestUrl } from 'obsidian';
 import * as cheerio from 'cheerio';
-type CheerioAPI = any;
-type Cheerio<T> = any;
-type Element = any;
+import type { CheerioAPI, Cheerio } from 'cheerio';
+import type { Element } from 'domhandler';
+
+interface BlogComponent {
+	componentType?: string;
+	data?: {
+		text?: string;
+		quote?: string;
+		cite?: string;
+		src?: string;
+		url?: string;
+		imageUrl?: string;
+		imageInfo?: {
+			src?: string;
+			url?: string;
+			alt?: string;
+		};
+		caption?: string;
+		alt?: string;
+		title?: string;
+		code?: string;
+		link?: string;
+		type?: string;
+		[key: string]: unknown;
+	};
+}
 
 export interface NaverBlogPost {
     title: string;
@@ -645,7 +668,7 @@ export class NaverBlogFetcher {
         }
     }
 
-    private extractTextFromElement(element: Element, $: CheerioAPI): string {
+    private extractTextFromElement(element: Cheerio<unknown>, $: CheerioAPI): string {
         let content = '';
         
         // Use Python library approach: find .se-main-container first, then .se-component
@@ -921,7 +944,7 @@ export class NaverBlogFetcher {
                     if (textContent && textContent.length > 10 && !textContent.startsWith('#')) {
                         // Try to maintain paragraph structure
                         const paragraphs = textContent.split(/\n\s*\n/);
-                        paragraphs.forEach((paragraph: Element) => {
+                        paragraphs.forEach((paragraph: string) => {
                             const trimmed = paragraph.trim();
                             if (trimmed && !trimmed.startsWith('#')) {
                                 content += trimmed + '\n';
@@ -966,9 +989,9 @@ export class NaverBlogFetcher {
         }
     }
 
-    private extractContentFromComponents(components: Element[]): string {
+    private extractContentFromComponents(components: BlogComponent[]): string {
         let content = '';
-        
+
         for (const component of components) {
             const type = component.componentType;
             const data = component.data || {};
@@ -981,7 +1004,7 @@ export class NaverBlogFetcher {
                         if (textContent && !textContent.startsWith('#')) {
                             // Split into paragraphs if it's a long text
                             const paragraphs = textContent.split(/\n\s*\n/);
-                            paragraphs.forEach((paragraph: Element) => {
+                            paragraphs.forEach((paragraph: string) => {
                                 const trimmed = paragraph.trim();
                                 if (trimmed && !trimmed.startsWith('#')) {
                                     content += trimmed + '\n';
@@ -1496,7 +1519,7 @@ export class NaverBlogFetcher {
         return true;
     }
 
-    private extractOriginalImageUrl($el: Cheerio<Element>, imgElement: Element): string | null {
+    private extractOriginalImageUrl($el: Cheerio<Element>, imgElement: Cheerio<Element>): string | null {
         // Try to extract original image URL from Naver blog's data-linkdata attribute
         const imageLink = $el.find('a.__se_image_link, a.se-module-image-link');
         

@@ -74,7 +74,7 @@ export default class NaverBlogPlugin extends Plugin {
 		this.imageService = new ImageService(this.app, this.settings);
 
 		// Fetch models from APIs in background
-		this.refreshModels().catch(error => {
+		void this.refreshModels().catch(() => {
 			// Silently ignore startup model refresh errors
 		});
 
@@ -215,15 +215,18 @@ export default class NaverBlogPlugin extends Plugin {
 			// Refresh specific provider
 			const models = await this.fetchModelsFromAPI(provider);
 			switch (provider) {
-				case 'openai':
+				case 'openai': {
 					this.openai_models = models;
 					break;
-				case 'anthropic':
+				}
+				case 'anthropic': {
 					this.anthropic_models = models;
 					break;
-				case 'google':
+				}
+				case 'google': {
 					this.google_models = models;
 					break;
+				}
 			}
 		} else {
 			// Refresh all providers
@@ -419,7 +422,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const fixedContent = await this.aiService.callAIForLayoutFix(cleanBody);
 			
 			if (!fixedContent) {
-				new Notice('❌ AI formatting failed. Please try again.');
+				new Notice('AI formatting failed. Please try again.');
 				return;
 			}
 
@@ -431,21 +434,21 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			// Write the fixed content back to the file
 			await this.app.vault.modify(file, newContent);
 			
-			new Notice('✅ Layout and formatting fixed by AI!', NOTICE_TIMEOUTS.medium);
+			new Notice('Layout and formatting fixed by AI', NOTICE_TIMEOUTS.medium);
 			
 		} catch (error) {
 			
 			// Provide specific error messages
 			if (error.message.includes('401')) {
-				new Notice('❌ Invalid OpenAI API Key', 8000);
-				new Notice('💡 Please check your API key in plugin settings', NOTICE_TIMEOUTS.medium);
+				new Notice('Invalid OpenAI API key', 8000);
+				new Notice('Please check your API key in plugin settings', NOTICE_TIMEOUTS.medium);
 			} else if (error.message.includes('quota')) {
-				new Notice('❌ OpenAI API quota exceeded', 8000);
-				new Notice('💡 Please check your OpenAI billing settings', NOTICE_TIMEOUTS.medium);
+				new Notice('OpenAI API quota exceeded', 8000);
+				new Notice('Please check your OpenAI billing settings', NOTICE_TIMEOUTS.medium);
 			} else if (error.message.includes('network')) {
-				new Notice('❌ Network error - please check your connection', NOTICE_TIMEOUTS.medium);
+				new Notice('Network error - please check your connection', NOTICE_TIMEOUTS.medium);
 			} else {
-				new Notice(`❌ AI formatting failed: ${error.message}`, 8000);
+				new Notice(`AI formatting failed: ${error.message}`, 8000);
 			}
 		}
 	}

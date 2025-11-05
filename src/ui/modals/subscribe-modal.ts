@@ -78,7 +78,7 @@ export class NaverBlogSubscribeModal extends Modal {
 		this.close();
 		
 		// Immediately sync the new subscription
-		this.plugin.blogService.syncSubscribedBlogs();
+		void this.plugin.blogService.syncSubscribedBlogs();
 	}
 
 	onClose() {

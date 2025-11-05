@@ -44,7 +44,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					
 					// Refresh models for the new provider
 					if (value !== 'ollama') {
-						this.plugin.refreshModels(value as 'openai' | 'anthropic' | 'google').catch((error: Error) => {
+						void this.plugin.refreshModels(value as 'openai' | 'anthropic' | 'google').catch(() => {
 							// Silently ignore model refresh errors
 						});
 					}
@@ -76,7 +76,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 		// Show appropriate API key field based on provider
 		switch (this.plugin.settings.aiProvider) {
-			case 'openai':
+			case 'openai': {
 				new Setting(containerEl)
 					.setName(this.plugin.i18n.t('settings.openai_api_key'))
 					.setDesc(this.plugin.i18n.t('settings.openai_api_key_desc'))
@@ -88,8 +88,9 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						}));
 				break;
-				
-			case 'anthropic':
+			}
+
+			case 'anthropic': {
 				new Setting(containerEl)
 					.setName(this.plugin.i18n.t('settings.anthropic_api_key'))
 					.setDesc(this.plugin.i18n.t('settings.anthropic_api_key_desc'))
@@ -101,8 +102,9 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						}));
 				break;
-				
-			case 'google':
+			}
+
+			case 'google': {
 				new Setting(containerEl)
 					.setName(this.plugin.i18n.t('settings.google_api_key'))
 					.setDesc(this.plugin.i18n.t('settings.google_api_key_desc'))
@@ -114,8 +116,9 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						}));
 				break;
-				
-			case 'ollama':
+			}
+
+			case 'ollama': {
 				new Setting(containerEl)
 					.setName(this.plugin.i18n.t('settings.ollama_endpoint'))
 					.setDesc(this.plugin.i18n.t('settings.ollama_endpoint_desc'))
@@ -127,6 +130,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						}));
 				break;
+			}
 		}
 
 		new Setting(containerEl)
@@ -145,11 +149,11 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				this.setupFolderDropdown(input.inputEl, (folder) => {
 					const normalizedFolder = normalizePath(folder);
 					this.plugin.settings.defaultFolder = normalizedFolder;
-					this.plugin.saveSettings();
+					void this.plugin.saveSettings();
 					input.setValue(normalizedFolder);
 				}, () => {
 					this.plugin.settings.defaultFolder = '';
-					this.plugin.saveSettings();
+					void this.plugin.saveSettings();
 					input.setValue('');
 				});
 				
@@ -235,11 +239,11 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					this.setupFolderDropdown(input.inputEl, (folder) => {
 						const normalizedFolder = normalizePath(folder);
 						this.plugin.settings.imageFolder = normalizedFolder;
-						this.plugin.saveSettings();
+						void this.plugin.saveSettings();
 						input.setValue(normalizedFolder);
 					}, () => {
 						this.plugin.settings.imageFolder = '';
-						this.plugin.saveSettings();
+						void this.plugin.saveSettings();
 						input.setValue('');
 					});
 					
