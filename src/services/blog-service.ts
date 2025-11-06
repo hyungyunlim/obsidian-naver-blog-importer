@@ -29,7 +29,7 @@ export class BlogService {
 			// Filter out duplicates if enabled
 			let filteredPosts = posts;
 			if (this.settings.enableDuplicateCheck) {
-				const existingLogNos = await this.getExistingLogNos();
+				const existingLogNos = this.getExistingLogNos();
 				filteredPosts = posts.filter(post => !existingLogNos.has(post.logNo));
 				new Notice(`Found ${posts.length} posts, ${filteredPosts.length} new posts after duplicate check`, 4000);
 			} else {
@@ -97,9 +97,9 @@ export class BlogService {
 					new Notice(`Syncing blog ${blogProgress}: ${blogId} (${postCount} posts)`, 5000);
 					const posts = await this.fetchNaverBlogPosts(blogId, postCount);
 					
-					let blogSuccessCount = 0;
-					let blogErrorLogCount = 0;
-					let blogErrorCount = 0;
+					
+					
+					
 					
 					for (let j = 0; j < posts.length; j++) {
 						const post = posts[j];

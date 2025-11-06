@@ -483,10 +483,10 @@ export class NaverBlogFetcher {
             // Debug: list all meta tags
             $('meta').each((_, meta) => {
                 const $meta = $(meta);
-                const name = $meta.attr('name');
-                const property = $meta.attr('property');
-                const content = $meta.attr('content');
-                // Skip: meta tag processing not needed
+                
+                
+                
+                
             });
 
             const metaSelectors = [

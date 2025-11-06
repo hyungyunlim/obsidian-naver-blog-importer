@@ -49,7 +49,7 @@ export default class NaverBlogPlugin extends Plugin {
 		this.i18n = new I18n(this.app);
 		// Detect locale from Obsidian's language setting
 		const locale = LocaleUtils.detectLocale();
-		await this.i18n.loadTranslations(locale);
+		this.i18n.loadTranslations(locale);
 
 		// Initialize AI service
 		this.aiService = new AIService(this.settings);
