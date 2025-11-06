@@ -95,7 +95,6 @@ export class ImageService {
 						
 						// Save image
 						const imagePath = normalizePath(`${attachmentsFolder}/${filename}`);
-						try {
 							await this.app.vault.createBinary(imagePath, response.arrayBuffer);
 							
 							// Verify file was saved
@@ -105,9 +104,6 @@ export class ImageService {
 							if (!fileExists) {
 								throw new Error('File was not saved properly');
 							}
-						} catch (saveError) {
-							throw saveError;
-						}
 						
 						// Update content with local path (relative to default folder)
 						const relativePath = this.calculateRelativePath();
