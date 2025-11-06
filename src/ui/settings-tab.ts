@@ -353,13 +353,14 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 						try {
 							await this.plugin.createMarkdownFile(post);
 							successCount++;
-						} catch (error) {
-						}
+						} catch {
+									// Skip failed post
+							}
 					}
 					
-					new Notice(`✓ Synced ${successCount} posts from ${blogId}`);
+					new Notice(`Synced ${successCount} posts from ${blogId}`);
 				} catch (error) {
-					new Notice(`✗ Failed to sync ${blogId}: ${error.message}`);
+					new Notice(`Failed to sync ${blogId}: ${error.message}`);
 				}
 			};
 			

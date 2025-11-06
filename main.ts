@@ -398,7 +398,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 	async rewriteCurrentNote(file: TFile): Promise<void> {
 		try {
-			new Notice('🤖 AI layout fixing in progress...', NOTICE_TIMEOUTS.medium);
+			new Notice('AI layout fixing in progress...', NOTICE_TIMEOUTS.medium);
 			
 			// Read the current file content
 			const content = await this.app.vault.read(file);

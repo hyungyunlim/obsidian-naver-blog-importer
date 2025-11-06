@@ -1,0 +1,4 @@
+
+> obsidian-naver-blog-importer@1.2.5 build
+> tsc -noEmit -skipLibCheck && node esbuild.config.mjs production
+

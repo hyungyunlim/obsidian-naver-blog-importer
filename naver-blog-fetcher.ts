@@ -369,7 +369,12 @@ export class NaverBlogFetcher {
                 });
             }
             
-        } catch (error) {
+        } catch {
+
+            
+            // Continue with next URL format
+
+            
         }
         
         return posts;
@@ -1531,7 +1536,10 @@ export class NaverBlogFetcher {
                     if (data.src) {
                         return data.src;
                     }
-                } catch (e) {
+                } catch {
+
+                                    // Continue parsing
+
                 }
             }
         }
@@ -1549,7 +1557,10 @@ export class NaverBlogFetcher {
                     if (data.data && data.data.imageInfo && data.data.imageInfo.src) {
                         return data.data.imageInfo.src;
                     }
-                } catch (e) {
+                } catch {
+
+                                    // Continue parsing
+
                 }
             }
         }

@@ -78,8 +78,9 @@ export class ImageService {
 						// Decode URL-encoded Korean characters
 						try {
 							filename = decodeURIComponent(filename);
-						} catch (e) {
-						}
+						} catch {
+						// Keep original filename if decoding fails
+					}
 						
 						// If filename is too long or problematic, use a simpler name
 						if (filename.length > MAX_FILENAME_LENGTH || !filename.includes('.')) {
@@ -157,7 +158,8 @@ export class ImageService {
 								processedContent = processedContent.replace(fullMatch, newImageMd);
 								imageCount++;
 							}
-						} catch (altError) {
+						} catch {
+							// Alternative download method failed, skip this image
 						}
 					}
 				}

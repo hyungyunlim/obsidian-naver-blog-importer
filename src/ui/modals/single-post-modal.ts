@@ -109,9 +109,9 @@ export class NaverBlogSinglePostModal extends Modal {
 					excerpt: post.content.substring(0, 150) + '...'
 				});
 				
-				new Notice(`✓ Successfully imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
+				new Notice(`Successfully imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
 			} catch (error) {
-				new Notice(`✗ Failed to import post: ${error.message}`, NOTICE_TIMEOUTS.medium);
+				new Notice(`Failed to import post: ${error.message}`, NOTICE_TIMEOUTS.medium);
 			}
 		});
 

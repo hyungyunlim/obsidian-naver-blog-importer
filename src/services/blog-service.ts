@@ -70,7 +70,8 @@ export class BlogService {
 					existingLogNos.add(cache.frontmatter.logNo);
 				}
 			}
-		} catch (error) {
+		} catch {
+			// Continue processing remaining subscriptions
 		}
 		return existingLogNos;
 	}

@@ -37,7 +37,8 @@ export class OpenAIClient {
 				
 				return models;
 			}
-		} catch (error) {
+		} catch {
+			// Return empty array if model fetch fails
 		}
 		
 		return [];
