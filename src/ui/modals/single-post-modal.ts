@@ -19,7 +19,7 @@ export class NaverBlogSinglePostModal extends Modal {
 
 		const inputContainer = contentEl.createDiv({ cls: 'naver-blog-input-container' });
 
-		
+
 		const input = inputContainer.createEl('input', {
 			type: 'text',
 			placeholder: this.plugin.i18n.t('modals.import_single_post.log_no_placeholder'),
@@ -27,7 +27,7 @@ export class NaverBlogSinglePostModal extends Modal {
 		});
 
 		const exampleDiv = inputContainer.createDiv({ cls: 'naver-blog-example' });
-		
+
 		exampleDiv.createEl('br');
 		exampleDiv.appendText('• Desktop URL: https://blog.naver.com/yonofbooks/220883239733');
 		exampleDiv.createEl('br');
@@ -47,67 +47,69 @@ export class NaverBlogSinglePostModal extends Modal {
 			cls: 'mod-cta'
 		});
 
-		importButton.addEventListener('click', async () => {
-			const inputValue = input.value.trim();
-			if (!inputValue) {
-				new Notice('Please enter a post URL or log number');
-				return;
-			}
-
-			// Parse input to extract blogId and logNo
-			let blogId = '';
-			let logNo = '';
-
-			if (inputValue.includes('blog.naver.com') || inputValue.includes('m.blog.naver.com')) {
-				// Handle both desktop and mobile URLs
-				let urlMatch;
-				
-				if (inputValue.includes('m.blog.naver.com')) {
-					// Mobile URL format: https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265
-					urlMatch = inputValue.match(/[?&]blogId=([^&]+).*[?&]logNo=(\d+)/);
-				} else {
-					// Desktop URL format: https://blog.naver.com/blogid/logno
-					urlMatch = inputValue.match(/blog\.naver\.com\/([^/]+)\/(\d+)/);
-				}
-				
-				if (urlMatch) {
-					blogId = urlMatch[1];
-					logNo = urlMatch[2];
-				} else {
-					new Notice('Invalid Naver blog URL format');
+		importButton.addEventListener('click', () => {
+			void (async () => {
+				const inputValue = input.value.trim();
+				if (!inputValue) {
+					new Notice('Please enter a post URL or log number');
 					return;
 				}
-			} else if (/^\d{8,15}$/.test(inputValue)) {
-				// LogNo only - need to ask for blog ID or use default
-				blogId = 'yonofbooks'; // Default for testing, could be made configurable
-				logNo = inputValue;
-				new Notice(`Using default blog ID: ${blogId}`, 3000);
-			} else {
-				new Notice('Please enter a valid URL or log number (8-15 digits)');
-				return;
-			}
 
-			// Start import process
-			this.close();
-			
-			try {
-				new Notice(`Importing post ${logNo} from ${blogId}...`, 3000);
-				
-				const fetcher = new NaverBlogFetcher(blogId);
-				const post = await fetcher.fetchSinglePost(logNo);
-				
-				
-				// Create the file
-				await this.plugin.createMarkdownFile({
-					...post,
-					tags: ['imported'],
-					excerpt: post.content.substring(0, 150) + '...'
-				});
-				
-				new Notice(`Successfully imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
-			} catch (error) {
-				new Notice(`Failed to import post: ${error.message}`, NOTICE_TIMEOUTS.medium);
-			}
+				// Parse input to extract blogId and logNo
+				let blogId = '';
+				let logNo = '';
+
+				if (inputValue.includes('blog.naver.com') || inputValue.includes('m.blog.naver.com')) {
+					// Handle both desktop and mobile URLs
+					let urlMatch;
+
+					if (inputValue.includes('m.blog.naver.com')) {
+						// Mobile URL format: https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265
+						urlMatch = inputValue.match(/[?&]blogId=([^&]+).*[?&]logNo=(\d+)/);
+					} else {
+						// Desktop URL format: https://blog.naver.com/blogid/logno
+						urlMatch = inputValue.match(/blog\.naver\.com\/([^/]+)\/(\d+)/);
+					}
+
+					if (urlMatch) {
+						blogId = urlMatch[1];
+						logNo = urlMatch[2];
+					} else {
+						new Notice('Invalid Naver blog URL format');
+						return;
+					}
+				} else if (/^\d{8,15}$/.test(inputValue)) {
+					// LogNo only - need to ask for blog ID or use default
+					blogId = 'yonofbooks'; // Default for testing, could be made configurable
+					logNo = inputValue;
+					new Notice(`Using default blog ID: ${blogId}`, 3000);
+				} else {
+					new Notice('Please enter a valid URL or log number (8-15 digits)');
+					return;
+				}
+
+				// Start import process
+				this.close();
+
+				try {
+					new Notice(`Importing post ${logNo} from ${blogId}...`, 3000);
+
+					const fetcher = new NaverBlogFetcher(blogId);
+					const post = await fetcher.fetchSinglePost(logNo);
+
+
+					// Create the file
+					await this.plugin.createMarkdownFile({
+						...post,
+						tags: ['imported'],
+						excerpt: post.content.substring(0, 150) + '...'
+					});
+
+					new Notice(`Successfully imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
+				} catch (error) {
+					new Notice(`Failed to import post: ${error.message}`, NOTICE_TIMEOUTS.medium);
+				}
+			})();
 		});
 
 		// Enter key to import
