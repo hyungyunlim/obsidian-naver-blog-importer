@@ -111,9 +111,9 @@ export class BlogService {
 							await this.createMarkdownFile(post);
 							
 							if (isErrorPost) {
-								
+								// Error post - already handled
 							} else {
-								
+								// Regular post - already processed
 							}
 							totalNewPosts++;
 						} catch (error) {

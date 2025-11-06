@@ -1565,7 +1565,7 @@ export class NaverBlogFetcher {
         const parentComponent = $el.closest('.se-component');
         if (parentComponent.length > 0) {
             // Look for data attributes in parent component
-            const dataAttrs = (parentComponent[0] as any)?.attribs;
+            const dataAttrs = (parentComponent[0] as unknown as { attribs?: Record<string, unknown> })?.attribs;
             if (dataAttrs) {
                 for (let i = 0; i < dataAttrs.length; i++) {
                     const attr = dataAttrs[i] as { name: string; value: string };
