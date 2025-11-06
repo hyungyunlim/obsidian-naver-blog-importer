@@ -26,7 +26,7 @@ export class NaverBlogImportModal extends Modal {
 				inputElement = text.inputEl;
 				text.setPlaceholder(this.plugin.i18n.t('modals.import_blog_url.url_label'))
 					.setValue(this.blogId)
-					.onChange(async (value) => {
+					.onChange((value) => {
 						this.blogId = value;
 					});
 				
@@ -34,7 +34,7 @@ export class NaverBlogImportModal extends Modal {
 				text.inputEl.addEventListener('keydown', (event) => {
 					if (event.key === 'Enter') {
 						event.preventDefault();
-						this.handleImport();
+						void this.handleImport();
 					}
 				});
 			});
@@ -43,8 +43,8 @@ export class NaverBlogImportModal extends Modal {
 			.addButton(btn => btn
 				.setButtonText(this.plugin.i18n.t('modals.import_blog_url.import_button'))
 				.setCta()
-				.onClick(async () => {
-					this.handleImport();
+				.onClick(() => {
+					void this.handleImport();
 				}));
 
 		// Focus on input when modal opens
@@ -55,7 +55,7 @@ export class NaverBlogImportModal extends Modal {
 		}, UI_DEFAULTS.modalTimeout);
 	}
 
-	async handleImport() {
+	handleImport() {
 		if (!this.blogId.trim()) {
 			new Notice("Please enter a blog ID");
 			return;
@@ -65,7 +65,7 @@ export class NaverBlogImportModal extends Modal {
 		this.close();
 		
 		// Start import in background
-		this.importPosts();
+		void this.importPosts();
 	}
 
 	async importPosts() {

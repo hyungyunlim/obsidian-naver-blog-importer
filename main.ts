@@ -67,7 +67,7 @@ export default class NaverBlogPlugin extends Plugin {
 		});
 
 		// Add ribbon icon
-		this.addRibbonIcon('download', 'Import Naver Blog', (evt: MouseEvent) => {
+		this.addRibbonIcon('download', 'Import naver blog', (evt: MouseEvent) => {
 			new NaverBlogImportModal(this.app, this).open();
 		});
 
@@ -120,14 +120,14 @@ export default class NaverBlogPlugin extends Plugin {
 						return;
 					}
 					
-					this.rewriteCurrentNote(activeFile);
+					void this.rewriteCurrentNote(activeFile);
 				}
 			}
 		});
 
 		// Auto-sync subscribed blogs on startup
 		if (this.settings.subscribedBlogs.length > 0) {
-			setTimeout(() => this.blogService.syncSubscribedBlogs(), UI_DELAYS.autoSync);
+			setTimeout(() => void this.blogService.syncSubscribedBlogs(), UI_DELAYS.autoSync);
 		}
 
 		// Add settings tab

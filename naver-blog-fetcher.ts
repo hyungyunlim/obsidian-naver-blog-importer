@@ -486,8 +486,7 @@ export class NaverBlogFetcher {
                 const name = $meta.attr('name');
                 const property = $meta.attr('property');
                 const content = $meta.attr('content');
-                if ((name || property) && content) {
-                }
+                // Skip: meta tag processing not needed
             });
 
             const metaSelectors = [
@@ -515,7 +514,6 @@ export class NaverBlogFetcher {
                         date = this.parseDate(metaContent);
                         if (date) {
                             break;
-                        } else {
                         }
                     }
                 }
@@ -826,7 +824,6 @@ export class NaverBlogFetcher {
                                 if (caption) {
                                     content += `*${caption}*\n`;
                                 }
-                            } else {
                             }
                         } else {
                             // Fallback to placeholder
@@ -1346,7 +1343,6 @@ export class NaverBlogFetcher {
                         if (this.isContentImage($img, imgSrc)) {
                             const alt = $img.attr('alt') || $img.attr('title') || 'Additional Image';
                             additionalImages.push(`![${alt}](${imgSrc})`);
-                        } else {
                         }
                     }
                 }
@@ -1363,7 +1359,6 @@ export class NaverBlogFetcher {
                             // Filter out background images using same logic as content images
                             if (this.shouldIncludeImage(imgSrc, 'Background Image')) {
                                 additionalImages.push(`![Background Image](${imgSrc})`);
-                            } else {
                             }
                         }
                     }
@@ -1625,6 +1620,7 @@ export class NaverBlogFetcher {
         
         // Log the transformation for debugging
         if (enhancedUrl !== imgSrc) {
+            // Empty block
         }
         
         

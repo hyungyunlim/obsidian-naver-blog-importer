@@ -26,14 +26,14 @@ export class NaverBlogSubscribeModal extends Modal {
 				inputElement = text.inputEl;
 				text.setPlaceholder(this.plugin.i18n.t('modals.subscribe_blog.blog_id_placeholder'))
 					.setValue(this.blogId)
-					.onChange(async (value) => {
+					.onChange((value) => {
 						this.blogId = value;
 					});
 				
 				text.inputEl.addEventListener('keydown', (event) => {
 					if (event.key === 'Enter') {
 						event.preventDefault();
-						this.handleSubscribe();
+						void this.handleSubscribe();
 					}
 				});
 			});
@@ -42,8 +42,8 @@ export class NaverBlogSubscribeModal extends Modal {
 			.addButton(btn => btn
 				.setButtonText(this.plugin.i18n.t('modals.subscribe_blog.subscribe_button'))
 				.setCta()
-				.onClick(async () => {
-					this.handleSubscribe();
+				.onClick(() => {
+					void this.handleSubscribe();
 				}));
 
 		setTimeout(() => {

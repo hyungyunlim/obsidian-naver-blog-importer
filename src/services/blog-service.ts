@@ -60,7 +60,7 @@ export class BlogService {
 		}
 	}
 
-	async getExistingLogNos(): Promise<Set<string>> {
+	getExistingLogNos(): Set<string> {
 		const existingLogNos = new Set<string>();
 		try {
 			const files = this.app.vault.getMarkdownFiles();
@@ -134,9 +134,9 @@ export class BlogService {
 		} finally {
 			syncNotice.hide();
 			if (totalNewPosts > 0 || totalErrors > 0) {
-				new Notice(`✅ Sync completed: ${totalNewPosts} posts imported, ${totalErrors} errors`, 5000);
+				new Notice(`Sync completed: ${totalNewPosts} posts imported, ${totalErrors} errors`, 5000);
 			} else {
-				new Notice('✅ Sync completed: No new posts found', 5000);
+				new Notice('Sync completed: No new posts found', 5000);
 			}
 		}
 	}

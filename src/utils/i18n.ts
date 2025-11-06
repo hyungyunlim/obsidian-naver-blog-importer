@@ -10,7 +10,7 @@ export class I18n {
 		this.translations = this.getDefaultTranslations();
 	}
 	
-	async loadTranslations(locale: string) {
+	loadTranslations(locale: string) {
 		// Load built-in translations directly
 		if (locale === 'ko' || locale.startsWith('ko')) {
 			this.translations = this.getKoreanTranslations();
