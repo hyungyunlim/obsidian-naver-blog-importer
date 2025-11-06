@@ -83,7 +83,7 @@ export class NaverBlogFetcher {
                             });
                             break; // Found one working post, that's enough for testing
                         }
-                    } catch (e) {
+                    } catch {
                         continue;
                     }
                 }
@@ -921,7 +921,7 @@ export class NaverBlogFetcher {
                                     const link = data.link || '#';
                                     const type = data.type || 'Unknown';
                                     materialParts.push(`[${title}](${link}) (${type})`);
-                                } catch (e) {
+                                } catch {
                                     materialParts.push('[자료]');
                                 }
                             } else {
@@ -1589,7 +1589,7 @@ export class NaverBlogFetcher {
                                 
                                 return originalUrl;
                             }
-                        } catch (e) {
+                        } catch {
                             // Continue to next attribute
                         }
                     }

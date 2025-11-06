@@ -1,19 +1,12 @@
-import { 
-	App, 
-	Plugin, 
-	PluginSettingTab, 
-	Setting, 
-	Modal, 
-	Notice, 
+import {
+	App,
+	Plugin,
+	Notice,
 	TFile,
-	TFolder,
-	requestUrl,
-	RequestUrlParam,
 	normalizePath,
 	getFrontMatterInfo
 } from 'obsidian';
 
-import { NaverBlogFetcher } from './naver-blog-fetcher';
 import { I18n } from './src/utils/i18n';
 import { AIService } from './src/services/ai-service';
 import { BlogService } from './src/services/blog-service';
@@ -21,26 +14,21 @@ import { ImageService } from './src/services/image-service';
 import { NaverBlogImportModal } from './src/ui/modals/import-modal';
 import { NaverBlogSubscribeModal } from './src/ui/modals/subscribe-modal';
 import { NaverBlogSinglePostModal } from './src/ui/modals/single-post-modal';
-import { FolderSuggestModal } from './src/ui/modals/folder-suggest-modal';
 import { NaverBlogSettingTab } from './src/ui/settings-tab';
 import { LocaleUtils } from './src/utils/locale-utils';
 import { ContentUtils } from './src/utils/content-utils';
 import { SettingsUtils } from './src/utils/settings-utils';
 import { APIClientFactory } from './src/api';
-import { 
-	Translations, 
-	BlogSubscription, 
-	NaverBlogSettings, 
+import {
+	NaverBlogSettings,
 	DEFAULT_SETTINGS,
-	ProcessedBlogPost,
-	NaverBlogPost
+	ProcessedBlogPost
 } from './src/types';
 import {
 	NOTICE_TIMEOUTS,
 	UI_DELAYS,
 	API_DELAYS,
-	AI_TOKEN_LIMITS,
-	AI_PROMPTS
+	AI_TOKEN_LIMITS
 } from './src/constants';
 
 export default class NaverBlogPlugin extends Plugin {
@@ -202,7 +190,7 @@ export default class NaverBlogPlugin extends Plugin {
 	async fetchModelsFromAPI(provider: 'openai' | 'anthropic' | 'google'): Promise<string[]> {
 		try {
 			return await APIClientFactory.fetchModels(this.settings, provider);
-		} catch (error) {
+		} catch {
 			return [];
 		}
 	}
@@ -284,7 +272,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 				
 				const tags = JSON.parse(cleanedText.trim());
 				return Array.isArray(tags) ? tags : [];
-			} catch (parseError) {
+			} catch {
 				// console.warn('Failed to parse tags as JSON:', content_text);
 				// Fallback parsing - extract array from text
 				const matches = content_text.match(/\[(.*?)\]/s);
@@ -294,14 +282,14 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 						const arrayContent = '[' + matches[1] + ']';
 						const tags = JSON.parse(arrayContent);
 						return Array.isArray(tags) ? tags : [];
-					} catch (e) {
+					} catch {
 						// Manual parsing if JSON fails
 						return matches[1].split(',').map((tag: string) => tag.trim().replace(/["\n]/g, ''));
 					}
 				}
 				return [];
 			}
-		} catch (error) {
+		} catch {
 			return [];
 		} finally {
 			notice.hide();
@@ -332,7 +320,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			// Use higher maxTokens for Pro models due to thinking mode
 			const maxTokens = this.settings.aiModel.includes('pro') ? AI_TOKEN_LIMITS.pro : AI_TOKEN_LIMITS.default;
 			return await this.aiService.callAI(messages, maxTokens);
-		} catch (error) {
+		} catch {
 			return '';
 		} finally {
 			notice.hide();

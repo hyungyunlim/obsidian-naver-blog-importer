@@ -31,7 +31,6 @@ export class ImageService {
 			// Find all image markdown patterns - filter out unwanted images
 			const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
 			let processedContent = content;
-			let match;
 			let imageCount = 0;
 			const allMatches = [...content.matchAll(new RegExp(imageRegex.source, 'g'))];
 			
@@ -116,7 +115,6 @@ export class ImageService {
 						const newImageMd = `![${altText}](${localImagePath})`;
 						
 						// Clean the original image URL from query parameters before replacing
-						const cleanOriginalUrl = imageUrl.split('?')[0];
 						processedContent = processedContent.replace(fullMatch, newImageMd);
 						
 						// Updated markdown with local image path

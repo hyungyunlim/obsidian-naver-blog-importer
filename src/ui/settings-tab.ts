@@ -1,10 +1,9 @@
-import { App, PluginSettingTab, Setting, Notice, TFolder, normalizePath } from 'obsidian';
-import { FolderSuggestModal } from './modals/folder-suggest-modal';
+import { App, PluginSettingTab, Setting, Notice, normalizePath } from 'obsidian';
+
 import { 
 	DEFAULT_BLOG_POST_COUNT, 
 	MAX_POST_IMPORT_LIMIT, 
 	MAX_SUBSCRIPTION_POST_COUNT,
-	UI_DEFAULTS,
 	PLACEHOLDERS 
 } from '../constants';
 import { AIProviderUtils } from '../utils/ai-provider-utils';
@@ -52,7 +51,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					this.display(); // Refresh settings to show appropriate API key field and model
 				}));
 
-		const modelSetting = new Setting(containerEl)
+		const _ = new Setting(containerEl)
 			.setName(this.plugin.i18n.t('settings.ai_model'))
 			.setDesc(this.plugin.i18n.t('settings.ai_model_desc'))
 			.addDropdown(dropdown => {
@@ -305,7 +304,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			// Post count setting
 			const countDiv = blogDiv.createDiv({ cls: 'naver-blog-count-container' });
 			
-			const countLabel = countDiv.createEl('span', { 
+			const _ = countDiv.createEl('span', { 
 				text: this.plugin.i18n.t('settings.posts_label') + ':',
 				cls: 'naver-blog-count-label'
 			});

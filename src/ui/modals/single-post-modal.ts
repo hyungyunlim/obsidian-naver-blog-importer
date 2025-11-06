@@ -1,6 +1,6 @@
 import { App, Modal, Notice } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
-import { PLACEHOLDERS, UI_DEFAULTS, NOTICE_TIMEOUTS } from '../../constants';
+import { UI_DEFAULTS, NOTICE_TIMEOUTS } from '../../constants';
 import type NaverBlogPlugin from '../../../main';
 
 export class NaverBlogSinglePostModal extends Modal {
@@ -19,11 +19,7 @@ export class NaverBlogSinglePostModal extends Modal {
 
 		const inputContainer = contentEl.createDiv({ cls: 'naver-blog-input-container' });
 
-		const inputLabel = inputContainer.createEl('label', {
-			text: this.plugin.i18n.t('modals.import_single_post.log_no_label') + ':',
-			cls: 'setting-item-name naver-blog-input-label'
-		});
-
+		
 		const input = inputContainer.createEl('input', {
 			type: 'text',
 			placeholder: this.plugin.i18n.t('modals.import_single_post.log_no_placeholder'),
@@ -32,7 +28,6 @@ export class NaverBlogSinglePostModal extends Modal {
 
 		const exampleDiv = inputContainer.createDiv({ cls: 'naver-blog-example' });
 		
-		const exampleTitle = exampleDiv.createEl('strong', { text: 'Examples:' });
 		exampleDiv.createEl('br');
 		exampleDiv.appendText('• Desktop URL: https://blog.naver.com/yonofbooks/220883239733');
 		exampleDiv.createEl('br');

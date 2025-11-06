@@ -111,13 +111,13 @@ export class BlogService {
 							await this.createMarkdownFile(post);
 							
 							if (isErrorPost) {
-								blogErrorLogCount++;
+								// blogErrorLogCount++;
 							} else {
-								blogSuccessCount++;
+								// blogSuccessCount++;
 							}
 							totalNewPosts++;
 						} catch (error) {
-							blogErrorCount++;
+							// blogErrorCount++;
 							totalErrors++;
 						}
 						await new Promise(resolve => setTimeout(resolve, 500));

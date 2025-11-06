@@ -136,7 +136,6 @@ export class GoogleClient {
 					const delay = calculateBackoffDelay(attempt); // 2s, 4s, 8s
 					// console.warn(`Google API 503 error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
 					// Show retry notice
-					const retryNotice = new Notice(`API 서버 과부하, ${delay/1000}초 후 재시도... (${attempt}/${RETRY_DELAYS.maxRetries})`, delay);
 					await new Promise(resolve => setTimeout(resolve, delay));
 					continue;
 				} else {
