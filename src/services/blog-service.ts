@@ -1,6 +1,6 @@
 import { App, Notice } from 'obsidian';
 import { NaverBlogFetcher } from '../../naver-blog-fetcher';
-import { NaverBlogSettings, ProcessedBlogPost, BlogSubscription } from '../types';
+import { NaverBlogSettings, ProcessedBlogPost } from '../types';
 
 export class BlogService {
 	constructor(
@@ -111,13 +111,13 @@ export class BlogService {
 							await this.createMarkdownFile(post);
 							
 							if (isErrorPost) {
-								// blogErrorLogCount++;
+								
 							} else {
-								// blogSuccessCount++;
+								
 							}
 							totalNewPosts++;
 						} catch (error) {
-							// blogErrorCount++;
+							
 							totalErrors++;
 						}
 						await new Promise(resolve => setTimeout(resolve, 500));

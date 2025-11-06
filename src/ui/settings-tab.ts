@@ -43,7 +43,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					
 					// Refresh models for the new provider
 					if (value !== 'ollama') {
-						void this.plugin.refreshModels(value as 'openai' | 'anthropic' | 'google').catch(() => {
+						void this.plugin.refreshModels(value).catch(() => {
 							// Silently ignore model refresh errors
 						});
 					}
@@ -51,7 +51,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					this.display(); // Refresh settings to show appropriate API key field and model
 				}));
 
-		const _ = new Setting(containerEl)
+		new Setting(containerEl)
 			.setName(this.plugin.i18n.t('settings.ai_model'))
 			.setDesc(this.plugin.i18n.t('settings.ai_model_desc'))
 			.addDropdown(dropdown => {

@@ -1,5 +1,4 @@
 import {
-	App,
 	Plugin,
 	Notice,
 	TFile,

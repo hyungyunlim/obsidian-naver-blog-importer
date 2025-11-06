@@ -67,7 +67,7 @@ export class NaverBlogSinglePostModal extends Modal {
 					urlMatch = inputValue.match(/[?&]blogId=([^&]+).*[?&]logNo=(\d+)/);
 				} else {
 					// Desktop URL format: https://blog.naver.com/blogid/logno
-					urlMatch = inputValue.match(/blog\.naver\.com\/([^\/]+)\/(\d+)/);
+					urlMatch = inputValue.match(/blog\.naver\.com\/([^/]+)\/(\d+)/);
 				}
 				
 				if (urlMatch) {

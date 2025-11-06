@@ -153,7 +153,7 @@ export class AIProviderUtils {
 			case 'ollama':
 				return ollamaEndpoint || 'http://localhost:11434';
 			default:
-				throw new Error(`Unsupported AI provider: ${provider}`);
+				throw new Error(`Unsupported AI provider: ${provider}` as never);
 		}
 	}
 }

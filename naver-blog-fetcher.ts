@@ -801,7 +801,7 @@ export class NaverBlogFetcher {
                             const dataAttrs = imgElement[0]?.attributes;
                             if (dataAttrs) {
                                 for (let i = 0; i < dataAttrs.length; i++) {
-                                    const attr = dataAttrs[i];
+                                    const attr = dataAttrs[i] as { name: string; value: string };
                                     if (attr.name.includes('src') || attr.name.includes('url')) {
                                         if (attr.value && (attr.value.startsWith('http') || attr.value.startsWith('//'))) {
                                             imgSrc = attr.value;
@@ -856,7 +856,7 @@ export class NaverBlogFetcher {
                                 const dataAttrs = nestedEl.attributes;
                                 if (dataAttrs) {
                                     for (let i = 0; i < dataAttrs.length; i++) {
-                                        const attr = dataAttrs[i];
+                                        const attr = dataAttrs[i] as { name: string; value: string };
                                         if ((attr.name.includes('src') || attr.name.includes('url')) && 
                                             attr.value && (attr.value.startsWith('http') || attr.value.startsWith('//'))) {
                                             bgImageSrc = attr.value;
@@ -1031,7 +1031,7 @@ export class NaverBlogFetcher {
                         }
                     }
                     break;
-                case 'se-image':
+                case 'se-image': {
                     // Image - with comprehensive image source detection
                     const imageUrl = data.src || data.url || data.imageUrl || data.imageInfo?.url;
                     if (imageUrl) {
@@ -1054,6 +1054,7 @@ export class NaverBlogFetcher {
                         }
                     }
                     break;
+                }
                 case 'se-code':
                     if (data.code) {
                         let cleanCode = data.code;
@@ -1376,7 +1377,7 @@ export class NaverBlogFetcher {
         }
     }
 
-    private createErrorContent(post: Omit<NaverBlogPost, 'content'>, error: Error | unknown): string {
+    private createErrorContent(post: Omit<NaverBlogPost, 'content'>, error: unknown): string {
         const timestamp = new Date().toISOString();
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         
@@ -1567,7 +1568,7 @@ export class NaverBlogFetcher {
             const dataAttrs = (parentComponent[0] as any)?.attribs;
             if (dataAttrs) {
                 for (let i = 0; i < dataAttrs.length; i++) {
-                    const attr = dataAttrs[i];
+                    const attr = dataAttrs[i] as { name: string; value: string };
                     if (attr.name.includes('data-') && attr.value.includes('https://postfiles.pstatic.net')) {
                         try {
                             // Try to extract URL from JSON-like data attributes

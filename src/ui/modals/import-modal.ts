@@ -146,7 +146,7 @@ export class NaverBlogImportModal extends Modal {
 			}
 			
 			new Notice(summary, 8000);
-		} catch (error) {
+		} catch {
 			cancelNotice.hide();
 			new Notice("Import failed. Please check the console for details.");
 		}

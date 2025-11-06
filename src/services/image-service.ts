@@ -124,7 +124,7 @@ export class ImageService {
 					} else {
 						// Failed to download image - trying alternative method
 					}
-				} catch (imageError) {
+				} catch {
 					const imageProgress = `(${imageCount + 1}/${totalImages})`;
 					let directUrl = this.convertToDirectImageUrl(imageUrl);
 					

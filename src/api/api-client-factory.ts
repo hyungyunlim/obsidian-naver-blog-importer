@@ -24,7 +24,7 @@ export class APIClientFactory {
 			case 'ollama':
 				return new OllamaClient(settings.ollamaEndpoint);
 			default:
-				throw new Error(`Unsupported AI provider: ${provider}`);
+				throw new Error(`Unsupported AI provider: ${provider}` as never);
 		}
 	}
 
