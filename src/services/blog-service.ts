@@ -136,7 +136,7 @@ export class BlogService {
 			if (totalNewPosts > 0 || totalErrors > 0) {
 				new Notice(`Sync completed: ${totalNewPosts} posts imported, ${totalErrors} errors`, 5000);
 			} else {
-				new Notice('Sync completed: No new posts found', 5000);
+				new Notice('Sync completed: no new posts found', 5000);
 			}
 		}
 	}

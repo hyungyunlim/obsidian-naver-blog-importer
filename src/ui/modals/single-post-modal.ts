@@ -50,7 +50,7 @@ export class NaverBlogSinglePostModal extends Modal {
 		importButton.addEventListener('click', async () => {
 			const inputValue = input.value.trim();
 			if (!inputValue) {
-				new Notice('Please enter a post URL or LogNo');
+				new Notice('Please enter a post URL or log number');
 				return;
 			}
 
@@ -83,7 +83,7 @@ export class NaverBlogSinglePostModal extends Modal {
 				logNo = inputValue;
 				new Notice(`Using default blog ID: ${blogId}`, 3000);
 			} else {
-				new Notice('Please enter a valid URL or LogNo (8-15 digits)');
+				new Notice('Please enter a valid URL or log number (8-15 digits)');
 				return;
 			}
 
