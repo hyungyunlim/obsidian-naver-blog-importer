@@ -16,23 +16,40 @@ export class NaverBlogImportModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h2', { text: this.plugin.i18n.t('modals.import_blog_url.title') });
+		contentEl.createEl('h2', { text: 'Import from Naver Blog' });
 
 		const inputContainer = contentEl.createDiv({ cls: 'naver-blog-input-container' });
 
 		const input = inputContainer.createEl('input', {
 			type: 'text',
-			placeholder: 'Blog ID or Post URL',
+			placeholder: 'Blog ID or URL (e.g., yonofbooks or blog.naver.com/...)',
 			cls: 'naver-blog-input'
 		});
 
-		const exampleDiv = inputContainer.createDiv({ cls: 'naver-blog-example' });
-		exampleDiv.createEl('br');
-		exampleDiv.appendText('• Blog ID: yonofbooks');
-		exampleDiv.createEl('br');
-		exampleDiv.appendText('• Post URL: https://blog.naver.com/blogid/123456789');
-		exampleDiv.createEl('br');
-		exampleDiv.appendText('• Mobile: https://m.blog.naver.com/PostView.naver?blogId=xxx&logNo=xxx');
+		const detectionDiv = inputContainer.createDiv({ cls: 'naver-blog-detection' });
+		detectionDiv.style.marginTop = '8px';
+		detectionDiv.style.fontSize = '12px';
+		detectionDiv.style.color = 'var(--text-muted)';
+
+		// Update detection status on input
+		const updateDetection = () => {
+			const value = input.value.trim();
+			if (!value) {
+				detectionDiv.empty();
+				return;
+			}
+
+			const detection = this.detectInputType(value);
+			detectionDiv.empty();
+
+			const icon = detection.type === 'single' ? '📄' :
+						 detection.type === 'bulk' ? '📚' : '⚠️';
+			detectionDiv.setText(`${icon} ${detection.message}`);
+			detectionDiv.style.color = detection.type === 'invalid' ?
+				'var(--text-error)' : 'var(--text-muted)';
+		};
+
+		input.addEventListener('input', updateDetection);
 
 		const buttonContainer = contentEl.createDiv({ cls: 'naver-blog-button-container' });
 
@@ -66,11 +83,41 @@ export class NaverBlogImportModal extends Modal {
 				if (clipboardText && isNaverBlogUrl(clipboardText)) {
 					input.value = clipboardText.trim();
 					input.select();
+					updateDetection();
 				}
 			} catch {
 				// Clipboard access denied - silently ignore
 			}
 		}, UI_DEFAULTS.modalTimeout);
+	}
+
+	detectInputType(value: string): { type: 'single' | 'bulk' | 'invalid'; message: string } {
+		if (isNaverBlogUrl(value)) {
+			const parsed = parseNaverBlogUrl(value);
+			if (parsed) {
+				return {
+					type: 'single',
+					message: `Single post from "${parsed.blogId}" (logNo: ${parsed.logNo})`
+				};
+			}
+			const blogId = extractBlogIdFromUrl(value);
+			if (blogId) {
+				return {
+					type: 'bulk',
+					message: `All posts from "${blogId}"`
+				};
+			}
+			return { type: 'invalid', message: 'Invalid URL format' };
+		}
+
+		const blogId = value.replace(/[^a-zA-Z0-9_-]/g, '');
+		if (blogId) {
+			return {
+				type: 'bulk',
+				message: `All posts from "${blogId}"`
+			};
+		}
+		return { type: 'invalid', message: 'Invalid blog ID' };
 	}
 
 	async handleImport(inputValue: string) {
