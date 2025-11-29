@@ -3,10 +3,7 @@ import {
 	Notice,
 	TFile,
 	normalizePath,
-	getFrontMatterInfo,
-	Editor,
-	MarkdownView,
-	MarkdownFileInfo
+	getFrontMatterInfo
 } from 'obsidian';
 
 import { I18n } from './src/utils/i18n';
@@ -15,14 +12,11 @@ import { BlogService } from './src/services/blog-service';
 import { ImageService } from './src/services/image-service';
 import { NaverBlogImportModal } from './src/ui/modals/import-modal';
 import { NaverBlogSubscribeModal } from './src/ui/modals/subscribe-modal';
-import { NaverBlogSinglePostModal } from './src/ui/modals/single-post-modal';
 import { NaverBlogSettingTab } from './src/ui/settings-tab';
 import { LocaleUtils } from './src/utils/locale-utils';
 import { ContentUtils } from './src/utils/content-utils';
 import { SettingsUtils } from './src/utils/settings-utils';
-import { isNaverBlogUrl, parseNaverBlogUrl } from './src/utils/url-utils';
 import { APIClientFactory } from './src/api';
-import { NaverBlogFetcher } from './naver-blog-fetcher';
 import {
 	NaverBlogSettings,
 	DEFAULT_SETTINGS,
@@ -93,14 +87,6 @@ export default class NaverBlogPlugin extends Plugin {
 		});
 
 		this.addCommand({
-			id: 'import-single-post',
-			name: this.i18n.t('commands.import-single-post'),
-			callback: () => {
-				new NaverBlogSinglePostModal(this.app, this).open();
-			}
-		});
-
-		this.addCommand({
 			id: 'rewrite-current-note',
 			name: this.i18n.t('commands.ai-fix-layout'),
 			checkCallback: (checking: boolean) => {
@@ -134,26 +120,6 @@ export default class NaverBlogPlugin extends Plugin {
 			setTimeout(() => void this.blogService.syncSubscribedBlogs(), UI_DELAYS.autoSync);
 		}
 
-		// Register paste event handler for Naver Blog URLs
-		this.registerEvent(
-			this.app.workspace.on('editor-paste', (evt: ClipboardEvent, editor: Editor, info: MarkdownView | MarkdownFileInfo) => {
-				// Check if already handled
-				if (evt.defaultPrevented) return;
-
-				const clipboardText = evt.clipboardData?.getData('text/plain');
-				if (!clipboardText || !isNaverBlogUrl(clipboardText)) return;
-
-				const parsed = parseNaverBlogUrl(clipboardText);
-				if (!parsed) return;
-
-				// Prevent default paste behavior
-				evt.preventDefault();
-
-				// Import the post
-				void this.importFromClipboard(parsed.blogId, parsed.logNo, clipboardText);
-			})
-		);
-
 		// Add settings tab
 		this.addSettingTab(new NaverBlogSettingTab(this.app, this));
 	}
@@ -179,34 +145,6 @@ export default class NaverBlogPlugin extends Plugin {
 
 	async fetchNaverBlogPosts(blogId: string, maxPosts?: number): Promise<ProcessedBlogPost[]> {
 		return await this.blogService.fetchNaverBlogPosts(blogId, maxPosts);
-	}
-
-	/**
-	 * Import a blog post from clipboard URL
-	 */
-	async importFromClipboard(blogId: string, logNo: string, originalUrl: string): Promise<void> {
-		try {
-			new Notice(`Importing from ${blogId}/${logNo}...`, NOTICE_TIMEOUTS.short);
-
-			const fetcher = new NaverBlogFetcher(blogId);
-			const post = await fetcher.fetchSinglePost(logNo);
-
-			if (!post) {
-				new Notice('Failed to fetch post', NOTICE_TIMEOUTS.medium);
-				return;
-			}
-
-			// Create the file with original tags if available
-			await this.createMarkdownFile({
-				...post,
-				tags: post.originalTags.length > 0 ? post.originalTags : [],
-				excerpt: post.content.substring(0, 150) + '...'
-			});
-
-			new Notice(`✅ Imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
-		} catch (error) {
-			new Notice(`❌ Import failed: ${error.message}`, NOTICE_TIMEOUTS.medium);
-		}
 	}
 
 	async callAI(messages: Array<{role: string, content: string}>, maxTokens: number = 150): Promise<string> {
