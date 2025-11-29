@@ -21,6 +21,38 @@ export function isNaverBlogUrl(text: string | undefined | null): boolean {
 }
 
 /**
+ * Extract just the blogId from a Naver Blog URL (home page or post URL)
+ * Supports:
+ * - Desktop home: https://blog.naver.com/blogid or https://blog.naver.com/blogid/
+ * - Desktop post: https://blog.naver.com/blogid/logno
+ * - Mobile: URLs with blogId parameter
+ */
+export function extractBlogIdFromUrl(url: string): string | null {
+	if (!url) return null;
+
+	const trimmed = url.trim();
+
+	// Mobile URLs - extract from query parameter
+	if (trimmed.includes('m.blog.naver.com') || trimmed.includes('m.naver.com')) {
+		const blogIdMatch = trimmed.match(/[?&]blogId=([^&]+)/);
+		if (blogIdMatch) {
+			return blogIdMatch[1];
+		}
+	}
+
+	// Desktop URLs - extract from path
+	if (trimmed.includes('blog.naver.com')) {
+		// Match blogid from path (with or without trailing logno)
+		const urlMatch = trimmed.match(/blog\.naver\.com\/([^/?#]+)/);
+		if (urlMatch && urlMatch[1]) {
+			return urlMatch[1];
+		}
+	}
+
+	return null;
+}
+
+/**
  * Parse a Naver Blog URL and extract blogId and logNo
  * Supports:
  * - Desktop: https://blog.naver.com/blogid/logno

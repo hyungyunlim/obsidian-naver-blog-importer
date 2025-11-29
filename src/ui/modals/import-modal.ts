@@ -1,7 +1,7 @@
 import { App, Modal, Notice } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
 import { UI_DEFAULTS, NOTICE_TIMEOUTS } from '../../constants';
-import { isNaverBlogUrl, parseNaverBlogUrl } from '../../utils/url-utils';
+import { isNaverBlogUrl, parseNaverBlogUrl, extractBlogIdFromUrl } from '../../utils/url-utils';
 import type NaverBlogPlugin from '../../../main';
 
 export class NaverBlogImportModal extends Modal {
@@ -83,12 +83,19 @@ export class NaverBlogImportModal extends Modal {
 
 		// Check if it's a post URL or just a blog ID
 		if (isNaverBlogUrl(inputValue)) {
-			// Single post import
+			// Try to parse as single post URL first
 			const parsed = parseNaverBlogUrl(inputValue);
 			if (parsed) {
 				await this.importSinglePost(parsed.blogId, parsed.logNo);
 			} else {
-				new Notice('Invalid Naver blog URL format');
+				// No logNo found - try to extract blogId for bulk import
+				// e.g., https://blog.naver.com/iluvssang/
+				const blogId = extractBlogIdFromUrl(inputValue);
+				if (blogId) {
+					await this.importAllPosts(blogId);
+				} else {
+					new Notice('Invalid Naver blog URL format');
+				}
 			}
 		} else {
 			// Bulk import - treat as blog ID
