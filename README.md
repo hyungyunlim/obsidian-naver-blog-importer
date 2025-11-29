@@ -1,215 +1,95 @@
-# 네이버 블로그 가져오기 (Obsidian 플러그인)
+# Naver Blog Importer (Obsidian Plugin)
 
-AI 기반 향상 기능과 함께 네이버 블로그 포스트를 옵시디언 볼트로 직접 가져오는 플러그인입니다.
+Import Naver Blog posts directly into your Obsidian vault with AI-powered enhancements.
 
 ![Obsidian Downloads](https://img.shields.io/badge/dynamic/json?logo=obsidian&color=%23483699&label=downloads&query=%24%5B%22naver-blog-importer%22%5D.downloads&url=https%3A%2F%2Fraw.githubusercontent.com%2Fobsidianmd%2Fobsidian-releases%2Fmaster%2Fcommunity-plugin-stats.json)
 
-## 주요 기능
+## Features
 
-- **🚀 대량 블로그 가져오기**: 블로그 ID만으로 모든 포스트를 한 번에 가져오기
-- **📂 구독 관리 시스템**: 여러 블로그를 구독하고 새 포스트를 자동으로 동기화
-  - 블로그별 개별 포스트 수 설정
-  - 개별 블로그 수동 동기화
-  - 시작 시 자동 동기화
-- **🤖 AI 기반 기능** (선택 사항):
-  - OpenAI, Anthropic, Google API를 사용한 자동 태그 생성
-  - AI 생성 포스트 요약
-  - 스마트 레이아웃 포맷팅 및 콘텐츠 향상
-- **🔧 고급 기능**:
-  - 로컬 이미지 다운로드 및 저장
-  - 중복 포스트 감지 및 필터링
-  - URL로 단일 포스트 가져오기
-- **📝 포괄적인 파싱**: 텍스트, 이미지, 인용문, 코드 블록, 목록 등을 올바른 순서로 지원
-- **⚡ 최적화된 메타데이터**: 풍부한 메타데이터가 포함된 옵시디언 친화적 프론트매터
-- **🌐 다국어 지원**: 완전한 한국어 및 영어 언어 지원
+- **Bulk Import**: Import all posts from a blog by ID
+- **Single Post Import**: Import individual posts by URL (desktop, mobile, m.naver.com)
+- **Subscription System**: Subscribe to multiple blogs with auto-sync
+- **AI Features** (optional): Auto-generate tags and excerpts using OpenAI, Anthropic, Google, or Ollama
+- **Image Download**: Download and save images locally
+- **Organized Storage**: Posts saved under `blogId` subfolder with rich frontmatter
+- **Duplicate Detection**: Skip already imported posts
+- **Multi-language**: Korean and English UI support
 
-## 설치 방법
+## Installation
 
-### 옵시디언 커뮤니티 플러그인에서 설치
+### From Obsidian Community Plugins
 
-1. 옵시디언 설정 열기
-2. 커뮤니티 플러그인으로 이동하여 안전 모드 비활성화
-3. 찾아보기를 클릭하고 "Naver Blog Importer" 검색
-4. 플러그인 설치 및 활성화
+1. Open Obsidian Settings → Community Plugins
+2. Search for "Naver Blog Importer"
+3. Install and enable
 
-### 수동 설치
+### Manual Installation
 
-1. GitHub에서 최신 릴리즈 다운로드
-2. `main.js`, `manifest.json`, `styles.css`를 볼트의 `.obsidian/plugins/naver-blog-importer/` 폴더에 압축 해제
-3. 옵시디언 재시작 후 설정에서 플러그인 활성화
+1. Download latest release from GitHub
+2. Extract to `.obsidian/plugins/naver-blog-importer/`
+3. Enable in Settings → Community Plugins
 
-## 빠른 시작
+## Usage
 
-### 1. AI 제공업체 설정 (선택 사항)
+### Import Posts
 
-1. 설정 → 커뮤니티 플러그인 → 네이버 블로그 가져오기로 이동
-2. AI 제공업체 선택 (OpenAI, Anthropic, Google, 또는 Ollama)
-3. AI 기반 기능을 위한 API 키 입력
-4. 포스트 및 이미지 폴더 설정 구성
+**Bulk Import**: Click ribbon icon → Enter blog ID → Import all posts
 
-### 2. 포스트 가져오기
+**Single Post**: Command palette → "Import single post" → Enter URL or LogNo
 
-**방법 1: 대량 가져오기**
-1. 다운로드 리본 아이콘 클릭 또는 명령 팔레트 사용
-2. "블로그에서 모든 포스트 가져오기" 선택
-3. 네이버 블로그 ID 입력 (예: "yonofbooks")
-4. "모든 포스트 가져오기" 클릭
+**Supported URL formats**:
+- `https://blog.naver.com/blogid/logno`
+- `https://m.blog.naver.com/PostView.naver?blogId=xxx&logNo=xxx`
+- `https://m.naver.com/PostView.naver?blogId=xxx&logNo=xxx`
 
-**방법 2: 단일 포스트 가져오기**
-1. 명령 팔레트 → "URL로 단일 포스트 가져오기" 사용
-2. 블로그 ID와 포스트 URL 또는 LogNo 입력
-3. "포스트 가져오기" 클릭
-
-**방법 3: 구독 관리**
-1. 명령 팔레트 → "구독한 블로그 동기화" 사용
-2. 구독 목록에 블로그 ID 추가
-3. 시작 시 새 포스트 자동 동기화
-
-### 3. 출력 형식
-
-각 블로그 포스트는 풍부한 메타데이터가 포함된 마크다운 파일로 저장됩니다:
+### Output Format
 
 ```markdown
 ---
-title: "블로그 포스트 제목"
+title: "Post Title"
 date: 2024-01-01
-tags: ["AI-생성", "태그2", "태그3"]
-excerpt: "AI 생성 포스트 요약..."
-source: "Naver Blog"
-url: "https://blog.naver.com/blogid/123456789"
+tags: ["tag1", "tag2"]
+excerpt: "AI-generated summary..."
+source: "네이버 블로그"
+blogId: "example_blog"
+url: "https://blog.naver.com/example_blog/123456789"
 logNo: "123456789"
-categories: ["카테고리1", "카테고리2"]
 ---
 
-# 블로그 포스트 제목
-
-적절히 포맷된 이미지, 인용문, 코드 블록이 포함된 포스트 내용...
+Post content with images, quotes, code blocks...
 ```
 
-## 지원하는 콘텐츠 유형
+Posts are saved to: `{defaultFolder}/{blogId}/{title}.md`
 
-- ✅ **텍스트**: 적절한 포맷팅이 적용된 일반 텍스트 콘텐츠
-- ✅ **제목**: `##` 형식으로 변환된 소제목
-- ✅ **인용문**: `>` 형식으로 변환된 블록 인용문
-- ✅ **이미지**: 캡션과 로컬 다운로드가 포함된 고품질 이미지
-- ✅ **코드 블록**: ``` 형식으로 변환된 코드 스니펫
-- ✅ **구분선**: `---` 형식으로 변환된 수평선
-- ⚠️ **동영상**: 소스 링크가 포함된 플레이스홀더로 표시
-- ⚠️ **임베드 콘텐츠**: 설명이 포함된 플레이스홀더로 표시
-- ⚠️ **표**: 플레이스홀더로 표시 (향후 개선 예정)
+## Settings
 
-## AI 제공업체 및 API 키
+- **AI Provider**: OpenAI, Anthropic, Google, or Ollama
+- **Default Folder**: Where posts are saved
+- **Image Folder**: Where images are downloaded
+- **Enable AI Tags/Excerpt**: Toggle AI features
+- **Enable Image Download**: Download images locally
+- **Duplicate Check**: Skip existing posts
 
-플러그인은 향상된 기능을 위해 여러 AI 제공업체를 지원합니다:
+## Supported Content
 
-- **OpenAI**: [API 키 받기](https://platform.openai.com/api-keys)
-- **Anthropic**: [API 키 받기](https://console.anthropic.com/)
-- **Google Gemini**: [API 키 받기](https://aistudio.google.com/app/apikey)
-- **Ollama**: 로컬 AI 서버 (API 키 불필요)
+- ✅ Text, headings, quotes, code blocks
+- ✅ Images with captions
+- ✅ Ordered/unordered lists
+- ✅ Horizontal lines
+- ⚠️ Videos, embeds, tables (placeholder)
 
-AI 기능은 선택 사항입니다 - 기본 블로그 가져오기는 API 키 없이도 작동합니다.
-
-## 설정
-
-### AI 설정
-- **제공업체**: OpenAI, Anthropic, Google, 또는 Ollama 중 선택
-- **모델**: 특정 모델 선택 (API에서 자동 새로고침)
-- **기능**: AI 태그 및 요약 활성화/비활성화
-
-### 폴더 설정
-- **기본 폴더**: 가져온 포스트가 저장되는 위치
-- **이미지 폴더**: 다운로드된 이미지가 저장되는 위치
-
-### 고급 옵션
-- **중복 확인**: 이미 존재하는 포스트 건너뛰기
-- **이미지 다운로드**: 이미지를 로컬에 다운로드하고 저장
-- **구독 관리**: 여러 블로그 자동 동기화
-
-## 문제 해결
-
-### 일반적인 문제
-
-1. **가져오기 실패**: 네트워크 연결 및 블로그 접근성 확인
-2. **AI 기능이 작동하지 않음**: API 키 및 제공업체 설정 확인
-3. **이미지가 로드되지 않음**: 설정에서 이미지 다운로드 활성화
-4. **언어 문제**: 설정에서 옵시디언 언어 변경
-
-### 성능 팁
-
-- 정기 업데이트를 위해 구독 관리 사용
-- 재가져오기 방지를 위해 중복 확인 활성화
-- 구성을 위해 적절한 폴더 구조 설정
-
-## 아키텍처 및 코드 품질
-
-이 플러그인은 모듈러 아키텍처를 가진 엔터프라이즈 급 개발 관행을 따릅니다:
-
-- **📊 코드 통계**: 801라인 (2,969라인에서 73% 감소)
-- **🏗️ 모듈러 설계**: 단일 책임을 가진 26개의 전문 모듈
-- **🔧 클린 아키텍처**: 완전한 관심사 분리 (API, 서비스, UI, 유틸리티)
-- **🎯 SOLID 원칙**: 팩토리 패턴, 의존성 역전, 인터페이스 분리
-- **📝 타입 안전성**: 컴파일 타임 검증이 포함된 완전한 TypeScript 커버리지
-- **🧪 테스트 가능**: 독립적인 모듈 테스트 기능
-
-### 개발 영감
-
-이 프로젝트는 다음과 같은 훌륭한 라이브러리에서 영감을 받고 참조했습니다:
-
-- **[betarixm/naver-blog.md](https://github.com/betarixm/naver-blog.md)** - 포괄적인 네이버 블로그 파싱 및 마크다운 변환 라이브러리
-- **[Jeongseup/naver-blog-backer](https://github.com/Jeongseup/naver-blog-backer)** - 파싱 통찰력이 포함된 네이버 블로그 백업 솔루션
-
-네이버 블로그의 구조와 API 패턴에 대한 귀중한 통찰력을 제공해 주신 이 프로젝트들에 특별한 감사를 표합니다.
-
-## 기여하기
-
-버그 신고 및 기능 요청은 [GitHub Issues](https://github.com/hyungyunlim/obsidian-naver-blog-importer/issues)를 통해 환영합니다.
-
-### 개발 환경 설정
+## Development
 
 ```bash
-# 저장소 복제
 git clone https://github.com/hyungyunlim/obsidian-naver-blog-importer.git
-
-# 의존성 설치
 npm install
-
-# 개발용 빌드
-npm run dev
-
-# 프로덕션 빌드
 npm run build
 ```
 
-## 라이선스
+## Credits
 
-MIT 라이선스 - 자세한 내용은 [LICENSE](LICENSE)를 참조하세요.
+Inspired by [betarixm/naver-blog.md](https://github.com/betarixm/naver-blog.md) and [Jeongseup/naver-blog-backer](https://github.com/Jeongseup/naver-blog-backer).
 
-## 변경 로그
+## License
 
-### v1.2.1 (최신) - 주요 아키텍처 리팩터링
-- **🏗️ 완전한 코드 리팩터링**: 73% 코드 감소 (2,969 → 801라인)
-- **📦 모듈러 아키텍처**: 26개의 전문 모듈로 분리
-- **🎯 팩토리 패턴 구현**: 통합 API 클라이언트 관리
-- **🔧 클린 아키텍처**: 완전한 관심사 분리
-- **🚀 성능 최적화**: 로딩 및 실행 속도 향상
-- **🧪 향상된 테스트 가능성**: 독립적인 모듈 테스트 기능
-- **📝 엔터프라이즈 표준**: SOLID 원칙 및 클린 코드 관행
-
-### v1.2.0
-- **🤖 향상된 AI 통합**: OpenAI, Anthropic, Google, Ollama 지원
-- **🌐 실시간 모델 가져오기**: API에서 자동 모델 목록 업데이트
-- **🎯 스마트 토큰 관리**: 다양한 모델 유형에 대한 적응형 한도
-- **🔄 재시도 로직**: 실패한 API 호출에 대한 자동 재시도
-- **📱 진행률 알림**: AI 작업에 대한 실시간 상태 업데이트
-- **🌍 향상된 지역화**: 더 나은 언어 감지 및 전환
-
-### v1.0.1
-- **🖼️ 이미지 위치 수정**: 이미지가 이제 올바른 순서로 나타남
-- **📂 향상된 구독 UI**: 블로그별 개별 포스트 수 설정
-- **🔄 개별 동기화**: 특정 블로그에 대한 수동 동기화
-- **🎨 UI 개선**: 더 나은 사용자 인터페이스 및 피드백
-
-### v1.0.0
-- **🎉 초기 릴리즈**: 핵심 블로그 가져오기 기능
-- **🤖 AI 기능**: 태그 및 요약 생성
-- **📝 콘텐츠 파싱**: 다양한 블로그 구성 요소 지원
+MIT License

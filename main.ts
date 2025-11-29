@@ -349,14 +349,22 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			// Create filename - just title.md without date prefix and hyphen replacements
 			const filename = this.imageService.sanitizeFilename(`${post.title}.md`);
-			const folder = normalizePath(this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder);
-			
-			// Ensure folder exists
+			const baseFolder = normalizePath(this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder);
+			// Store posts under blogId subfolder
+			const folder = normalizePath(`${baseFolder}/${post.blogId}`);
+
+			// Ensure base folder exists
+			const baseFolderExists = this.app.vault.getAbstractFileByPath(baseFolder);
+			if (!baseFolderExists) {
+				await this.app.vault.createFolder(baseFolder);
+			}
+
+			// Ensure blogId subfolder exists
 			const folderExists = this.app.vault.getAbstractFileByPath(folder);
 			if (!folderExists) {
 				await this.app.vault.createFolder(folder);
 			}
-			
+
 			const filepath = normalizePath(`${folder}/${filename}`);
 
 			// Create frontmatter

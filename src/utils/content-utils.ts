@@ -12,16 +12,16 @@ export class ContentUtils {
 	static createFrontmatter(post: ProcessedBlogPost, sanitizeFilename: (filename: string) => string): string {
 		const tags = post.tags.length > 0 ? post.tags.map(tag => `"${tag}"`).join(', ') : '';
 		const excerpt = post.excerpt ? `"${post.excerpt.replace(/"/g, '\\"')}"` : '""';
-		
+
 		return `---
 title: "${post.title}"
 filename: "${post.date}-${sanitizeFilename(post.title)}"
 date: ${post.date}
 share: true
-categories: [IT, 개발, 생활]
 tags: [${tags}]
 excerpt: ${excerpt}
 source: "네이버 블로그"
+blogId: "${post.blogId}"
 url: "${post.url}"
 logNo: "${post.logNo}"
 ---`;

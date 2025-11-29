@@ -38,11 +38,11 @@ export class BlogService {
 			
 			new Notice(`Processing ${filteredPosts.length} posts...`, 3000);
 			
-			// Convert to ProcessedBlogPost with empty tags and excerpt
+			// Convert to ProcessedBlogPost - use original tags from blog
 			const processedPosts: ProcessedBlogPost[] = filteredPosts.map(post => ({
 				...post,
 				title: post.title.replace(/^\[.*?\]\s*/, '').replace(/\s*\[.*?\]$/, '').trim(), // Remove [] brackets from title start/end
-				tags: [],
+				tags: post.originalTags || [],
 				excerpt: ''
 			}));
 			
@@ -152,11 +152,11 @@ export class BlogService {
 				throw new Error('Post not found or could not be fetched');
 			}
 			
-			// Convert to ProcessedBlogPost
+			// Convert to ProcessedBlogPost - use original tags from blog
 			const processedPost: ProcessedBlogPost = {
 				...post,
 				title: post.title.replace(/^\[.*?\]\s*/, '').replace(/\s*\[.*?\]$/, '').trim(),
-				tags: [],
+				tags: post.originalTags || [],
 				excerpt: ''
 			};
 			

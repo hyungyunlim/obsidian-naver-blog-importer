@@ -29,9 +29,11 @@ export class NaverBlogSinglePostModal extends Modal {
 		const exampleDiv = inputContainer.createDiv({ cls: 'naver-blog-example' });
 
 		exampleDiv.createEl('br');
-		exampleDiv.appendText('• Desktop URL: https://blog.naver.com/yonofbooks/220883239733');
+		exampleDiv.appendText('• Desktop: https://blog.naver.com/yonofbooks/220883239733');
 		exampleDiv.createEl('br');
-		exampleDiv.appendText('• Mobile URL: https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265');
+		exampleDiv.appendText('• Mobile: https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265');
+		exampleDiv.createEl('br');
+		exampleDiv.appendText('• m.naver.com: https://m.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265');
 		exampleDiv.createEl('br');
 		exampleDiv.appendText('• LogNo only: 220883239733');
 
@@ -59,16 +61,29 @@ export class NaverBlogSinglePostModal extends Modal {
 				let blogId = '';
 				let logNo = '';
 
-				if (inputValue.includes('blog.naver.com') || inputValue.includes('m.blog.naver.com')) {
-					// Handle both desktop and mobile URLs
+				// Check for various Naver blog URL formats
+				const isNaverBlogUrl = inputValue.includes('blog.naver.com') ||
+									   inputValue.includes('m.blog.naver.com') ||
+									   inputValue.includes('m.naver.com');
+
+				if (isNaverBlogUrl) {
+					// Handle desktop, mobile blog, and mobile naver URLs
 					let urlMatch;
 
-					if (inputValue.includes('m.blog.naver.com')) {
-						// Mobile URL format: https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265
-						urlMatch = inputValue.match(/[?&]blogId=([^&]+).*[?&]logNo=(\d+)/);
+					if (inputValue.includes('m.blog.naver.com') || inputValue.includes('m.naver.com')) {
+						// Mobile URL formats:
+						// https://m.blog.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265
+						// https://m.naver.com/PostView.naver?blogId=xk2a1&logNo=223926972265
+						urlMatch = inputValue.match(/[?&]blogId=([^&]+).*[?&]logNo=(\d+)/) ||
+								   inputValue.match(/[?&]logNo=(\d+).*[?&]blogId=([^&]+)/);
+
+						// Handle reversed parameter order
+						if (urlMatch && inputValue.indexOf('logNo=') < inputValue.indexOf('blogId=')) {
+							[urlMatch[1], urlMatch[2]] = [urlMatch[2], urlMatch[1]];
+						}
 					} else {
 						// Desktop URL format: https://blog.naver.com/blogid/logno
-						urlMatch = inputValue.match(/blog\.naver\.com\/([^/]+)\/(\d+)/);
+						urlMatch = inputValue.match(/blog\.naver\.com\/([^/?#]+)\/(\d+)/);
 					}
 
 					if (urlMatch) {
@@ -98,10 +113,10 @@ export class NaverBlogSinglePostModal extends Modal {
 					const post = await fetcher.fetchSinglePost(logNo);
 
 
-					// Create the file
+					// Create the file - use original tags from blog if available
 					await this.plugin.createMarkdownFile({
 						...post,
-						tags: ['imported'],
+						tags: post.originalTags.length > 0 ? post.originalTags : [],
 						excerpt: post.content.substring(0, 150) + '...'
 					});
 

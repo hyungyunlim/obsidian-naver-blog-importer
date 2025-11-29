@@ -34,6 +34,8 @@ export interface NaverBlogPost {
     logNo: string;
     url: string;
     thumbnail?: string;
+    blogId: string;
+    originalTags: string[];
 }
 
 export class NaverBlogFetcher {
@@ -47,14 +49,16 @@ export class NaverBlogFetcher {
     async fetchSinglePost(logNo: string): Promise<NaverBlogPost> {
         try {
             const parsed = await this.fetchPostContent(logNo);
-            
+
             return {
                 title: parsed.title,
                 date: parsed.date,
                 logNo: logNo,
                 url: `https://blog.naver.com/${this.blogId}/${logNo}`,
                 thumbnail: undefined,
-                content: parsed.content
+                content: parsed.content,
+                blogId: this.blogId,
+                originalTags: parsed.tags
             };
         } catch (error) {
             throw new Error(`Failed to fetch single post ${logNo}: ${error.message}`);
@@ -110,14 +114,16 @@ export class NaverBlogFetcher {
                         logNo: post.logNo,
                         url: post.url,
                         thumbnail: post.thumbnail,
-                        content: parsed.content
+                        content: parsed.content,
+                        blogId: this.blogId,
+                        originalTags: parsed.tags
                     });
-                    
-                    
+
+
                     // Add delay to be respectful to the server
                     await this.delay(1000);
                 } catch (error) {
-                    
+
                     // Create error post for failed fetch
                     const errorContent = this.createErrorContent(post, error);
                     postsWithContent.push({
@@ -126,7 +132,9 @@ export class NaverBlogFetcher {
                         logNo: post.logNo,
                         url: post.url,
                         thumbnail: post.thumbnail,
-                        content: errorContent
+                        content: errorContent,
+                        blogId: this.blogId,
+                        originalTags: []
                     });
                     
                     
@@ -141,8 +149,8 @@ export class NaverBlogFetcher {
         }
     }
 
-    private async getPostList(maxPosts?: number): Promise<Omit<NaverBlogPost, 'content'>[]> {
-        const posts: Omit<NaverBlogPost, 'content'>[] = [];
+    private async getPostList(maxPosts?: number): Promise<Omit<NaverBlogPost, 'content' | 'blogId' | 'originalTags'>[]> {
+        const posts: Omit<NaverBlogPost, 'content' | 'blogId' | 'originalTags'>[] = [];
 
         try {
             
@@ -226,8 +234,8 @@ export class NaverBlogFetcher {
         return posts;
     }
 
-    private parsePostListFromHTML(html: string): Omit<NaverBlogPost, 'content'>[] {
-        const posts: Omit<NaverBlogPost, 'content'>[] = [];
+    private parsePostListFromHTML(html: string): Omit<NaverBlogPost, 'content' | 'blogId' | 'originalTags'>[] {
+        const posts: Omit<NaverBlogPost, 'content' | 'blogId' | 'originalTags'>[] = [];
         
         try {
             const $ = cheerio.load(html);
@@ -380,7 +388,7 @@ export class NaverBlogFetcher {
         return posts;
     }
 
-    private async fetchPostContent(logNo: string): Promise<{ content: string; title: string; date: string }> {
+    private async fetchPostContent(logNo: string): Promise<{ content: string; title: string; date: string; tags: string[] }> {
         try {
             // Try different URL formats for Naver blog posts
             const urlFormats = [
@@ -417,12 +425,13 @@ export class NaverBlogFetcher {
         }
     }
 
-    private parsePostContent(html: string): { content: string; title: string; date: string } {
+    private parsePostContent(html: string): { content: string; title: string; date: string; tags: string[] } {
         try {
             const $ = cheerio.load(html);
             let content = '';
             let title = '';
             let date = '';
+            const tags: string[] = [];
 
             // Extract title from various selectors - improved with more specific selectors
             const titleSelectors = [
@@ -661,10 +670,36 @@ export class NaverBlogFetcher {
             // Clean up the content
             content = this.cleanContent(content);
 
+            // Extract tags from the blog post
+            // Look for tag list container with various selectors
+            const tagSelectors = [
+                'div[id^="tagList_"] a span.ell',
+                '.wrap_tag a.item span.ell',
+                '.post_tag a span',
+                '.tag_area a',
+                '.se-tag a',
+                'a.itemTagfont span.ell'
+            ];
+
+            for (const selector of tagSelectors) {
+                $(selector).each((_: number, el: Element) => {
+                    let tagText = $(el).text().trim();
+                    // Remove # prefix if present
+                    if (tagText.startsWith('#')) {
+                        tagText = tagText.substring(1);
+                    }
+                    if (tagText && !tags.includes(tagText)) {
+                        tags.push(tagText);
+                    }
+                });
+                if (tags.length > 0) break;
+            }
+
             return {
                 content: content || '[No content could be extracted]',
                 title: title || 'Untitled',
-                date: date || new Date().toISOString().split('T')[0]
+                date: date || new Date().toISOString().split('T')[0],
+                tags: tags
             };
         } catch (error) {
             throw new Error(`Failed to parse content: ${error.message}`);
@@ -694,18 +729,25 @@ export class NaverBlogFetcher {
             // Handle different component types
             if ($el.hasClass('se-component')) {
                 if ($el.hasClass('se-text')) {
-                    // Text component - improved paragraph and list handling
+                    // Text component - process all children in DOM order (p, ul, ol)
                     const textModule = $el.find('.se-module-text');
                     if (textModule.length > 0) {
-                        // Check for lists first (ul/ol) - improved detection
-                        const lists = textModule.find('ul, ol');
-                        
-                        if (lists.length > 0) {
-                            lists.each((_: number, list: Element) => {
-                                const $list = $(list);
-                                const isOrdered = list.tagName.toLowerCase() === 'ol';
-                                const listItems = $list.find('li');
-                                
+                        // Process all direct children in DOM order to maintain text flow
+                        textModule.children().each((_: number, child: Element) => {
+                            const $child = $(child);
+                            const tagName = child.tagName.toLowerCase();
+
+                            if (tagName === 'p') {
+                                // Regular paragraph
+                                const paragraphText = $child.text().trim();
+                                if (paragraphText && !paragraphText.startsWith('#')) {
+                                    content += paragraphText + '\n';
+                                }
+                            } else if (tagName === 'ul' || tagName === 'ol') {
+                                // List (ordered or unordered)
+                                const isOrdered = tagName === 'ol';
+                                const listItems = $child.find('li');
+
                                 listItems.each((index: number, li: Element) => {
                                     const $li = $(li);
                                     const listItemText = $li.text().trim();
@@ -718,31 +760,18 @@ export class NaverBlogFetcher {
                                     }
                                 });
                                 content += '\n'; // Add space after list
-                            });
-                        } else {
-                            // Process regular paragraphs if no lists found
+                            }
+                        });
+
+                        // Fallback: if no children processed, try to get paragraphs directly
+                        if (textModule.children().length === 0) {
                             textModule.find('p').each((_: number, p: Element) => {
                                 const $p = $(p);
                                 const paragraphText = $p.text().trim();
-                                if (paragraphText && !paragraphText.startsWith('#')) { // Skip hashtags
+                                if (paragraphText && !paragraphText.startsWith('#')) {
                                     content += paragraphText + '\n';
                                 }
                             });
-                            
-                            // If no <p> tags found, get the whole text
-                            if (textModule.find('p').length === 0) {
-                                const textContent = textModule.text().trim();
-                                if (textContent && !textContent.startsWith('#')) {
-                                    // Split by line breaks and create paragraphs
-                                    const lines = textContent.split(/\n+/);
-                                    lines.forEach((line: string) => {
-                                        const trimmedLine = line.trim();
-                                        if (trimmedLine && !trimmedLine.startsWith('#')) {
-                                            content += trimmedLine + '\n';
-                                        }
-                                    });
-                                }
-                            }
                         }
                     }
                 } else if ($el.hasClass('se-sectionTitle')) {
@@ -1377,7 +1406,7 @@ export class NaverBlogFetcher {
         }
     }
 
-    private createErrorContent(post: Omit<NaverBlogPost, 'content'>, error: unknown): string {
+    private createErrorContent(post: Omit<NaverBlogPost, 'content' | 'blogId' | 'originalTags'>, error: unknown): string {
         const timestamp = new Date().toISOString();
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         
