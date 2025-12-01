@@ -942,6 +942,18 @@ export class NaverBlogFetcher {
                         content += `*${groupCaption}*\n`;
                     }
                     content += '\n';
+                } else if ($el.hasClass('se-file')) {
+                    // File attachment component
+                    const fileName = $el.find('.se-file-name').text().trim();
+                    const fileExt = $el.find('.se-file-extension').text().trim();
+                    const downloadLink = $el.find('a.se-file-save-button').attr('href');
+
+                    if (fileName && downloadLink) {
+                        const fullFileName = fileName + fileExt;
+                        content += `📎 [${fullFileName}](${downloadLink})\n\n`;
+                    } else if (fileName) {
+                        content += `📎 ${fileName}${fileExt} (다운로드 링크 없음)\n\n`;
+                    }
                 } else if ($el.hasClass('se-code')) {
                     // Code component - improved like Python script
                     const codeElements = $el.find('.se-code-source');
