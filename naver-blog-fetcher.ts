@@ -954,6 +954,26 @@ export class NaverBlogFetcher {
                     } else if (fileName) {
                         content += `📎 ${fileName}${fileExt} (다운로드 링크 없음)\n\n`;
                     }
+                } else if ($el.hasClass('se-oglink')) {
+                    // Open Graph link preview component
+                    const linkEl = $el.find('a.se-oglink-info, a.se-oglink-thumbnail').first();
+                    const linkUrl = linkEl.attr('href') || '';
+                    const title = $el.find('.se-oglink-title').text().trim();
+                    const summary = $el.find('.se-oglink-summary').text().trim();
+                    const domain = $el.find('.se-oglink-url').text().trim();
+
+                    if (linkUrl && title) {
+                        content += `> 🔗 **[${title}](${linkUrl})**\n`;
+                        if (summary) {
+                            content += `> ${summary}\n`;
+                        }
+                        if (domain) {
+                            content += `> *${domain}*\n`;
+                        }
+                        content += '\n';
+                    } else if (linkUrl) {
+                        content += `🔗 ${linkUrl}\n\n`;
+                    }
                 } else if ($el.hasClass('se-code')) {
                     // Code component - improved like Python script
                     const codeElements = $el.find('.se-code-source');
