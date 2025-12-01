@@ -907,6 +907,41 @@ export class NaverBlogFetcher {
                             content += caption ? `[이미지: ${caption}]\n` : `[이미지]\n`;
                         }
                     }
+                } else if ($el.hasClass('se-imageGroup')) {
+                    // Image Group (slideshow/carousel) component
+                    const imageItems = $el.find('.se-imageGroup-item');
+                    const groupCaption = $el.find('.se-caption').text().trim();
+
+                    imageItems.each((_: number, item: Element) => {
+                        const $item = $(item);
+                        const imgElement = $item.find('img');
+
+                        if (imgElement.length > 0) {
+                            // Try to extract original image URL from link data
+                            let imgSrc = this.extractOriginalImageUrl($item, imgElement);
+
+                            // Fallback to standard image source attributes
+                            if (!imgSrc) {
+                                imgSrc = imgElement.attr('data-lazy-src') ||
+                                       imgElement.attr('src') ||
+                                       imgElement.attr('data-src') ||
+                                       imgElement.attr('data-original') ||
+                                       imgElement.attr('data-image-src');
+                            }
+
+                            if (imgSrc && this.shouldIncludeImage(imgSrc, '')) {
+                                imgSrc = this.enhanceImageUrl(imgSrc);
+                                const altText = imgElement.attr('alt') || imgElement.attr('title') || 'Blog Image';
+                                content += `![${altText}](${imgSrc})\n`;
+                            }
+                        }
+                    });
+
+                    // Add group caption at the end
+                    if (groupCaption) {
+                        content += `*${groupCaption}*\n`;
+                    }
+                    content += '\n';
                 } else if ($el.hasClass('se-code')) {
                     // Code component - improved like Python script
                     const codeElements = $el.find('.se-code-source');
