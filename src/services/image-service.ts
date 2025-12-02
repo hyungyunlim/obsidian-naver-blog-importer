@@ -166,6 +166,11 @@ export class ImageService {
 	}
 
 	shouldDownloadImage(imageUrl: string, altText: string): boolean {
+		// Allow Naver video/GIF CDN images first (content videos/GIFs)
+		if (imageUrl.includes('mblogvideo-phinf.pstatic.net')) {
+			return true;
+		}
+
 		// Check URL patterns
 		for (const pattern of SKIP_IMAGE_PATTERNS) {
 			if (pattern.test(imageUrl)) {
@@ -213,20 +218,24 @@ export class ImageService {
 	convertToDirectImageUrl(url: string): string {
 		// Convert Naver blog image URLs to direct download URLs - improved logic
 		let directUrl = url;
-		
+
 		// For postfiles.pstatic.net, keep the original URL but without query params
 		if (directUrl.includes('postfiles.pstatic.net')) {
 			// Remove only size-related query parameters, keep the URL structure
 			directUrl = directUrl.replace(/\?type=w\d+/i, '').replace(/&type=w\d+/i, '');
 			return directUrl;
 		}
-		
+
+		// For mblogvideo-phinf.pstatic.net, keep the original URL (video/GIF content)
+		if (directUrl.includes('mblogvideo-phinf.pstatic.net')) {
+			return directUrl;
+		}
+
 		// Remove query parameters for other domains
 		directUrl = directUrl.split('?')[0];
-		
+
 		// Convert various Naver CDN formats to direct download URLs
 		directUrl = directUrl
-			.replace('https://mblogvideo-phinf.pstatic.net/', 'https://blogfiles.pstatic.net/') // video CDN
 			.replace('https://mblogthumb-phinf.pstatic.net/', 'https://blogfiles.pstatic.net/') // thumbnail CDN
 			.replace('https://blogpfthumb-phinf.pstatic.net/', 'https://blogfiles.pstatic.net/') // profile thumb CDN
 			.replace(NAVER_CDN_PATTERNS.year2018, '/MjAxOA==/')  // URL decode patterns
