@@ -48,7 +48,8 @@ export class I18n {
 				'import-single-post': 'Import single post by URL',
 				'import-blog-url': 'Import all posts from blog',
 				'sync-subscribed-blogs': 'Sync subscribed blogs',
-				'ai-fix-layout': 'AI fix layout and format (preserve content 100%)'
+				'ai-fix-layout': 'AI fix layout and format (preserve content 100%)',
+				'delete-note-with-images': 'Delete note with embedded images'
 			},
 			settings: {
 				ai_configuration: 'AI',
@@ -111,7 +112,10 @@ export class I18n {
 				image_download_complete: 'Image download complete: {{count}} images',
 				generating_ai_tags: 'Generating AI tags...',
 				generating_ai_excerpt: 'Generating AI excerpt...',
-				post_limit_exceeded: 'Maximum limit is 1000 posts. Value adjusted to 1000.'
+				post_limit_exceeded: 'Maximum limit is 1000 posts. Value adjusted to 1000.',
+				note_deleted: 'Deleted note and {{count}} images',
+				note_deleted_no_images: 'Deleted note (no images found)',
+				delete_failed: 'Failed to delete: {{error}}'
 			},
 			modals: {
 				import_single_post: {
@@ -165,7 +169,8 @@ export class I18n {
 				'import-single-post': 'URL로 단일 포스트 가져오기',
 				'import-blog-url': '블로그 전체 포스트 가져오기',
 				'sync-subscribed-blogs': '구독 블로그 동기화',
-				'ai-fix-layout': 'AI 레이아웃 수정 및 포맷 (내용 100% 보존)'
+				'ai-fix-layout': 'AI 레이아웃 수정 및 포맷 (내용 100% 보존)',
+				'delete-note-with-images': '노트와 포함된 이미지 함께 삭제'
 			},
 			settings: {
 				ai_configuration: 'AI',
@@ -228,7 +233,10 @@ export class I18n {
 				image_download_complete: '이미지 다운로드 완료: {{count}}개',
 				generating_ai_tags: 'AI 태그 생성 중...',
 				generating_ai_excerpt: 'AI 요약 생성 중...',
-				post_limit_exceeded: '최대 제한은 1000개 포스트입니다. 값이 1000으로 조정되었습니다.'
+				post_limit_exceeded: '최대 제한은 1000개 포스트입니다. 값이 1000으로 조정되었습니다.',
+				note_deleted: '노트와 {{count}}개의 이미지가 삭제되었습니다',
+				note_deleted_no_images: '노트가 삭제되었습니다 (이미지 없음)',
+				delete_failed: '삭제 실패: {{error}}'
 			},
 			modals: {
 				import_single_post: {

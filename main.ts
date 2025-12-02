@@ -92,12 +92,12 @@ export default class NaverBlogPlugin extends Plugin {
 			checkCallback: (checking: boolean) => {
 				const activeFile = this.app.workspace.getActiveFile();
 				const hasMarkdownFile = activeFile && activeFile.path.endsWith('.md');
-				
+
 				if (checking) {
 					// This is called to check if the command should be available
 					return hasMarkdownFile;
 				}
-				
+
 				// This is called when the command is executed
 				if (hasMarkdownFile) {
 					// Check API key first - use AI service to verify
@@ -109,8 +109,25 @@ export default class NaverBlogPlugin extends Plugin {
 						new Notice(this.i18n.t('notices.set_api_key'), NOTICE_TIMEOUTS.medium);
 						return;
 					}
-					
+
 					void this.rewriteCurrentNote(activeFile);
+				}
+			}
+		});
+
+		this.addCommand({
+			id: 'delete-note-with-images',
+			name: this.i18n.t('commands.delete-note-with-images'),
+			checkCallback: (checking: boolean) => {
+				const activeFile = this.app.workspace.getActiveFile();
+				const hasMarkdownFile = activeFile && activeFile.path.endsWith('.md');
+
+				if (checking) {
+					return hasMarkdownFile;
+				}
+
+				if (hasMarkdownFile) {
+					void this.deleteNoteWithImages(activeFile);
 				}
 			}
 		});
@@ -445,5 +462,87 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 		return await this.aiService.callAIForLayoutFix(content);
 	}
 
+	async deleteNoteWithImages(file: TFile): Promise<void> {
+		try {
+			// Read the file content
+			const content = await this.app.vault.read(file);
 
+			// Extract image paths from markdown content
+			// Matches: ![alt](path) and ![[path]]
+			const imagePaths: string[] = [];
+
+			// Standard markdown images: ![alt](path)
+			const markdownImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+			let match;
+			while ((match = markdownImageRegex.exec(content)) !== null) {
+				const imagePath = match[2];
+				// Only include relative paths (not URLs)
+				if (!imagePath.startsWith('http://') && !imagePath.startsWith('https://')) {
+					imagePaths.push(imagePath);
+				}
+			}
+
+			// Obsidian wiki-style images: ![[path]]
+			const wikiImageRegex = /!\[\[([^\]]+)\]\]/g;
+			while ((match = wikiImageRegex.exec(content)) !== null) {
+				const imagePath = match[1].split('|')[0]; // Remove any alias after |
+				imagePaths.push(imagePath);
+			}
+
+			// Delete images
+			let deletedImageCount = 0;
+			const noteFolder = file.parent?.path || '';
+			const imageFolder = this.settings.imageFolder;
+
+			for (const imagePath of imagePaths) {
+				try {
+					// Try multiple path resolution strategies
+					const pathsToTry: string[] = [];
+
+					// 1. If path starts with attachments/, replace with imageFolder setting
+					if (imagePath.startsWith('attachments/')) {
+						const filename = imagePath.substring('attachments/'.length);
+						pathsToTry.push(normalizePath(`${imageFolder}/${filename}`));
+					}
+
+					// 2. Relative to note's folder
+					if (!imagePath.startsWith('/')) {
+						pathsToTry.push(normalizePath(`${noteFolder}/${imagePath}`));
+					}
+
+					// 3. Relative to imageFolder setting (image filename only)
+					const imageFilename = imagePath.split('/').pop() || imagePath;
+					pathsToTry.push(normalizePath(`${imageFolder}/${imageFilename}`));
+
+					// 4. As-is (absolute or vault-relative path)
+					pathsToTry.push(normalizePath(imagePath));
+
+					// Try each path until we find the file
+					for (const tryPath of pathsToTry) {
+						const imageFile = this.app.vault.getAbstractFileByPath(tryPath);
+						if (imageFile instanceof TFile) {
+							await this.app.vault.delete(imageFile);
+							deletedImageCount++;
+							break; // Found and deleted, move to next image
+						}
+					}
+				} catch {
+					// Image file not found or couldn't be deleted, continue
+				}
+			}
+
+			// Delete the note itself
+			await this.app.vault.delete(file);
+
+			// Show result notice
+			if (deletedImageCount > 0) {
+				new Notice(this.i18n.t('notices.note_deleted', { count: String(deletedImageCount) }), NOTICE_TIMEOUTS.medium);
+			} else {
+				new Notice(this.i18n.t('notices.note_deleted_no_images'), NOTICE_TIMEOUTS.medium);
+			}
+
+		} catch (error) {
+			new Notice(this.i18n.t('notices.delete_failed', { error: error.message }), NOTICE_TIMEOUTS.medium);
+		}
+	}
 }

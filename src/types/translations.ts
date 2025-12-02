@@ -4,6 +4,7 @@ export interface Translations {
 		'import-blog-url': string;
 		'sync-subscribed-blogs': string;
 		'ai-fix-layout': string;
+		'delete-note-with-images': string;
 	};
 	settings: {
 		ai_configuration: string;
@@ -67,6 +68,9 @@ export interface Translations {
 		generating_ai_tags: string;
 		generating_ai_excerpt: string;
 		post_limit_exceeded: string;
+		note_deleted: string;
+		note_deleted_no_images: string;
+		delete_failed: string;
 	};
 	modals: {
 		import_single_post: {
