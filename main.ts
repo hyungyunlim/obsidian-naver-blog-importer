@@ -317,13 +317,13 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 		}
 	}
 
-	async createMarkdownFile(post: ProcessedBlogPost): Promise<void> {
+	async createMarkdownFile(post: ProcessedBlogPost): Promise<TFile | null> {
 		try {
 			// Generate AI tags and excerpt if enabled
 			if (this.settings.enableAiTags) {
 				post.tags = await this.generateAITags(post.title, post.content);
 			}
-			
+
 			if (this.settings.enableAiExcerpt) {
 				// Add small delay between AI calls to avoid rate limiting
 				if (this.settings.enableAiTags) {
@@ -360,7 +360,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			// Create frontmatter
 			const frontmatter = ContentUtils.createFrontmatter(post, this.imageService.sanitizeFilename.bind(this.imageService));
-			
+
 			// Create full content
 			const fullContent = `${frontmatter}\n${processedContent}`;
 
@@ -368,15 +368,17 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const fileExists = this.app.vault.getAbstractFileByPath(filepath);
 			if (fileExists) {
 				// File already exists, skip silently
-				return;
+				return null;
 			}
-			
+
 			// Create the file
-			await this.app.vault.create(filepath, fullContent);
-			
+			const createdFile = await this.app.vault.create(filepath, fullContent);
+
 			new Notice(`Created: ${filename}`);
+			return createdFile;
 		} catch (error) {
 			new Notice(`Failed to create file for: ${post.title}`);
+			return null;
 		}
 	}
 

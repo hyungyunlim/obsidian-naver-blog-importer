@@ -16,8 +16,22 @@ export class ImageService {
 	) {}
 
 	async downloadAndProcessImages(content: string, logNo: string): Promise<string> {
+		// Always convert mblogvideo URLs to links (these are MP4 videos, not images)
+		// This runs regardless of image download settings
+		const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+		let processedContent = content;
+		const allMatches = [...content.matchAll(new RegExp(imageRegex.source, 'g'))];
+
+		for (const [fullMatch, altText, imageUrl] of allMatches) {
+			if (imageUrl.includes('mblogvideo-phinf.pstatic.net')) {
+				const linkText = altText || '동영상';
+				const newLink = `[${linkText}](${imageUrl})`;
+				processedContent = processedContent.replace(fullMatch, newLink);
+			}
+		}
+
 		if (!this.settings.enableImageDownload) {
-			return content;
+			return processedContent;
 		}
 
 		try {
@@ -28,14 +42,13 @@ export class ImageService {
 				await this.app.vault.createFolder(attachmentsFolder);
 			}
 
-			// Find all image markdown patterns - filter out unwanted images
-			const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
-			let processedContent = content;
 			let imageCount = 0;
-			const allMatches = [...content.matchAll(new RegExp(imageRegex.source, 'g'))];
-			
+
+			// Re-match after video conversion
+			const remainingMatches = [...processedContent.matchAll(new RegExp(imageRegex.source, 'g'))];
+
 			// Filter out unwanted images (GIFs, animations, editor assets)
-			const filteredMatches = allMatches.filter(([_, altText, imageUrl]) => {
+			const filteredMatches = remainingMatches.filter(([_, altText, imageUrl]) => {
 				return this.shouldDownloadImage(imageUrl, altText);
 			});
 			

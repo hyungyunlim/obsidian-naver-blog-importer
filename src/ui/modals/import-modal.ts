@@ -1,4 +1,4 @@
-import { App, Modal, Notice } from 'obsidian';
+import { App, Modal, Notice, TFile } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
 import { UI_DEFAULTS, NOTICE_TIMEOUTS } from '../../constants';
 import { isNaverBlogUrl, parseNaverBlogUrl, extractBlogIdFromUrl } from '../../utils/url-utils';
@@ -167,13 +167,18 @@ export class NaverBlogImportModal extends Modal {
 				return;
 			}
 
-			await this.plugin.createMarkdownFile({
+			const createdFile = await this.plugin.createMarkdownFile({
 				...post,
 				tags: post.originalTags.length > 0 ? post.originalTags : [],
 				excerpt: post.content.substring(0, 150) + '...'
 			});
 
 			new Notice(`✅ Imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
+
+			// Open the created file
+			if (createdFile) {
+				await this.openFile(createdFile);
+			}
 		} catch (error) {
 			new Notice(`❌ Import failed: ${error.message}`, NOTICE_TIMEOUTS.medium);
 		}
@@ -206,6 +211,7 @@ export class NaverBlogImportModal extends Modal {
 			let successCount = 0;
 			let errorCount = 0;
 			let errorLogCount = 0;
+			let lastCreatedFile: TFile | null = null;
 			const totalPosts = posts.length;
 
 			for (let i = 0; i < posts.length; i++) {
@@ -217,7 +223,11 @@ export class NaverBlogImportModal extends Modal {
 
 				try {
 					new Notice(`Creating file ${progress}: ${post.title}`, 3000);
-					await this.plugin.createMarkdownFile(post);
+					const createdFile = await this.plugin.createMarkdownFile(post);
+
+					if (createdFile) {
+						lastCreatedFile = createdFile;
+					}
 
 					if (isErrorPost) {
 						errorLogCount++;
@@ -246,10 +256,21 @@ export class NaverBlogImportModal extends Modal {
 			else if (errorCount > 0) summary += ' ⚠️';
 
 			new Notice(summary, 8000);
+
+			// Open the last created file after import completes
+			if (lastCreatedFile && !importCancelled) {
+				await this.openFile(lastCreatedFile);
+			}
 		} catch {
 			cancelNotice.hide();
 			new Notice("Import failed. Check console for details.");
 		}
+	}
+
+	async openFile(file: TFile) {
+		// Use plugin.app since modal may be closed
+		const leaf = this.plugin.app.workspace.getLeaf(false);
+		await leaf.openFile(file, { active: true });
 	}
 
 	onClose() {
