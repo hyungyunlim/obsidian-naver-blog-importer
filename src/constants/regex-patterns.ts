@@ -30,7 +30,7 @@ export const CONTENT_PATTERNS = {
 
 // File validation patterns
 export const FILE_PATTERNS = {
-	validImageDomain: /^https?:\/\/(blogfiles|postfiles|mblogthumb-phinf|blogpfthumb-phinf|mblogvideo-phinf)\.pstatic\.net/,
+	validImageDomain: /^https?:\/\/(blogfiles|postfiles|mblogthumb-phinf|blogpfthumb-phinf)\.pstatic\.net/,
 	naverProfilePath: /ssl\.pstatic\.net\/static\/blog\/profile\//
 } as const;
 

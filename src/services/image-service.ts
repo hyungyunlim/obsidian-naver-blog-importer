@@ -166,9 +166,9 @@ export class ImageService {
 	}
 
 	shouldDownloadImage(imageUrl: string, altText: string): boolean {
-		// Allow Naver video/GIF CDN images first (content videos/GIFs)
+		// Skip Naver video CDN (these are MP4 videos, not images)
 		if (imageUrl.includes('mblogvideo-phinf.pstatic.net')) {
-			return true;
+			return false;
 		}
 
 		// Check URL patterns
@@ -203,8 +203,7 @@ export class ImageService {
 			'blogfiles.pstatic.net',
 			'postfiles.pstatic.net',
 			'mblogthumb-phinf.pstatic.net',
-			'blogpfthumb-phinf.pstatic.net',
-			'mblogvideo-phinf.pstatic.net'  // Video/GIF CDN
+			'blogpfthumb-phinf.pstatic.net'
 		];
 		
 		const isValidDomain = validDomains.some(domain => imageUrl.includes(domain));
@@ -223,11 +222,6 @@ export class ImageService {
 		if (directUrl.includes('postfiles.pstatic.net')) {
 			// Remove only size-related query parameters, keep the URL structure
 			directUrl = directUrl.replace(/\?type=w\d+/i, '').replace(/&type=w\d+/i, '');
-			return directUrl;
-		}
-
-		// For mblogvideo-phinf.pstatic.net, keep the original URL (video/GIF content)
-		if (directUrl.includes('mblogvideo-phinf.pstatic.net')) {
 			return directUrl;
 		}
 

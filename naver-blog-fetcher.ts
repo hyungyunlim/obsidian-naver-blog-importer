@@ -812,11 +812,12 @@ export class NaverBlogFetcher {
                     const caption = $el.find('.se-caption').text().trim();
 
                     // Check for GIF MP4 video first (Naver converts GIFs to MP4 videos)
+                    // These are actual video files, so we keep them as links instead of images
                     if (videoElement.length > 0) {
                         let videoSrc = videoElement.attr('src') || videoElement.attr('data-gif-url');
                         if (videoSrc) {
-                            const altText = caption || 'Blog Image';
-                            content += `![${altText}](${videoSrc})\n`;
+                            const altText = caption || '동영상';
+                            content += `[${altText}](${videoSrc})\n`;
                             if (caption) {
                                 content += `*${caption}*\n`;
                             }
