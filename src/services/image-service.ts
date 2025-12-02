@@ -198,11 +198,12 @@ export class ImageService {
 			'blogfiles.pstatic.net',
 			'postfiles.pstatic.net',
 			'mblogthumb-phinf.pstatic.net',
-			'blogpfthumb-phinf.pstatic.net'
+			'blogpfthumb-phinf.pstatic.net',
+			'mblogvideo-phinf.pstatic.net'  // Video/GIF CDN
 		];
 		
 		const isValidDomain = validDomains.some(domain => imageUrl.includes(domain));
-		if (!isValidDomain && !imageUrl.match(/\.(jpg|jpeg|png|webp)(\?|$)/i)) {
+		if (!isValidDomain && !imageUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i)) {
 			return false;
 		}
 		

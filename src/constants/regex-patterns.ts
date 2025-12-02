@@ -30,7 +30,7 @@ export const CONTENT_PATTERNS = {
 
 // File validation patterns
 export const FILE_PATTERNS = {
-	validImageDomain: /^https?:\/\/(blogfiles|postfiles|mblogthumb-phinf|blogpfthumb-phinf)\.pstatic\.net/,
+	validImageDomain: /^https?:\/\/(blogfiles|postfiles|mblogthumb-phinf|blogpfthumb-phinf|mblogvideo-phinf)\.pstatic\.net/,
 	naverProfilePath: /ssl\.pstatic\.net\/static\/blog\/profile\//
 } as const;
 
@@ -41,9 +41,8 @@ export const SKIP_IMAGE_PATTERNS = [
 	/se-emoticon/i,
 	/editor/i,
 	/naverblog_pc/i,
-	
-	// Common animation and GIF patterns
-	/\.gif$/i,
+
+	// Common animation and UI patterns (GIF removed - handled by domain check)
 	/loading/i,
 	/spinner/i,
 	/animation/i,

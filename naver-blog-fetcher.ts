@@ -1502,18 +1502,22 @@ export class NaverBlogFetcher {
 
     private shouldIncludeImage(imgSrc: string, caption?: string): boolean {
         // Filter out profile and UI images specifically in content extraction
-        
+
         // Skip ssl.pstatic.net profile images
         if (imgSrc.includes('ssl.pstatic.net/static/blog/profile/')) {
             return false;
         }
-        
-        // Skip obvious UI patterns
+
+        // Allow Naver video/GIF CDN images (content videos/GIFs)
+        if (imgSrc.includes('mblogvideo-phinf.pstatic.net')) {
+            return true;
+        }
+
+        // Skip obvious UI patterns (GIF removed - handled by domain check above)
         const uiPatterns = [
             /se-sticker/i,
             /se-emoticon/i,
             /editor/i,
-            /\.gif$/i,
             /icon/i,
             /logo/i,
             /button/i,
@@ -1558,18 +1562,22 @@ export class NaverBlogFetcher {
 
     private isContentImage($img: Cheerio<Element>, imgSrc: string): boolean {
         // Check if image is likely a content image vs UI element
-        
+
         // Skip ssl.pstatic.net profile images - same as shouldIncludeImage
         if (imgSrc.includes('ssl.pstatic.net/static/blog/profile/')) {
             return false;
         }
-        
-        // Skip obvious UI patterns
+
+        // Allow Naver video/GIF CDN images (content videos/GIFs)
+        if (imgSrc.includes('mblogvideo-phinf.pstatic.net')) {
+            return true;
+        }
+
+        // Skip obvious UI patterns (GIF removed - handled by domain check above)
         const uiPatterns = [
             /se-sticker/i,
             /se-emoticon/i,
             /editor/i,
-            /\.gif$/i,
             /icon/i,
             /logo/i,
             /button/i,
