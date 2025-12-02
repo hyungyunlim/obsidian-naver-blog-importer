@@ -1,4 +1,4 @@
-import { requestUrl } from 'obsidian';
+import { requestUrl, Notice } from 'obsidian';
 import * as cheerio from 'cheerio';
 import type { CheerioAPI, Cheerio } from 'cheerio';
 import type { Element } from 'domhandler';
@@ -725,7 +725,7 @@ export class NaverBlogFetcher {
         
         allComponents.forEach((el: Element) => {
             const $el = $(el);
-            
+
             // Handle different component types
             if ($el.hasClass('se-component')) {
                 if ($el.hasClass('se-text')) {
@@ -808,9 +808,20 @@ export class NaverBlogFetcher {
                 } else if ($el.hasClass('se-image')) {
                     // Image component - with comprehensive image source detection
                     const imgElement = $el.find('img');
+                    const videoElement = $el.find('video._gifmp4, video[src*="mblogvideo-phinf"]');
                     const caption = $el.find('.se-caption').text().trim();
-                    
-                    if (imgElement.length > 0) {
+
+                    // Check for GIF MP4 video first (Naver converts GIFs to MP4 videos)
+                    if (videoElement.length > 0) {
+                        let videoSrc = videoElement.attr('src') || videoElement.attr('data-gif-url');
+                        if (videoSrc) {
+                            const altText = caption || 'Blog Image';
+                            content += `![${altText}](${videoSrc})\n`;
+                            if (caption) {
+                                content += `*${caption}*\n`;
+                            }
+                        }
+                    } else if (imgElement.length > 0) {
                         // First, try to find original image URL from Naver link data
                         let imgSrc = this.extractOriginalImageUrl($el, imgElement);
                         
