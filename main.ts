@@ -12,6 +12,7 @@ import { BlogService } from './src/services/blog-service';
 import { ImageService } from './src/services/image-service';
 import { NaverBlogImportModal } from './src/ui/modals/import-modal';
 import { NaverBlogSubscribeModal } from './src/ui/modals/subscribe-modal';
+import { NaverCafeImportModal } from './src/ui/modals/cafe-import-modal';
 import { NaverBlogSettingTab } from './src/ui/settings-tab';
 import { LocaleUtils } from './src/utils/locale-utils';
 import { ContentUtils } from './src/utils/content-utils';
@@ -20,7 +21,9 @@ import { APIClientFactory } from './src/api';
 import {
 	NaverBlogSettings,
 	DEFAULT_SETTINGS,
-	ProcessedBlogPost
+	DEFAULT_CAFE_SETTINGS,
+	ProcessedBlogPost,
+	ProcessedCafePost
 } from './src/types';
 import {
 	NOTICE_TIMEOUTS,
@@ -132,6 +135,15 @@ export default class NaverBlogPlugin extends Plugin {
 			}
 		});
 
+		// Cafe import command
+		this.addCommand({
+			id: 'import-naver-cafe',
+			name: 'Import from Naver Cafe',
+			callback: () => {
+				new NaverCafeImportModal(this.app, this).open();
+			}
+		});
+
 		// Auto-sync subscribed blogs on startup
 		if (this.settings.subscribedBlogs.length > 0) {
 			setTimeout(() => void this.blogService.syncSubscribedBlogs(), UI_DELAYS.autoSync);
@@ -146,7 +158,14 @@ export default class NaverBlogPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		const loadedData = await this.loadData();
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
+		// Ensure cafeSettings exists with defaults
+		if (!this.settings.cafeSettings) {
+			this.settings.cafeSettings = { ...DEFAULT_CAFE_SETTINGS };
+		} else {
+			this.settings.cafeSettings = Object.assign({}, DEFAULT_CAFE_SETTINGS, this.settings.cafeSettings);
+		}
 	}
 
 	async saveSettings() {
@@ -399,7 +418,107 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 		}
 	}
 
+	async createCafeMarkdownFile(post: ProcessedCafePost): Promise<TFile | null> {
+		try {
+			// Generate AI tags and excerpt if enabled
+			if (this.settings.enableAiTags) {
+				post.tags = await this.generateAITags(post.title, post.content);
+			}
 
+			if (this.settings.enableAiExcerpt) {
+				if (this.settings.enableAiTags) {
+					await new Promise(resolve => setTimeout(resolve, API_DELAYS.betweenPosts));
+				}
+				post.excerpt = await this.generateAIExcerpt(post.title, post.content);
+			}
+
+			// Process images if enabled (use cafeSettings if available, otherwise use blog's enableImageDownload)
+			let processedContent = post.content;
+			const shouldDownloadImages = this.settings.cafeSettings?.downloadCafeImages ?? this.settings.enableImageDownload;
+			if (shouldDownloadImages) {
+				processedContent = await this.imageService.downloadAndProcessImages(post.content, post.articleId);
+			}
+
+			// Create filename
+			const filename = this.imageService.sanitizeFilename(`${post.title}.md`);
+			const baseFolder = normalizePath(this.settings.cafeSettings?.cafeImportFolder || DEFAULT_CAFE_SETTINGS.cafeImportFolder);
+			// Store posts under cafeUrl subfolder
+			const folder = normalizePath(`${baseFolder}/${post.cafeUrl}`);
+
+			// Ensure base folder exists
+			const baseFolderExists = this.app.vault.getAbstractFileByPath(baseFolder);
+			if (!baseFolderExists) {
+				await this.app.vault.createFolder(baseFolder);
+			}
+
+			// Ensure cafeUrl subfolder exists
+			const folderExists = this.app.vault.getAbstractFileByPath(folder);
+			if (!folderExists) {
+				await this.app.vault.createFolder(folder);
+			}
+
+			const filepath = normalizePath(`${folder}/${filename}`);
+
+			// Create frontmatter for cafe post
+			const frontmatter = this.createCafeFrontmatter(post);
+
+			// Create full content
+			const fullContent = `${frontmatter}\n${processedContent}`;
+
+			// Check if file already exists
+			const fileExists = this.app.vault.getAbstractFileByPath(filepath);
+			if (fileExists) {
+				return null;
+			}
+
+			// Create the file
+			const createdFile = await this.app.vault.create(filepath, fullContent);
+
+			new Notice(`Created: ${filename}`);
+			return createdFile;
+		} catch (error) {
+			new Notice(`Failed to create file for: ${post.title}`);
+			return null;
+		}
+	}
+
+	private createCafeFrontmatter(post: ProcessedCafePost): string {
+		const lines: string[] = ['---'];
+
+		lines.push(`title: "${post.title.replace(/"/g, '\\"')}"`);
+		lines.push(`date: ${post.date}`);
+		lines.push(`author: "${post.author}"`);
+		lines.push(`articleId: "${post.articleId}"`);
+		lines.push(`cafeId: "${post.cafeId}"`);
+		lines.push(`cafeName: "${post.cafeName}"`);
+		lines.push(`cafeUrl: "${post.cafeUrl}"`);
+		if (post.menuName) {
+			lines.push(`menuName: "${post.menuName}"`);
+		}
+		lines.push(`url: "${post.url}"`);
+		lines.push(`source: naver-cafe`);
+
+		if (post.tags && post.tags.length > 0) {
+			lines.push('tags:');
+			post.tags.forEach(tag => {
+				lines.push(`  - "${tag.replace(/"/g, '\\"')}"`);
+			});
+		}
+
+		if (post.excerpt) {
+			lines.push(`excerpt: "${post.excerpt.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`);
+		}
+
+		if (post.viewCount !== undefined) {
+			lines.push(`viewCount: ${post.viewCount}`);
+		}
+		if (post.commentCount !== undefined) {
+			lines.push(`commentCount: ${post.commentCount}`);
+		}
+
+		lines.push('---');
+		return lines.join('\n');
+	}
 
 	async rewriteCurrentNote(file: TFile): Promise<void> {
 		try {

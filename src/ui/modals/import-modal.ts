@@ -1,8 +1,10 @@
 import { App, Modal, Notice, TFile } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
-import { UI_DEFAULTS, NOTICE_TIMEOUTS } from '../../constants';
+import { NaverCafeFetcher } from '../../fetchers/naver-cafe-fetcher';
+import { UI_DEFAULTS, NOTICE_TIMEOUTS, parseCafeUrl } from '../../constants';
 import { isNaverBlogUrl, parseNaverBlogUrl, extractBlogIdFromUrl } from '../../utils/url-utils';
 import type NaverBlogPlugin from '../../../main';
+import type { ProcessedCafePost } from '../../types';
 
 export class NaverBlogImportModal extends Modal {
 	plugin: NaverBlogPlugin;
@@ -16,13 +18,13 @@ export class NaverBlogImportModal extends Modal {
 		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h2', { text: 'Import from Naver Blog' });
+		contentEl.createEl('h2', { text: 'Import from Naver' });
 
 		const inputContainer = contentEl.createDiv({ cls: 'naver-blog-input-container' });
 
 		const input = inputContainer.createEl('input', {
 			type: 'text',
-			placeholder: 'Blog ID or URL (e.g., yonofbooks or blog.naver.com/...)',
+			placeholder: 'Blog/Cafe URL (blog.naver.com/... or cafe.naver.com/...)',
 			cls: 'naver-blog-input'
 		});
 
@@ -43,7 +45,8 @@ export class NaverBlogImportModal extends Modal {
 			detectionDiv.empty();
 
 			const icon = detection.type === 'single' ? '📄' :
-						 detection.type === 'bulk' ? '📚' : '⚠️';
+						 detection.type === 'bulk' ? '📚' :
+						 detection.type === 'cafe' ? '☕' : '⚠️';
 			detectionDiv.setText(`${icon} ${detection.message}`);
 			detectionDiv.style.color = detection.type === 'invalid' ?
 				'var(--text-error)' : 'var(--text-muted)';
@@ -80,7 +83,7 @@ export class NaverBlogImportModal extends Modal {
 
 			try {
 				const clipboardText = await navigator.clipboard.readText();
-				if (clipboardText && isNaverBlogUrl(clipboardText)) {
+				if (clipboardText && (isNaverBlogUrl(clipboardText) || this.isNaverCafeUrl(clipboardText))) {
 					input.value = clipboardText.trim();
 					input.select();
 					updateDetection();
@@ -91,7 +94,25 @@ export class NaverBlogImportModal extends Modal {
 		}, UI_DEFAULTS.modalTimeout);
 	}
 
-	detectInputType(value: string): { type: 'single' | 'bulk' | 'invalid'; message: string } {
+	isNaverCafeUrl(value: string): boolean {
+		return value.includes('cafe.naver.com');
+	}
+
+	detectInputType(value: string): { type: 'single' | 'bulk' | 'cafe' | 'invalid'; message: string } {
+		// Check for Cafe URL first
+		if (this.isNaverCafeUrl(value)) {
+			const parsed = parseCafeUrl(value);
+			if (parsed && parsed.articleId) {
+				const cafeIdentifier = parsed.cafeUrl || parsed.cafeId || 'unknown';
+				return {
+					type: 'cafe',
+					message: `☕ Cafe article from "${cafeIdentifier}" (articleId: ${parsed.articleId})`
+				};
+			}
+			return { type: 'invalid', message: 'Could not parse cafe article ID from URL' };
+		}
+
+		// Check for Blog URL
 		if (isNaverBlogUrl(value)) {
 			const parsed = parseNaverBlogUrl(value);
 			if (parsed) {
@@ -122,13 +143,29 @@ export class NaverBlogImportModal extends Modal {
 
 	async handleImport(inputValue: string) {
 		if (!inputValue) {
-			new Notice('Please enter a blog ID or post URL');
+			new Notice('Please enter a blog ID or URL');
 			return;
 		}
 
 		this.close();
 
-		// Check if it's a post URL or just a blog ID
+		// Check for Cafe URL first
+		if (this.isNaverCafeUrl(inputValue)) {
+			const parsed = parseCafeUrl(inputValue);
+			if (parsed && parsed.articleId) {
+				const cafeIdentifier = parsed.cafeUrl || parsed.cafeId;
+				if (cafeIdentifier) {
+					await this.importCafeArticle(cafeIdentifier, parsed.articleId);
+				} else {
+					new Notice('Could not extract cafe identifier from URL');
+				}
+			} else {
+				new Notice('Invalid Naver Cafe URL. Please include the article ID.');
+			}
+			return;
+		}
+
+		// Check if it's a blog post URL or just a blog ID
 		if (isNaverBlogUrl(inputValue)) {
 			// Try to parse as single post URL first
 			const parsed = parseNaverBlogUrl(inputValue);
@@ -152,6 +189,50 @@ export class NaverBlogImportModal extends Modal {
 			} else {
 				new Notice('Invalid blog ID');
 			}
+		}
+	}
+
+	async importCafeArticle(cafeIdOrUrl: string, articleId: string) {
+		try {
+			new Notice(`Importing cafe article...`, NOTICE_TIMEOUTS.short);
+
+			const cookie = this.plugin.settings.cafeSettings?.naverCookie || '';
+			const fetcher = new NaverCafeFetcher(cafeIdOrUrl, cookie);
+			const article = await fetcher.fetchSingleArticle(articleId);
+
+			if (!article) {
+				new Notice('Failed to fetch cafe article', NOTICE_TIMEOUTS.medium);
+				return;
+			}
+
+			// Convert to ProcessedCafePost
+			const processedPost: ProcessedCafePost = {
+				title: article.title.replace(/^\[.*?\]\s*/, '').replace(/\s*\[.*?\]$/, '').trim(),
+				content: article.content,
+				date: article.writeDate,
+				articleId: article.articleId,
+				cafeId: article.cafeId,
+				cafeName: article.cafeName || '',
+				cafeUrl: cafeIdOrUrl,
+				menuId: article.menuId,
+				menuName: article.menuName || '',
+				author: article.writerNickname,
+				url: article.url,
+				tags: article.tags,
+				excerpt: article.content.substring(0, 150).replace(/\n/g, ' ') + '...',
+				viewCount: article.viewCount,
+				commentCount: article.commentCount,
+			};
+
+			const createdFile = await this.plugin.createCafeMarkdownFile(processedPost);
+
+			new Notice(`✅ Imported: "${processedPost.title}"`, NOTICE_TIMEOUTS.medium);
+
+			if (createdFile) {
+				await this.openFile(createdFile);
+			}
+		} catch (error) {
+			new Notice(`❌ Import failed: ${error.message}`, NOTICE_TIMEOUTS.medium);
 		}
 	}
 

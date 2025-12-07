@@ -51,7 +51,7 @@ export class ImageService {
 			const filteredMatches = remainingMatches.filter(([_, altText, imageUrl]) => {
 				return this.shouldDownloadImage(imageUrl, altText);
 			});
-			
+
 			const totalImages = filteredMatches.length;
 
 			// Found ${totalImages} valid images to download
@@ -216,7 +216,11 @@ export class ImageService {
 			'blogfiles.pstatic.net',
 			'postfiles.pstatic.net',
 			'mblogthumb-phinf.pstatic.net',
-			'blogpfthumb-phinf.pstatic.net'
+			'blogpfthumb-phinf.pstatic.net',
+			// Cafe image domains
+			'cafeptthumb-phinf.pstatic.net',
+			'cafefiles.pstatic.net',
+			'cafe.pstatic.net'
 		];
 		
 		const isValidDomain = validDomains.some(domain => imageUrl.includes(domain));

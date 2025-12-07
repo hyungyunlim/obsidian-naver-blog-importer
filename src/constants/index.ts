@@ -5,6 +5,9 @@
 // API endpoints and URLs
 export * from './api-endpoints';
 
+// Cafe API endpoints
+export * from './cafe-endpoints';
+
 // AI models and providers
 export * from './ai-models';
 

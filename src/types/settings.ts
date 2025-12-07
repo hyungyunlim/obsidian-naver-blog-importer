@@ -1,6 +1,20 @@
+import type { CafeSubscription } from './cafe';
+
 export interface BlogSubscription {
 	blogId: string;
 	postCount: number;
+}
+
+export interface CafeSettings {
+	naverCookie: string;
+	cafeImportFolder: string;
+	includeComments: boolean;
+	downloadCafeImages: boolean;
+	excludeNotice: boolean;
+	excludeRecommended: boolean;
+	minContentLength: number;
+	subscribedCafes: CafeSubscription[];
+	enableCafeDuplicateCheck: boolean;
 }
 
 export interface NaverBlogSettings {
@@ -20,7 +34,21 @@ export interface NaverBlogSettings {
 	subscriptionCount: number;
 	blogSubscriptions: BlogSubscription[];
 	postImportLimit: number;
+	// Cafe settings
+	cafeSettings: CafeSettings;
 }
+
+export const DEFAULT_CAFE_SETTINGS: CafeSettings = {
+	naverCookie: '',
+	cafeImportFolder: 'Naver Cafe Posts',
+	includeComments: false,
+	downloadCafeImages: true,
+	excludeNotice: true,
+	excludeRecommended: false,
+	minContentLength: 0,
+	subscribedCafes: [],
+	enableCafeDuplicateCheck: true,
+};
 
 export const DEFAULT_SETTINGS: NaverBlogSettings = {
 	aiProvider: 'openai',
@@ -38,5 +66,6 @@ export const DEFAULT_SETTINGS: NaverBlogSettings = {
 	subscribedBlogs: [],
 	subscriptionCount: 10,
 	blogSubscriptions: [],
-	postImportLimit: 0 // 0 means no limit
+	postImportLimit: 0, // 0 means no limit
+	cafeSettings: DEFAULT_CAFE_SETTINGS,
 };

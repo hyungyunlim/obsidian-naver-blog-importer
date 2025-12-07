@@ -46,7 +46,7 @@ export const SKIP_IMAGE_PATTERNS = [
 	/loading/i,
 	/spinner/i,
 	/animation/i,
-	/thumb/i,
+	// Note: removed /thumb/i as it incorrectly matches cafeptthumb-phinf domain
 	
 	// Profile and background images
 	/profile/i,
