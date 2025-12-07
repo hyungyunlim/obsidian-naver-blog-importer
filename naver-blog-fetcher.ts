@@ -1,7 +1,7 @@
 import { requestUrl, Notice } from 'obsidian';
 import * as cheerio from 'cheerio';
 import type { CheerioAPI, Cheerio } from 'cheerio';
-import type { Element } from 'domhandler';
+import type { Element, AnyNode } from 'domhandler';
 
 interface BlogComponent {
 	componentType?: string;
@@ -706,6 +706,63 @@ export class NaverBlogFetcher {
         }
     }
 
+    /**
+     * Parse oembed component (YouTube, etc.) and extract link
+     * Uses Obsidian's native embed syntax: ![title](url) for YouTube
+     */
+    private parseOembedComponent($component: Cheerio<AnyNode>, $: CheerioAPI): string {
+        // Try to get data from script tag with data-module or data-module-v2
+        const scriptEl = $component.find('script.__se_module_data, script[data-module]');
+
+        if (scriptEl.length > 0) {
+            const moduleData = scriptEl.attr('data-module-v2') || scriptEl.attr('data-module');
+            if (moduleData) {
+                try {
+                    const data = JSON.parse(moduleData);
+                    const oembedData = data.data;
+
+                    if (oembedData) {
+                        const url = oembedData.inputUrl || oembedData.url || '';
+                        const title = oembedData.title || '';
+
+                        if (url) {
+                            // YouTube: Use Obsidian native embed syntax
+                            if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                                return `![${title || 'YouTube'}](${url})\n\n`;
+                            }
+                            // Other embeds: Use link format
+                            return `[${title || '임베드 콘텐츠'}](${url})\n\n`;
+                        }
+                    }
+                } catch {
+                    // Fall through to iframe check
+                }
+            }
+        }
+
+        // Fallback: try to extract URL from iframe src
+        const iframe = $component.find('iframe');
+        if (iframe.length > 0) {
+            const src = iframe.attr('src') || '';
+            const title = iframe.attr('title') || '';
+
+            // Convert YouTube embed URL to watch URL
+            if (src.includes('youtube.com/embed/')) {
+                const videoId = src.match(/embed\/([^?&]+)/)?.[1];
+                if (videoId) {
+                    const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                    return `![${title || 'YouTube'}](${watchUrl})\n\n`;
+                }
+            }
+
+            if (src) {
+                return `[${title || '임베드 콘텐츠'}](${src})\n\n`;
+            }
+        }
+
+        return '[임베드 콘텐츠]\n';
+    }
+
     private extractTextFromElement(element: Cheerio<unknown>, $: CheerioAPI): string {
         let content = '';
         
@@ -1043,8 +1100,8 @@ export class NaverBlogFetcher {
                     // Video component
                     content += '[비디오]\n';
                 } else if ($el.hasClass('se-oembed')) {
-                    // Embedded content
-                    content += '[임베드 콘텐츠]\n';
+                    // Embedded content (YouTube, etc.)
+                    content += this.parseOembedComponent($el, $);
                 } else if ($el.hasClass('se-table')) {
                     // Table component
                     content += '[표]\n';
@@ -1190,9 +1247,23 @@ export class NaverBlogFetcher {
                 case 'se-video':
                     content += '[비디오]\n';
                     break;
-                case 'se-oembed':
-                    content += '[임베드 콘텐츠]\n';
+                case 'se-oembed': {
+                    // Embedded content (YouTube, etc.) - Use Obsidian native embed syntax
+                    const oembedData = data as Record<string, string>;
+                    const oembedUrl = oembedData.inputUrl || oembedData.url || '';
+                    const oembedTitle = oembedData.title || '';
+
+                    if (oembedUrl) {
+                        if (oembedUrl.includes('youtube.com') || oembedUrl.includes('youtu.be')) {
+                            content += `![${oembedTitle || 'YouTube'}](${oembedUrl})\n\n`;
+                        } else {
+                            content += `[${oembedTitle || '임베드 콘텐츠'}](${oembedUrl})\n\n`;
+                        }
+                    } else {
+                        content += '[임베드 콘텐츠]\n';
+                    }
                     break;
+                }
                 case 'se-table':
                     content += '[표]\n';
                     break;

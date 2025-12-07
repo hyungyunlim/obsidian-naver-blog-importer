@@ -285,6 +285,35 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 						this.displaySubscriptions(subscriptionDiv);
 					}
 				}));
+
+		// Naver Cafe settings section
+		new Setting(containerEl)
+			.setName('Naver Cafe Settings')
+			.setHeading();
+
+		new Setting(containerEl)
+			.setName('Naver Cookie')
+			.setDesc('For private/member-only cafes. Get from browser DevTools: Application → Cookies → NID_AUT and NID_SES')
+			.addTextArea(text => text
+				.setPlaceholder('NID_AUT=xxx; NID_SES=xxx')
+				.setValue(this.plugin.settings.cafeSettings?.naverCookie || '')
+				.onChange(async (value) => {
+					if (!this.plugin.settings.cafeSettings) {
+						this.plugin.settings.cafeSettings = {
+							naverCookie: '',
+							cafeImportFolder: 'Naver Cafe Posts',
+							includeComments: false,
+							downloadCafeImages: true,
+							excludeNotice: true,
+							excludeRecommended: false,
+							minContentLength: 0,
+							subscribedCafes: [],
+							enableCafeDuplicateCheck: true
+						};
+					}
+					this.plugin.settings.cafeSettings.naverCookie = value;
+					await this.plugin.saveSettings();
+				}));
 	}
 
 	displaySubscriptions(containerEl: HTMLElement) {

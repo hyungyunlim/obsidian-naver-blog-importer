@@ -1,4 +1,5 @@
 import { requestUrl } from 'obsidian';
+import * as https from 'https';
 import * as cheerio from 'cheerio';
 import type { CheerioAPI, Cheerio } from 'cheerio';
 import type { Element, AnyNode } from 'domhandler';
@@ -25,7 +26,11 @@ export class NaverCafeFetcher {
 		// cafeIdOrUrl can be either numeric cafeId or string cafeUrl
 		this.cafeId = cafeIdOrUrl;
 		this.cafeUrl = cafeIdOrUrl;
-		this.cookie = cookie;
+		// Clean cookie: remove newlines, carriage returns, and other control characters
+		this.cookie = cookie
+			.replace(/[\r\n\t]/g, '')  // Remove newlines and tabs
+			.replace(/\s+/g, ' ')       // Normalize spaces
+			.trim();
 	}
 
 	/**
@@ -66,6 +71,46 @@ export class NaverCafeFetcher {
 	}
 
 	/**
+	 * Make HTTPS request with proper Cookie header support (bypasses Obsidian's requestUrl limitations)
+	 */
+	private httpsRequest(url: string, cookie?: string): Promise<{ status: number; body: string }> {
+		return new Promise((resolve, reject) => {
+			const urlObj = new URL(url);
+			const options: https.RequestOptions = {
+				hostname: urlObj.hostname,
+				port: 443,
+				path: urlObj.pathname + urlObj.search,
+				method: 'GET',
+				headers: {
+					'Accept': 'application/json, text/plain, */*',
+					'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+					'Referer': 'https://cafe.naver.com/',
+					'Origin': 'https://cafe.naver.com',
+					'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+				},
+			};
+
+			if (cookie) {
+				options.headers!['Cookie'] = cookie;
+			}
+
+			const req = https.request(options, (res) => {
+				let data = '';
+				res.on('data', (chunk) => { data += chunk; });
+				res.on('end', () => {
+					resolve({ status: res.statusCode || 0, body: data });
+				});
+			});
+
+			req.on('error', (error) => {
+				reject(error);
+			});
+
+			req.end();
+		});
+	}
+
+	/**
 	 * Fetch a single article by articleId
 	 */
 	async fetchSingleArticle(articleId: string): Promise<CafeArticleDetail> {
@@ -73,33 +118,18 @@ export class NaverCafeFetcher {
 			// First, resolve the cafeId
 			const cafeId = await this.resolveCafeId();
 
-			// Try the article API first (best method)
+			// Try the article API first with native https (best method for cookie support)
 			try {
 				const apiUrl = `${CAFE_ARTICLE_API}/${cafeId}/articles/${articleId}`;
-				const response = await requestUrl({
-					url: apiUrl,
-					method: 'GET',
-					contentType: 'application/json',
-					headers: {
-						'Accept': 'application/json, text/plain, */*',
-						'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-						'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-						'Referer': 'https://cafe.naver.com/',
-						'Origin': 'https://cafe.naver.com',
-					},
-				});
+				const response = await this.httpsRequest(apiUrl, this.cookie || undefined);
 
 				if (response.status === 200) {
-					// Try response.json first, then parse response.text
-					let jsonData = response.json;
-					if (!jsonData && response.text) {
-						try {
-							jsonData = JSON.parse(response.text);
-						} catch {
-							// Not valid JSON
-						}
+					let jsonData;
+					try {
+						jsonData = JSON.parse(response.body);
+					} catch {
+						// Not valid JSON
 					}
-
 					if (jsonData) {
 						return this.parseArticleFromApiJson(jsonData, articleId, cafeId);
 					}
@@ -832,9 +862,10 @@ export class NaverCafeFetcher {
 				else if ($component.hasClass('se-video')) {
 					content += '[비디오]\n\n';
 				}
-				// Embedded content
+				// Embedded content (YouTube, etc.)
 				else if ($component.hasClass('se-oembed')) {
-					content += '[임베드 콘텐츠]\n\n';
+					const oembedContent = this.parseOembedComponent($component, $);
+					content += oembedContent;
 				}
 				// Table
 				else if ($component.hasClass('se-table')) {
@@ -933,6 +964,63 @@ export class NaverCafeFetcher {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Parse oembed component (YouTube, etc.) and extract link
+	 * Uses Obsidian's native embed syntax: ![title](url) for YouTube
+	 */
+	private parseOembedComponent($component: Cheerio<AnyNode>, $: CheerioAPI): string {
+		// Try to get data from script tag with data-module or data-module-v2
+		const scriptEl = $component.find('script.__se_module_data, script[data-module]');
+
+		if (scriptEl.length > 0) {
+			const moduleData = scriptEl.attr('data-module-v2') || scriptEl.attr('data-module');
+			if (moduleData) {
+				try {
+					const data = JSON.parse(moduleData);
+					const oembedData = data.data;
+
+					if (oembedData) {
+						const url = oembedData.inputUrl || oembedData.url || '';
+						const title = oembedData.title || '';
+
+						if (url) {
+							// YouTube: Use Obsidian native embed syntax
+							if (url.includes('youtube.com') || url.includes('youtu.be')) {
+								return `![${title || 'YouTube'}](${url})\n\n`;
+							}
+							// Other embeds: Use link format
+							return `[${title || '임베드 콘텐츠'}](${url})\n\n`;
+						}
+					}
+				} catch {
+					// Fall through to iframe check
+				}
+			}
+		}
+
+		// Fallback: try to extract URL from iframe src
+		const iframe = $component.find('iframe');
+		if (iframe.length > 0) {
+			const src = iframe.attr('src') || '';
+			const title = iframe.attr('title') || '';
+
+			// Convert YouTube embed URL to watch URL
+			if (src.includes('youtube.com/embed/')) {
+				const videoId = src.match(/embed\/([^?&]+)/)?.[1];
+				if (videoId) {
+					const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+					return `![${title || 'YouTube'}](${watchUrl})\n\n`;
+				}
+			}
+
+			if (src) {
+				return `[${title || '임베드 콘텐츠'}](${src})\n\n`;
+			}
+		}
+
+		return '[임베드 콘텐츠]\n\n';
 	}
 
 	/**
