@@ -291,27 +291,45 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.setName('Naver Cafe Settings')
 			.setHeading();
 
+		// Cookie description
+		const cookieDesc = document.createDocumentFragment();
+		cookieDesc.appendText('For private/member-only cafes. ');
+		cookieDesc.createEl('br');
+		cookieDesc.appendText('Get from Chrome: F12 → Application → Cookies → naver.com');
+
 		new Setting(containerEl)
-			.setName('Naver Cookie')
-			.setDesc('For private/member-only cafes. Get from browser DevTools: Application → Cookies → NID_AUT and NID_SES')
-			.addTextArea(text => text
-				.setPlaceholder('NID_AUT=xxx; NID_SES=xxx')
-				.setValue(this.plugin.settings.cafeSettings?.naverCookie || '')
+			.setName('Cookie Authentication')
+			.setDesc(cookieDesc);
+
+		// NID_AUT input
+		new Setting(containerEl)
+			.setName('NID_AUT')
+			.setDesc('Copy the NID_AUT cookie value')
+			.addText(text => text
+				.setPlaceholder('Paste NID_AUT value here')
+				.setValue(this.plugin.settings.cafeSettings?.nidAut || '')
 				.onChange(async (value) => {
-					if (!this.plugin.settings.cafeSettings) {
-						this.plugin.settings.cafeSettings = {
-							naverCookie: '',
-							cafeImportFolder: 'Naver Cafe Posts',
-							includeComments: false,
-							downloadCafeImages: true,
-							excludeNotice: true,
-							excludeRecommended: false,
-							minContentLength: 0,
-							subscribedCafes: [],
-							enableCafeDuplicateCheck: true
-						};
-					}
-					this.plugin.settings.cafeSettings.naverCookie = value;
+					this.ensureCafeSettings();
+					// Clean the value - remove "NID_AUT=" prefix if user pasted it
+					const cleanValue = value.replace(/^NID_AUT\s*=\s*/i, '').trim();
+					this.plugin.settings.cafeSettings!.nidAut = cleanValue;
+					this.updateCookieString();
+					await this.plugin.saveSettings();
+				}));
+
+		// NID_SES input
+		new Setting(containerEl)
+			.setName('NID_SES')
+			.setDesc('Copy the NID_SES cookie value')
+			.addText(text => text
+				.setPlaceholder('Paste NID_SES value here')
+				.setValue(this.plugin.settings.cafeSettings?.nidSes || '')
+				.onChange(async (value) => {
+					this.ensureCafeSettings();
+					// Clean the value - remove "NID_SES=" prefix if user pasted it
+					const cleanValue = value.replace(/^NID_SES\s*=\s*/i, '').trim();
+					this.plugin.settings.cafeSettings!.nidSes = cleanValue;
+					this.updateCookieString();
 					await this.plugin.saveSettings();
 				}));
 	}
@@ -411,6 +429,44 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				this.displaySubscriptions(containerEl);
 			};
 		});
+	}
+
+	/**
+	 * Ensure cafeSettings object exists
+	 */
+	private ensureCafeSettings(): void {
+		if (!this.plugin.settings.cafeSettings) {
+			this.plugin.settings.cafeSettings = {
+				naverCookie: '',
+				nidAut: '',
+				nidSes: '',
+				cafeImportFolder: 'Naver Cafe Posts',
+				includeComments: false,
+				downloadCafeImages: true,
+				excludeNotice: true,
+				excludeRecommended: false,
+				minContentLength: 0,
+				subscribedCafes: [],
+				enableCafeDuplicateCheck: true
+			};
+		}
+	}
+
+	/**
+	 * Build cookie string from NID_AUT and NID_SES values
+	 */
+	private updateCookieString(): void {
+		const settings = this.plugin.settings.cafeSettings;
+		if (!settings) return;
+
+		const parts: string[] = [];
+		if (settings.nidAut) {
+			parts.push(`NID_AUT=${settings.nidAut}`);
+		}
+		if (settings.nidSes) {
+			parts.push(`NID_SES=${settings.nidSes}`);
+		}
+		settings.naverCookie = parts.join('; ');
 	}
 
 	getAllFolders(): string[] {

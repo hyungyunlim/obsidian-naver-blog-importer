@@ -253,3 +253,28 @@
 .naver-blog-dropdown-item:last-child {
     border-bottom: none;
 }
+
+/* Cookie Textarea Setting */
+.naver-cookie-setting {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-2);
+}
+
+.naver-cookie-setting .setting-item-info {
+    width: 100%;
+    max-width: none;
+}
+
+.naver-cookie-setting .setting-item-control {
+    width: 100%;
+    justify-content: flex-start;
+}
+
+.naver-cookie-setting textarea {
+    width: 100%;
+    min-height: 100px;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-smaller);
+    resize: vertical;
+}

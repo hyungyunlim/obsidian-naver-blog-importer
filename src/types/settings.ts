@@ -6,7 +6,9 @@ export interface BlogSubscription {
 }
 
 export interface CafeSettings {
-	naverCookie: string;
+	naverCookie: string;  // Legacy - will be built from nidAut + nidSes
+	nidAut: string;       // NID_AUT cookie value
+	nidSes: string;       // NID_SES cookie value
 	cafeImportFolder: string;
 	includeComments: boolean;
 	downloadCafeImages: boolean;
@@ -40,6 +42,8 @@ export interface NaverBlogSettings {
 
 export const DEFAULT_CAFE_SETTINGS: CafeSettings = {
 	naverCookie: '',
+	nidAut: '',
+	nidSes: '',
 	cafeImportFolder: 'Naver Cafe Posts',
 	includeComments: false,
 	downloadCafeImages: true,
