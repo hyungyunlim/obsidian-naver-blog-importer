@@ -187,6 +187,7 @@ export class NaverCafeFetcher {
 
 		const menu = article.menu as Record<string, unknown> | undefined;
 		const writer = article.writer as Record<string, unknown> | undefined;
+		const cafe = result?.cafe as Record<string, unknown> | undefined;
 
 		// Parse writeDate (timestamp)
 		const writeTimestamp = article.writeDate as number;
@@ -199,6 +200,9 @@ export class NaverCafeFetcher {
 		const content = this.convertHtmlToMarkdown(contentHtml);
 		const images = this.extractImagesFromHtml(contentHtml);
 
+		// Extract cafe name (prefer pcCafeName for full name, fallback to name)
+		const cafeName = (cafe?.pcCafeName || cafe?.name || '') as string;
+
 		return {
 			articleId,
 			title: (article.subject || `Article ${articleId}`) as string,
@@ -209,7 +213,7 @@ export class NaverCafeFetcher {
 			menuId: (menu?.id || 0) as number,
 			menuName: (menu?.name || '') as string,
 			cafeId,
-			cafeName: '', // Can be fetched separately if needed
+			cafeName,
 			content,
 			images,
 			attachments: [],
@@ -387,9 +391,24 @@ export class NaverCafeFetcher {
 
 		// Extract cafe info
 		let cafeName = '';
-		const cafeNameEl = $('meta[property="og:site_name"], .cafe_name, .CafeInfo .name');
-		if (cafeNameEl.length > 0) {
-			cafeName = cafeNameEl.attr('content') || cafeNameEl.text().trim();
+		// Try multiple selectors for cafe name
+		const ogSiteName = $('meta[property="og:site_name"]').attr('content');
+		const ogTitle = $('meta[property="og:title"]').attr('content');
+		const cafeNameFromClass = $('.cafe_name, .CafeInfo .name, .cafe-info .name').first().text().trim();
+		const cafeNameFromHeader = $('.cafe_name_box .cafe_name, .CafeTitle .cafe_name').first().text().trim();
+
+		if (ogSiteName && ogSiteName !== '네이버 카페') {
+			cafeName = ogSiteName;
+		} else if (cafeNameFromClass) {
+			cafeName = cafeNameFromClass;
+		} else if (cafeNameFromHeader) {
+			cafeName = cafeNameFromHeader;
+		} else if (ogTitle) {
+			// og:title often contains "글제목 : 카페이름" format
+			const titleMatch = ogTitle.match(/:\s*(.+?)(?:\s*[-|]|$)/);
+			if (titleMatch) {
+				cafeName = titleMatch[1].trim();
+			}
 		}
 
 		// Extract menu name

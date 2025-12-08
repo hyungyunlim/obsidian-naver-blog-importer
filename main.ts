@@ -442,8 +442,9 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			// Create filename
 			const filename = this.imageService.sanitizeFilename(`${post.title}.md`);
 			const baseFolder = normalizePath(this.settings.cafeSettings?.cafeImportFolder || DEFAULT_CAFE_SETTINGS.cafeImportFolder);
-			// Store posts under cafeUrl subfolder
-			const folder = normalizePath(`${baseFolder}/${post.cafeUrl}`);
+			// Store posts under cafeName subfolder (fallback to cafeUrl if cafeName is empty)
+			const subfolderName = this.imageService.sanitizeFilename(post.cafeName || post.cafeUrl);
+			const folder = normalizePath(`${baseFolder}/${subfolderName}`);
 
 			// Ensure base folder exists
 			const baseFolderExists = this.app.vault.getAbstractFileByPath(baseFolder);
@@ -451,7 +452,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 				await this.app.vault.createFolder(baseFolder);
 			}
 
-			// Ensure cafeUrl subfolder exists
+			// Ensure cafeName subfolder exists
 			const folderExists = this.app.vault.getAbstractFileByPath(folder);
 			if (!folderExists) {
 				await this.app.vault.createFolder(folder);

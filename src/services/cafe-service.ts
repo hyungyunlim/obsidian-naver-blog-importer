@@ -58,7 +58,8 @@ export class CafeService {
 	async fetchCafeArticles(
 		cafeIdOrUrl: string,
 		menuId?: number,
-		maxArticles = 10
+		maxArticles = 10,
+		cafeName?: string
 	): Promise<ProcessedCafePost[]> {
 		let fetchNotice: Notice | null = null;
 
@@ -107,7 +108,7 @@ export class CafeService {
 			}
 
 			// Convert to ProcessedCafePost
-			return filteredArticles.map(article => this.convertToProcessedPost(article));
+			return filteredArticles.map(article => this.convertToProcessedPost(article, cafeName));
 		} catch (error) {
 			if (fetchNotice) {
 				fetchNotice.hide();
@@ -152,7 +153,8 @@ export class CafeService {
 						const posts = await this.fetchCafeArticles(
 							subscription.cafeUrl || subscription.cafeId,
 							menuId,
-							subscription.postCount
+							subscription.postCount,
+							subscription.cafeName
 						);
 
 						for (const post of posts) {
@@ -210,14 +212,14 @@ export class CafeService {
 	/**
 	 * Convert CafeArticleDetail to ProcessedCafePost
 	 */
-	private convertToProcessedPost(article: CafeArticleDetail): ProcessedCafePost {
+	private convertToProcessedPost(article: CafeArticleDetail, overrideCafeName?: string): ProcessedCafePost {
 		return {
 			title: this.cleanTitle(article.title),
 			content: article.content,
 			date: article.writeDate,
 			articleId: article.articleId,
 			cafeId: article.cafeId,
-			cafeName: article.cafeName || '',
+			cafeName: overrideCafeName || article.cafeName || '',
 			cafeUrl: article.url.match(/cafe\.naver\.com\/([^\/]+)/)?.[1] || article.cafeId,
 			menuId: article.menuId,
 			menuName: article.menuName || '',
