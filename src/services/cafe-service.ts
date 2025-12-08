@@ -14,6 +14,11 @@ export class CafeService {
 	 */
 	async importSingleArticle(cafeIdOrUrl: string, articleId: string): Promise<ProcessedCafePost> {
 		try {
+			// Warn if no cookie is set
+			if (!this.settings.naverCookie) {
+				new Notice('⚠️ 네이버 쿠키가 설정되지 않았습니다. 비공개 카페의 경우 가져오기가 실패할 수 있습니다.', 5000);
+			}
+
 			new Notice(`Importing cafe article ${articleId}...`, 3000);
 
 			const fetcher = new NaverCafeFetcher(cafeIdOrUrl, this.settings.naverCookie);
@@ -54,16 +59,23 @@ export class CafeService {
 
 	/**
 	 * Fetch cafe articles from a specific menu (board)
+	 * @param skipCookieWarning - Skip cookie warning if already shown by caller
 	 */
 	async fetchCafeArticles(
 		cafeIdOrUrl: string,
 		menuId?: number,
 		maxArticles = 10,
-		cafeName?: string
+		cafeName?: string,
+		skipCookieWarning = false
 	): Promise<ProcessedCafePost[]> {
 		let fetchNotice: Notice | null = null;
 
 		try {
+			// Warn if no cookie is set (only once per fetch operation)
+			if (!skipCookieWarning && !this.settings.naverCookie) {
+				new Notice('⚠️ 네이버 쿠키가 설정되지 않았습니다. 비공개 카페의 경우 가져오기가 실패할 수 있습니다.', 5000);
+			}
+
 			fetchNotice = new Notice('Fetching cafe articles...', 0);
 
 			const fetcher = new NaverCafeFetcher(cafeIdOrUrl, this.settings.naverCookie);
@@ -127,6 +139,11 @@ export class CafeService {
 			return;
 		}
 
+		// Warn once at the start if no cookie is set
+		if (!this.settings.naverCookie) {
+			new Notice('⚠️ 네이버 쿠키가 설정되지 않았습니다. 비공개 카페의 경우 가져오기가 실패할 수 있습니다.', 5000);
+		}
+
 		const syncNotice = new Notice('Syncing subscribed cafes...', 0);
 		let totalNewPosts = 0;
 		let totalErrors = 0;
@@ -154,7 +171,8 @@ export class CafeService {
 							subscription.cafeUrl || subscription.cafeId,
 							menuId,
 							subscription.postCount,
-							subscription.cafeName
+							subscription.cafeName,
+							true // skipCookieWarning - already shown at sync start
 						);
 
 						for (const post of posts) {

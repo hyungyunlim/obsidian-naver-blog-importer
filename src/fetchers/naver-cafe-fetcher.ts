@@ -123,6 +123,11 @@ export class NaverCafeFetcher {
 				const apiUrl = `${CAFE_ARTICLE_API}/${cafeId}/articles/${articleId}`;
 				const response = await this.httpsRequest(apiUrl, this.cookie || undefined);
 
+				// Check for authentication errors
+				if (response.status === 401 || response.status === 403) {
+					throw new Error('COOKIE_REQUIRED');
+				}
+
 				if (response.status === 200) {
 					let jsonData;
 					try {
@@ -131,10 +136,19 @@ export class NaverCafeFetcher {
 						// Not valid JSON
 					}
 					if (jsonData) {
+						// Check for error response in JSON (Naver sometimes returns 200 with error in body)
+						const result = (jsonData as Record<string, unknown>).result as Record<string, unknown> | undefined;
+						if (result?.errorCode === 'UNAUTHORIZED' || result?.errorCode === 'NOT_LOGGED_IN') {
+							throw new Error('COOKIE_REQUIRED');
+						}
 						return this.parseArticleFromApiJson(jsonData, articleId, cafeId);
 					}
 				}
-			} catch {
+			} catch (error) {
+				// Re-throw cookie errors, otherwise fall through to other methods
+				if (error.message === 'COOKIE_REQUIRED') {
+					throw new Error('네이버 카페 글을 가져오려면 쿠키 설정이 필요합니다. 설정에서 네이버 쿠키를 입력해주세요.');
+				}
 				// Fall through to other methods
 			}
 

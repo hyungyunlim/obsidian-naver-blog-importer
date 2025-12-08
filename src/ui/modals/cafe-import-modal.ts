@@ -149,9 +149,15 @@ export class NaverCafeImportModal extends Modal {
 
 	async importSingleArticle(cafeIdOrUrl: string, articleId: string) {
 		try {
+			const cookie = this.plugin.settings.cafeSettings?.naverCookie || '';
+
+			// Warn if no cookie is set
+			if (!cookie) {
+				new Notice('⚠️ 네이버 쿠키가 설정되지 않았습니다. 비공개 카페의 경우 가져오기가 실패할 수 있습니다.', NOTICE_TIMEOUTS.medium);
+			}
+
 			new Notice(`Importing cafe article...`, NOTICE_TIMEOUTS.short);
 
-			const cookie = this.plugin.settings.cafeSettings?.naverCookie || '';
 			const fetcher = new NaverCafeFetcher(cafeIdOrUrl, cookie);
 			const article = await fetcher.fetchSingleArticle(articleId);
 
