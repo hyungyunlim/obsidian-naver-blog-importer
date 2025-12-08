@@ -1,6 +1,6 @@
 {
   "name": "obsidian-naver-blog-importer",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "Import posts from Naver Blog directly into Obsidian",
   "main": "main.js",
   "scripts": {

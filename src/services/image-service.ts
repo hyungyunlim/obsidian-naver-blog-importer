@@ -220,7 +220,9 @@ export class ImageService {
 			// Cafe image domains
 			'cafeptthumb-phinf.pstatic.net',
 			'cafefiles.pstatic.net',
-			'cafe.pstatic.net'
+			'cafe.pstatic.net',
+			// Naver store/sticker images
+			'storep-phinf.pstatic.net'
 		];
 		
 		const isValidDomain = validDomains.some(domain => imageUrl.includes(domain));
@@ -266,6 +268,15 @@ export class ImageService {
 			} else {
 				// Add type parameter if not present
 				directUrl += (directUrl.includes('?') ? '&' : '?') + 'type=w2000';
+			}
+			return directUrl;
+		}
+
+		// For storep-phinf.pstatic.net (Naver sticker/store images), add type parameter
+		// These images require a type parameter to be accessible
+		if (directUrl.includes('storep-phinf.pstatic.net')) {
+			if (!directUrl.includes('type=')) {
+				directUrl += (directUrl.includes('?') ? '&' : '?') + 'type=p100_100';
 			}
 			return directUrl;
 		}
