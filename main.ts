@@ -432,19 +432,22 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 				post.excerpt = await this.generateAIExcerpt(post.title, post.content);
 			}
 
-			// Process images if enabled (use cafeSettings if available, otherwise use blog's enableImageDownload)
-			let processedContent = post.content;
-			const shouldDownloadImages = this.settings.cafeSettings?.downloadCafeImages ?? this.settings.enableImageDownload;
-			if (shouldDownloadImages) {
-				processedContent = await this.imageService.downloadAndProcessImages(post.content, post.articleId);
-			}
-
-			// Create filename
+			// Create filename and folder paths first (needed for image processing)
 			const filename = this.imageService.sanitizeFilename(`${post.title}.md`);
 			const baseFolder = normalizePath(this.settings.cafeSettings?.cafeImportFolder || DEFAULT_CAFE_SETTINGS.cafeImportFolder);
 			// Store posts under cafeName subfolder (fallback to cafeUrl if cafeName is empty)
 			const subfolderName = this.imageService.sanitizeFilename(post.cafeName || post.cafeUrl);
 			const folder = normalizePath(`${baseFolder}/${subfolderName}`);
+			// Cafe images go to attachments subfolder inside the cafe folder
+			const cafeImageFolder = normalizePath(`${folder}/attachments`);
+
+			// Process images if enabled (use cafeSettings if available, otherwise use blog's enableImageDownload)
+			let processedContent = post.content;
+			const shouldDownloadImages = this.settings.cafeSettings?.downloadCafeImages ?? this.settings.enableImageDownload;
+			if (shouldDownloadImages) {
+				// Pass custom folders: images go to cafe's attachments folder, notes are in cafe folder
+				processedContent = await this.imageService.downloadAndProcessImages(post.content, post.articleId, cafeImageFolder, folder);
+			}
 
 			// Ensure base folder exists
 			const baseFolderExists = this.app.vault.getAbstractFileByPath(baseFolder);

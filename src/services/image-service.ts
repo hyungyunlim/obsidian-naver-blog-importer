@@ -15,7 +15,7 @@ export class ImageService {
 		private settings: NaverBlogSettings
 	) {}
 
-	async downloadAndProcessImages(content: string, logNo: string): Promise<string> {
+	async downloadAndProcessImages(content: string, logNo: string, customImageFolder?: string, customNotesFolder?: string): Promise<string> {
 		// Always convert mblogvideo URLs to links (these are MP4 videos, not images)
 		// This runs regardless of image download settings
 		const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
@@ -35,8 +35,8 @@ export class ImageService {
 		}
 
 		try {
-			// Create attachments folder
-			const attachmentsFolder = normalizePath(this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder);
+			// Create attachments folder (use custom folder if provided, otherwise default)
+			const attachmentsFolder = normalizePath(customImageFolder || this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder);
 			const folderExists = this.app.vault.getAbstractFileByPath(attachmentsFolder);
 			if (!folderExists) {
 				await this.app.vault.createFolder(attachmentsFolder);
@@ -118,8 +118,8 @@ export class ImageService {
 								throw new Error('File was not saved properly');
 							}
 						
-						// Update content with local path (relative to default folder)
-						const relativePath = this.calculateRelativePath();
+						// Update content with local path (relative to notes folder)
+						const relativePath = this.calculateRelativePath(customNotesFolder, customImageFolder);
 						const localImagePath = `${relativePath}${filename}`;
 						const newImageMd = `![${altText}](${localImagePath})`;
 						
@@ -158,8 +158,8 @@ export class ImageService {
 								
 								const imagePath = normalizePath(`${attachmentsFolder}/${filename}`);
 								await this.app.vault.createBinary(imagePath, altResponse.arrayBuffer);
-								
-								const relativePath = this.calculateRelativePath();
+
+								const relativePath = this.calculateRelativePath(customNotesFolder, customImageFolder);
 								const localImagePath = `${relativePath}${filename}`;
 								const newImageMd = `![${altText}](${localImagePath})`;
 								processedContent = processedContent.replace(fullMatch, newImageMd);
@@ -235,10 +235,38 @@ export class ImageService {
 		// Convert Naver blog image URLs to direct download URLs - improved logic
 		let directUrl = url;
 
-		// For postfiles.pstatic.net, keep the original URL but without query params
-		if (directUrl.includes('postfiles.pstatic.net')) {
-			// Remove only size-related query parameters, keep the URL structure
-			directUrl = directUrl.replace(/\?type=w\d+/i, '').replace(/&type=w\d+/i, '');
+		// Handle dthumb-phinf.pstatic.net thumbnail proxy URLs (used in cafe scrap posts)
+		// Format: https://dthumb-phinf.pstatic.net/?src=%22http%3A%2F%2Fpostfiles...%22&type=cafe_wa740
+		if (directUrl.includes('dthumb-phinf.pstatic.net')) {
+			try {
+				const urlObj = new URL(directUrl);
+				const srcParam = urlObj.searchParams.get('src');
+				if (srcParam) {
+					// Remove surrounding quotes (srcParam is already URL-decoded by searchParams.get)
+					let extractedUrl = srcParam.replace(/^["']|["']$/g, '');
+					// Convert http to https
+					if (extractedUrl.startsWith('http://')) {
+						extractedUrl = extractedUrl.replace('http://', 'https://');
+					}
+					directUrl = extractedUrl;
+				}
+			} catch {
+				// If URL parsing fails, continue with original
+			}
+		}
+
+		// For postfiles URLs (both pstatic.net and naver.net), use large size for full quality
+		// Examples: postfiles.pstatic.net, postfiles3.naver.net, postfiles9.naver.net
+		if (directUrl.includes('postfiles')) {
+			// Replace small thumbnail type (w2, w80, etc.) with large size (w2000)
+			// This returns the original/full-size image
+			if (directUrl.includes('type=')) {
+				directUrl = directUrl.replace(/type=w\d+/gi, 'type=w2000');
+				directUrl = directUrl.replace(/type=cafe_wa\d+/gi, 'type=w2000');
+			} else {
+				// Add type parameter if not present
+				directUrl += (directUrl.includes('?') ? '&' : '?') + 'type=w2000';
+			}
 			return directUrl;
 		}
 
@@ -269,10 +297,10 @@ export class ImageService {
 			.substring(0, MAX_FILENAME_LENGTH); // Limit length but keep spaces
 	}
 
-	private calculateRelativePath(): string {
-		const defaultFolderPath = normalizePath(this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder);
-		const imageFolderPath = normalizePath(this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder);
-		
+	private calculateRelativePath(customNotesFolder?: string, customImageFolder?: string): string {
+		const defaultFolderPath = normalizePath(customNotesFolder || this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder);
+		const imageFolderPath = normalizePath(customImageFolder || this.settings.imageFolder || DEFAULT_SETTINGS.imageFolder);
+
 		// Calculate relative path from default folder to image folder
 		let relativePath = '';
 		if (imageFolderPath.startsWith(defaultFolderPath)) {
@@ -285,25 +313,25 @@ export class ImageService {
 			// Image folder is outside default folder, use relative path
 			const defaultParts = defaultFolderPath.split('/');
 			const imageParts = imageFolderPath.split('/');
-			
+
 			// Find common prefix
 			let commonIndex = 0;
-			while (commonIndex < defaultParts.length && 
-				   commonIndex < imageParts.length && 
+			while (commonIndex < defaultParts.length &&
+				   commonIndex < imageParts.length &&
 				   defaultParts[commonIndex] === imageParts[commonIndex]) {
 				commonIndex++;
 			}
-			
+
 			// Go up from default folder
 			const upLevels = defaultParts.length - commonIndex;
 			const upPath = '../'.repeat(upLevels);
-			
+
 			// Go down to image folder
 			const downPath = imageParts.slice(commonIndex).join('/');
-			
+
 			relativePath = upPath + (downPath ? downPath + '/' : '');
 		}
-		
+
 		return relativePath;
 	}
 

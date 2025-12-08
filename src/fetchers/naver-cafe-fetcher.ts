@@ -195,10 +195,92 @@ export class NaverCafeFetcher {
 			? new Date(writeTimestamp).toISOString().split('T')[0]
 			: new Date().toISOString().split('T')[0];
 
-		// Convert HTML content to markdown
-		const contentHtml = (article.contentHtml || '') as string;
-		const content = this.convertHtmlToMarkdown(contentHtml);
-		const images = this.extractImagesFromHtml(contentHtml);
+		// Handle scraped content (blog posts shared to cafe)
+		const scrap = article.scrap as Record<string, unknown> | undefined;
+		const scrapContentHtml = (scrap?.contentHtml || '') as string;
+		const userContentHtml = (article.contentHtml || '') as string;
+
+		// Process contentElements - build image map for placeholders
+		// Naver API uses [[[CONTENT-ELEMENT-N]]] placeholders in contentHtml
+		const contentElements = (scrap?.contentElements || []) as Array<Record<string, unknown>>;
+		const extractedImages: string[] = [];
+		const placeholderMap = new Map<string, string>();
+
+		if (contentElements.length > 0) {
+			contentElements.forEach((element, index) => {
+				const placeholder = `[[[CONTENT-ELEMENT-${index}]]]`;
+				const elementType = element.type as string;
+				const elementJson = element.json as Record<string, unknown> | undefined;
+
+				if (elementType === 'IMAGE' && elementJson?.image) {
+					const imageData = elementJson.image as Record<string, unknown>;
+					let imageUrl = imageData.url as string;
+					if (imageUrl) {
+						// Convert dthumb proxy URL to direct image URL
+						imageUrl = this.convertDthumbToDirectUrl(imageUrl);
+						extractedImages.push(imageUrl);
+						placeholderMap.set(placeholder, `![Image](${imageUrl})`);
+					}
+				}
+			});
+		}
+
+		// Build full content: user comment + scraped content
+		let fullContent = '';
+
+		// Add user's comment/note ONLY if this is a scrap post and user added a comment
+		// For regular posts (non-scrap), userContentHtml IS the main content, not a comment
+		if (scrap && userContentHtml && userContentHtml.trim()) {
+			const userComment = this.convertHtmlToMarkdown(userContentHtml);
+			if (userComment.trim()) {
+				fullContent += `> ${userComment.trim().replace(/\n/g, '\n> ')}\n\n`;
+			}
+		}
+
+		// Add scrap source info if exists
+		if (scrap) {
+			const sourceUrl = (scrap.linkHtml as string || '').match(/href='([^']+)'/)?.[1] || '';
+			const sourceTitle = (scrap.titleHtml as string || '').replace(/<[^>]+>/g, '').trim();
+			if (sourceUrl) {
+				fullContent += `**출처**: [${sourceTitle || sourceUrl}](${sourceUrl})\n\n---\n\n`;
+			}
+		}
+
+		// Add main content (scraped or original)
+		const mainContentHtml = scrapContentHtml || userContentHtml;
+		let mainContent = this.convertHtmlToMarkdown(mainContentHtml);
+
+		// Replace placeholders with actual images AFTER markdown conversion
+		// The placeholders survive as text through the HTML-to-markdown conversion
+		let placeholdersReplaced = 0;
+		for (const [placeholder, imgMarkdown] of placeholderMap) {
+			if (mainContent.includes(placeholder)) {
+				mainContent = mainContent.replace(placeholder, `\n\n${imgMarkdown}\n\n`);
+				placeholdersReplaced++;
+			}
+		}
+		// Clean up any remaining placeholders
+		mainContent = mainContent.replace(/\[\[\[CONTENT-ELEMENT-\d+\]\]\]/g, '');
+
+		// Only append contentElements images if:
+		// 1. No placeholders were replaced AND
+		// 2. convertHtmlToMarkdown didn't extract any images (check for ![ pattern)
+		// This prevents duplicate images and preserves DOM order
+		const hasImagesInContent = mainContent.includes('![');
+		if (placeholdersReplaced === 0 && extractedImages.length > 0 && !hasImagesInContent) {
+			mainContent += '\n\n';
+			for (const imageUrl of extractedImages) {
+				mainContent += `![Image](${imageUrl})\n\n`;
+			}
+		}
+
+		fullContent += mainContent;
+
+		const content = fullContent.trim();
+		// Use extracted images from contentElements, or fallback to HTML extraction
+		const images = extractedImages.length > 0
+			? extractedImages
+			: this.extractImagesFromHtml(scrapContentHtml || userContentHtml);
 
 		// Extract cafe name (prefer pcCafeName for full name, fallback to name)
 		const cafeName = (cafe?.pcCafeName || cafe?.name || '') as string;
@@ -659,13 +741,109 @@ export class NaverCafeFetcher {
 		const $ = cheerio.load(html);
 		let content = '';
 
-		// Use blog parser approach: find .se-main-container first, then .se-component
+		// First, try to extract from .se-component-content structure (used in scraped posts)
+		// Process all wrapper divs in DOM order to maintain text/image sequence
+		const seViewer = $('.se-viewer, .se-components-wrap');
+		if (seViewer.length > 0) {
+			// Find all direct content wrapper divs (they have inline margin style)
+			seViewer.find('div[style*="margin:30px auto"]').each((_, wrapperDiv) => {
+				const $wrapper = $(wrapperDiv);
+
+				// Check for image - try multiple selectors for different scrap post formats
+				const imgEl = $wrapper.find('img.article_img, img.ATTACH_IMAGE, img[src*="postfiles"], img[src*="pstatic.net"]');
+				if (imgEl.length > 0) {
+					let imgSrc = imgEl.attr('src');
+					if (imgSrc) {
+						imgSrc = this.enhanceImageUrl(imgSrc);
+						const alt = imgEl.attr('alt') || 'Image';
+						content += `![${alt}](${imgSrc})\n\n`;
+					}
+					return; // Continue to next wrapper
+				}
+
+				// Check for horizontal line
+				const hrEl = $wrapper.find('hr');
+				if (hrEl.length > 0) {
+					content += '---\n\n';
+					return;
+				}
+
+				// Check for placeholder text (used in scrap posts for images)
+				// Placeholders like [[[CONTENT-ELEMENT-0]]] are used instead of <img> tags
+				const wrapperText = $wrapper.text();
+				const placeholderMatch = wrapperText.match(/\[\[\[CONTENT-ELEMENT-\d+\]\]\]/);
+				if (placeholderMatch) {
+					content += placeholderMatch[0] + '\n\n';
+					return;
+				}
+
+				// Extract text from <p> tags
+				$wrapper.find('p').each((_, p) => {
+					const text = $(p).text().trim();
+					// Skip empty text and zero-width spaces
+					if (text && text !== '​' && text.length > 0) {
+						content += text + '\n\n';
+					}
+				});
+			});
+
+			if (content.trim()) {
+				return this.cleanContent(content);
+			}
+		}
+
+		// Alternative: Process .se-component-content in order
+		const componentContents = $('.se-component-content');
+		if (componentContents.length > 0) {
+			componentContents.each((_, contentEl) => {
+				const $contentEl = $(contentEl);
+
+				// Check for image section or direct image
+				const imageSection = $contentEl.find('.se-section-image');
+				const directImg = $contentEl.find('img[src*="postfiles"], img[src*="pstatic.net"], img.article_img');
+
+				if (imageSection.length > 0 || directImg.length > 0) {
+					const imgEl = imageSection.length > 0 ? imageSection.find('img') : directImg;
+					if (imgEl.length > 0) {
+						let imgSrc = imgEl.attr('src');
+						if (imgSrc) {
+							imgSrc = this.enhanceImageUrl(imgSrc);
+							const alt = imgEl.attr('alt') || 'Image';
+							content += `![${alt}](${imgSrc})\n\n`;
+						}
+					}
+				} else {
+					// Extract text from <p> tags
+					$contentEl.find('p').each((_, p) => {
+						const text = $(p).text().trim();
+						// Skip empty text and zero-width spaces
+						if (text && text !== '​' && text.length > 0) {
+							content += text + '\n\n';
+						}
+					});
+				}
+			});
+
+			if (content.trim()) {
+				return this.cleanContent(content);
+			}
+		}
+
+		// Fallback: Use blog parser approach - find .se-main-container first, then .se-component
+		// Also handle .se-section for scraped blog posts (they use different structure)
 		const mainContainer = $('.se-main-container');
 		let components;
 		if (mainContainer.length > 0) {
+			// Try .se-component first, then .se-section for scraped content
 			components = mainContainer.find('.se-component').toArray();
+			if (components.length === 0) {
+				components = mainContainer.find('.se-section').toArray();
+			}
 		} else {
 			components = $('.se-component').toArray();
+			if (components.length === 0) {
+				components = $('.se-section').toArray();
+			}
 		}
 
 		if (components.length > 0) {
@@ -673,7 +851,8 @@ export class NaverCafeFetcher {
 				const $component = $(component);
 
 				// Text component - process all children in DOM order (p, ul, ol)
-				if ($component.hasClass('se-text')) {
+				// Also handles .se-section-text for scraped blog posts
+				if ($component.hasClass('se-text') || $component.hasClass('se-section-text')) {
 					const textModule = $component.find('.se-module-text');
 					if (textModule.length > 0) {
 						// Process all direct children in DOM order to maintain text flow
@@ -711,6 +890,12 @@ export class NaverCafeFetcher {
 								}
 							});
 						}
+					} else {
+						// No .se-module-text wrapper - try direct text extraction
+						const directText = $component.find('p').map((_, p) => $(p).text().trim()).get().join('\n');
+						if (directText) {
+							content += directText + '\n';
+						}
 					}
 					content += '\n';
 				}
@@ -747,7 +932,8 @@ export class NaverCafeFetcher {
 					}
 				}
 				// Image component - with comprehensive image source detection (like blog parser)
-				else if ($component.hasClass('se-image')) {
+				// Also handles .se-section-image for scraped blog posts
+				else if ($component.hasClass('se-image') || $component.hasClass('se-section-image')) {
 					const imgElement = $component.find('img');
 					const videoElement = $component.find('video._gifmp4, video[src*="mblogvideo-phinf"]');
 					const caption = $component.find('.se-caption').text().trim();
@@ -775,10 +961,18 @@ export class NaverCafeFetcher {
 						}
 
 						if (imgSrc && this.isContentImage(imgSrc)) {
+							// enhanceImageUrl now handles dthumb conversion internally
 							imgSrc = this.enhanceImageUrl(imgSrc);
 							const altText = caption || imgElement.attr('alt') || 'Image';
 							content += `![${altText}](${imgSrc})\n`;
 							if (caption) content += `*${caption}*\n`;
+						}
+					} else {
+						// No img element - check for placeholder text (used in scrap posts)
+						// Placeholders like [[[CONTENT-ELEMENT-0]]] are in <a> tags
+						const placeholderMatch = $component.text().match(/\[\[\[CONTENT-ELEMENT-\d+\]\]\]/);
+						if (placeholderMatch) {
+							content += placeholderMatch[0] + '\n';
 						}
 					}
 					content += '\n';
@@ -926,17 +1120,50 @@ export class NaverCafeFetcher {
 		}
 
 		// Fallback: if no SE components or empty content, try basic extraction
+		// Process elements in DOM order to maintain text/image sequence
 		if (!content.trim()) {
-			$('p, div.se-module-text').each((_, el) => {
-				const text = $(el).text().trim();
-				if (text) content += text + '\n\n';
-			});
+			// Find all block-level elements and process them in order
+			$('body').find('p, img, div[style*="margin:30px"], .se-component-content, hr').each((_, el) => {
+				const $el = $(el);
+				const tagName = (el as Element).tagName?.toLowerCase();
 
-			$('img').each((_, img) => {
-				const src = $(img).attr('data-lazy-src') || $(img).attr('src');
-				if (src && this.isContentImage(src)) {
-					const alt = $(img).attr('alt') || 'Image';
-					content += `![${alt}](${this.enhanceImageUrl(src)})\n\n`;
+				// Skip if this element is inside another element we already processed
+				if ($el.parents('.se-component-content').length > 0 && tagName !== 'p' && tagName !== 'img') {
+					return;
+				}
+
+				if (tagName === 'p') {
+					const text = $el.text().trim();
+					if (text && text !== '​' && text.length > 0) {
+						content += text + '\n\n';
+					}
+				} else if (tagName === 'img') {
+					const src = $el.attr('data-lazy-src') || $el.attr('src');
+					if (src && this.isContentImage(src)) {
+						const alt = $el.attr('alt') || 'Image';
+						content += `![${alt}](${this.enhanceImageUrl(src)})\n\n`;
+					}
+				} else if (tagName === 'hr') {
+					content += '---\n\n';
+				} else if (tagName === 'div') {
+					// Check for image in wrapper div
+					const imgEl = $el.find('img[src*="postfiles"], img[src*="pstatic.net"], img.article_img');
+					if (imgEl.length > 0) {
+						let imgSrc = imgEl.attr('src');
+						if (imgSrc) {
+							imgSrc = this.enhanceImageUrl(imgSrc);
+							const alt = imgEl.attr('alt') || 'Image';
+							content += `![${alt}](${imgSrc})\n\n`;
+						}
+					} else {
+						// Extract text from wrapper div's p tags
+						$el.find('p').each((_, p) => {
+							const text = $(p).text().trim();
+							if (text && text !== '​' && text.length > 0) {
+								content += text + '\n\n';
+							}
+						});
+					}
 				}
 			});
 		}
@@ -1088,19 +1315,55 @@ export class NaverCafeFetcher {
 	 * Note: Cafe images should NOT be converted to blogfiles (causes 404)
 	 */
 	private enhanceImageUrl(src: string): string {
-		let url = src;
+		// Convert dthumb proxy URLs and adjust type parameters for full-size
+		// convertDthumbToDirectUrl now handles postfiles URLs and sets type=w2000
+		return this.convertDthumbToDirectUrl(src);
+	}
 
-		// Remove size/type query parameters but keep the base URL
-		const queryIndex = url.indexOf('?');
-		if (queryIndex > 0) {
-			url = url.substring(0, queryIndex);
+	/**
+	 * Convert thumbnail/proxy URLs to full-size direct image URLs
+	 * Handles:
+	 * 1. dthumb-phinf.pstatic.net proxy URLs
+	 * 2. postfiles URLs with type parameter (thumbnails)
+	 * 3. Other Naver CDN thumbnail URLs
+	 */
+	private convertDthumbToDirectUrl(url: string): string {
+		let resultUrl = url;
+
+		// Handle dthumb-phinf.pstatic.net proxy URLs
+		if (resultUrl.includes('dthumb-phinf.pstatic.net')) {
+			try {
+				const urlObj = new URL(resultUrl);
+				const srcParam = urlObj.searchParams.get('src');
+				if (srcParam) {
+					// Remove surrounding quotes (srcParam is already URL-decoded by searchParams.get)
+					resultUrl = srcParam.replace(/^["']|["']$/g, '');
+				}
+			} catch {
+				// If URL parsing fails, continue with original URL
+			}
 		}
 
-		// For cafe images, use cafeptthumb-phinf (original quality)
-		// Do NOT convert to blogfiles - cafe images are different from blog images
-		// Just return the cleaned URL without CDN changes
+		// Convert http to https
+		if (resultUrl.startsWith('http://')) {
+			resultUrl = resultUrl.replace('http://', 'https://');
+		}
 
-		return url;
+		// For postfiles URLs, replace small type with large type for full-size image
+		if (resultUrl.includes('postfiles')) {
+			if (resultUrl.includes('type=')) {
+				resultUrl = resultUrl.replace(/type=w\d+/gi, 'type=w2000');
+				resultUrl = resultUrl.replace(/type=cafe_wa\d+/gi, 'type=w2000');
+			} else {
+				resultUrl += (resultUrl.includes('?') ? '&' : '?') + 'type=w2000';
+			}
+		} else {
+			// For other domains, remove type parameters
+			resultUrl = resultUrl.replace(/[?&]type=[^&]+/gi, '');
+			resultUrl = resultUrl.replace(/[?&]$/, '');
+		}
+
+		return resultUrl;
 	}
 
 	/**
@@ -1111,6 +1374,10 @@ export class NaverCafeFetcher {
 			.replace(/\r\n/g, '\n')
 			.replace(/\n{3,}/g, '\n\n')
 			.replace(/[ \t]+$/gm, '')
+			// Remove zero-width and invisible Unicode characters that cause display issues
+			.replace(/[\u200B-\u200F\u2028-\u202F\uFEFF]/g, '')
+			// Remove replacement character (often appears when encoding fails)
+			.replace(/\uFFFD/g, '')
 			.trim();
 	}
 
