@@ -1,6 +1,16 @@
-import { requestUrl } from 'obsidian';
-import * as https from 'https';
+import { requestUrl, Platform } from 'obsidian';
 import * as cheerio from 'cheerio';
+
+// Conditionally import https module (only available on desktop)
+let https: typeof import('https') | null = null;
+if (!Platform.isMobile) {
+	try {
+		// Dynamic import for desktop only
+		https = require('https');
+	} catch {
+		// https module not available
+	}
+}
 import type { CheerioAPI, Cheerio } from 'cheerio';
 import type { Element, AnyNode } from 'domhandler';
 import type { CafeArticle, CafeArticleDetail } from '../types';
@@ -71,38 +81,59 @@ export class NaverCafeFetcher {
 	}
 
 	/**
-	 * Make HTTPS request with proper Cookie header support (bypasses Obsidian's requestUrl limitations)
+	 * Make HTTPS request with proper Cookie header support
+	 * On desktop: uses Node.js https module (best cookie support)
+	 * On mobile: uses Obsidian's requestUrl (cookie support may be limited by Capacitor/WebView)
 	 */
-	private httpsRequest(url: string, cookie?: string): Promise<{ status: number; body: string }> {
+	private async makeRequest(url: string, cookie?: string): Promise<{ status: number; body: string }> {
+		const headers: Record<string, string> = {
+			'Accept': 'application/json, text/plain, */*',
+			'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+			'Referer': 'https://cafe.naver.com/',
+			'Origin': 'https://cafe.naver.com',
+			'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+		};
+
+		if (cookie) {
+			headers['Cookie'] = cookie;
+		}
+
+		// On mobile or if https module is not available, use requestUrl
+		if (Platform.isMobile || !https) {
+			try {
+				const response = await requestUrl({
+					url,
+					method: 'GET',
+					headers,
+					throw: false, // Don't throw on 4xx/5xx, we handle it ourselves
+				});
+				return { status: response.status, body: response.text };
+			} catch (error) {
+				// requestUrl failed, return error status
+				return { status: 0, body: '' };
+			}
+		}
+
+		// On desktop, use Node.js https for better cookie support
 		return new Promise((resolve, reject) => {
 			const urlObj = new URL(url);
-			const options: https.RequestOptions = {
+			const options = {
 				hostname: urlObj.hostname,
 				port: 443,
 				path: urlObj.pathname + urlObj.search,
 				method: 'GET',
-				headers: {
-					'Accept': 'application/json, text/plain, */*',
-					'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
-					'Referer': 'https://cafe.naver.com/',
-					'Origin': 'https://cafe.naver.com',
-					'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-				},
+				headers,
 			};
-
-			if (cookie) {
-				options.headers!['Cookie'] = cookie;
-			}
 
 			const req = https.request(options, (res) => {
 				let data = '';
-				res.on('data', (chunk) => { data += chunk; });
+				res.on('data', (chunk: string) => { data += chunk; });
 				res.on('end', () => {
 					resolve({ status: res.statusCode || 0, body: data });
 				});
 			});
 
-			req.on('error', (error) => {
+			req.on('error', (error: Error) => {
 				reject(error);
 			});
 
@@ -121,7 +152,7 @@ export class NaverCafeFetcher {
 			// Try the article API first with native https (best method for cookie support)
 			try {
 				const apiUrl = `${CAFE_ARTICLE_API}/${cafeId}/articles/${articleId}`;
-				const response = await this.httpsRequest(apiUrl, this.cookie || undefined);
+				const response = await this.makeRequest(apiUrl, this.cookie || undefined);
 
 				// Check for authentication errors
 				if (response.status === 401 || response.status === 403) {
