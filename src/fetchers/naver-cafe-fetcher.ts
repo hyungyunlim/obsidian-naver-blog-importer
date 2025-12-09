@@ -1,16 +1,5 @@
-import { requestUrl, Platform } from 'obsidian';
+import { requestUrl } from 'obsidian';
 import * as cheerio from 'cheerio';
-
-// Conditionally import https module (only available on desktop)
-let https: typeof import('https') | null = null;
-if (!Platform.isMobile) {
-	try {
-		// Dynamic import for desktop only
-		https = require('https');
-	} catch {
-		// https module not available
-	}
-}
 import type { CheerioAPI, Cheerio } from 'cheerio';
 import type { Element, AnyNode } from 'domhandler';
 import type { CafeArticle, CafeArticleDetail } from '../types';
@@ -81,9 +70,8 @@ export class NaverCafeFetcher {
 	}
 
 	/**
-	 * Make HTTPS request with proper Cookie header support
-	 * On desktop: uses Node.js https module (best cookie support)
-	 * On mobile: uses Obsidian's requestUrl (cookie support may be limited by Capacitor/WebView)
+	 * Make HTTPS request with Cookie header support
+	 * Uses Obsidian's requestUrl which works on both desktop and mobile
 	 */
 	private async makeRequest(url: string, cookie?: string): Promise<{ status: number; body: string }> {
 		const headers: Record<string, string> = {
@@ -98,47 +86,18 @@ export class NaverCafeFetcher {
 			headers['Cookie'] = cookie;
 		}
 
-		// On mobile or if https module is not available, use requestUrl
-		if (Platform.isMobile || !https) {
-			try {
-				const response = await requestUrl({
-					url,
-					method: 'GET',
-					headers,
-					throw: false, // Don't throw on 4xx/5xx, we handle it ourselves
-				});
-				return { status: response.status, body: response.text };
-			} catch (error) {
-				// requestUrl failed, return error status
-				return { status: 0, body: '' };
-			}
-		}
-
-		// On desktop, use Node.js https for better cookie support
-		return new Promise((resolve, reject) => {
-			const urlObj = new URL(url);
-			const options = {
-				hostname: urlObj.hostname,
-				port: 443,
-				path: urlObj.pathname + urlObj.search,
+		try {
+			const response = await requestUrl({
+				url,
 				method: 'GET',
 				headers,
-			};
-
-			const req = https.request(options, (res) => {
-				let data = '';
-				res.on('data', (chunk: string) => { data += chunk; });
-				res.on('end', () => {
-					resolve({ status: res.statusCode || 0, body: data });
-				});
+				throw: false, // Don't throw on 4xx/5xx, we handle it ourselves
 			});
-
-			req.on('error', (error: Error) => {
-				reject(error);
-			});
-
-			req.end();
-		});
+			return { status: response.status, body: response.text };
+		} catch {
+			// requestUrl failed, return error status
+			return { status: 0, body: '' };
+		}
 	}
 
 	/**
