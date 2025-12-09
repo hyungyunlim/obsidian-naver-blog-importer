@@ -88,6 +88,7 @@ export class NaverBlogFetcher {
                             break; // Found one working post, that's enough for testing
                         }
                     } catch {
+                        // Failed to fetch post content, try next logNo
                         continue;
                     }
                 }
@@ -196,7 +197,8 @@ export class NaverBlogFetcher {
                                 break; // Found posts with this URL pattern, no need to try others
                             }
                         }
-                    } catch (error) {
+                    } catch {
+                        // Request failed for this URL format, try next
                         continue;
                     }
                 }
@@ -378,11 +380,7 @@ export class NaverBlogFetcher {
             }
             
         } catch {
-
-            
-            // Continue with next URL format
-
-            
+            // Failed to parse HTML, return empty posts array
         }
         
         return posts;
@@ -1084,6 +1082,7 @@ export class NaverBlogFetcher {
                                     const type = data.type || 'Unknown';
                                     materialParts.push(`[${title}](${link}) (${type})`);
                                 } catch {
+                                    // Failed to parse link data JSON, use fallback
                                     materialParts.push('[자료]');
                                 }
                             } else {
@@ -1720,13 +1719,11 @@ export class NaverBlogFetcher {
                         return data.src;
                     }
                 } catch {
-
-                                    // Continue parsing
-
+                    // Invalid JSON in linkdata attribute, continue with other methods
                 }
             }
         }
-        
+
         // Also check script tags for image data (newer Naver blogs)
         const scriptElement = $el.find('script.__se_module_data, script[data-module-v2]');
         if (scriptElement.length > 0) {
@@ -1741,9 +1738,7 @@ export class NaverBlogFetcher {
                         return data.data.imageInfo.src;
                     }
                 } catch {
-
-                                    // Continue parsing
-
+                    // Invalid JSON in script element, continue with other methods
                 }
             }
         }
@@ -1805,12 +1800,6 @@ export class NaverBlogFetcher {
             .replace('https://mblogthumb-phinf.pstatic.net/', 'https://blogfiles.pstatic.net/')
             .replace('https://postfiles.pstatic.net/', 'https://blogfiles.pstatic.net/')
             .replace('https://blogpfthumb-phinf.pstatic.net/', 'https://blogfiles.pstatic.net/');
-        
-        // Log the transformation for debugging
-        if (enhancedUrl !== imgSrc) {
-            // Empty block
-        }
-        
         
         return enhancedUrl;
     }

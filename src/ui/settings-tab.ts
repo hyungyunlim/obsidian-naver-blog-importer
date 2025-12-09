@@ -288,7 +288,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 		// Naver Cafe settings section
 		new Setting(containerEl)
-			.setName('Naver Cafe Settings')
+			.setName('Naver Cafe settings')
 			.setHeading();
 
 		// Cookie description
@@ -298,7 +298,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		cookieDesc.appendText('Get from Chrome: F12 → Application → Cookies → naver.com');
 
 		new Setting(containerEl)
-			.setName('Cookie Authentication')
+			.setName('Cookie authentication')
 			.setDesc(cookieDesc);
 
 		// NID_AUT input
@@ -351,7 +351,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			// Post count setting
 			const countDiv = blogDiv.createDiv({ cls: 'naver-blog-count-container' });
 			
-			const _ = countDiv.createEl('span', { 
+			countDiv.createEl('span', {
 				text: this.plugin.i18n.t('settings.posts_label') + ':',
 				cls: 'naver-blog-count-label'
 			});

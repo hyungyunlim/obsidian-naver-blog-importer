@@ -56,12 +56,13 @@ export class NaverCafeImportModal extends Modal {
 		helpDiv.style.marginTop = '12px';
 		helpDiv.style.fontSize = '11px';
 		helpDiv.style.color = 'var(--text-faint)';
-		helpDiv.innerHTML = `
-			<strong>Supported formats:</strong><br>
-			• https://cafe.naver.com/cafename/12345<br>
-			• https://m.cafe.naver.com/cafename/12345<br>
-			• cafe.naver.com/ArticleRead.nhn?clubid=123&articleid=456
-		`;
+		helpDiv.createEl('strong', { text: 'Supported formats:' });
+		helpDiv.createEl('br');
+		helpDiv.appendText('• https://cafe.naver.com/cafename/12345');
+		helpDiv.createEl('br');
+		helpDiv.appendText('• https://m.cafe.naver.com/cafename/12345');
+		helpDiv.createEl('br');
+		helpDiv.appendText('• cafe.naver.com/ArticleRead.nhn?clubid=123&articleid=456');
 
 		const buttonContainer = contentEl.createDiv({ cls: 'naver-blog-button-container' });
 
