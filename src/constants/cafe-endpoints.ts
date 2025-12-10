@@ -39,6 +39,17 @@ export const buildCafeMobileArticleUrl = (cafeId: string, articleId: string): st
 	return `${CAFE_MOBILE_API_BASE}/${cafeId}/articles/${articleId}`;
 };
 
+// Comment API (uses official Naver Cafe API)
+export const CAFE_COMMENT_API_BASE = 'https://apis.naver.com/cafe-web/cafe-articleapi/v2/cafes';
+
+export const buildCafeCommentListUrl = (cafeId: string, articleId: string, page = 1, perPage = 100): string => {
+	const params = new URLSearchParams({
+		'page': page.toString(),
+		'perPage': perPage.toString(),
+	});
+	return `${CAFE_COMMENT_API_BASE}/${cafeId}/articles/${articleId}/comments?${params.toString()}`;
+};
+
 export const buildCafeMobileArticleListUrl = (cafeId: string, menuId?: number, page = 1): string => {
 	const params = new URLSearchParams({
 		'page': page.toString(),

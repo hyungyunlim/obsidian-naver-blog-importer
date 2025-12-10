@@ -332,6 +332,18 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					this.updateCookieString();
 					await this.plugin.saveSettings();
 				}));
+
+		// Include comments toggle
+		new Setting(containerEl)
+			.setName('Include comments')
+			.setDesc('Include comments at the bottom of imported cafe posts')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.cafeSettings?.includeComments ?? true)
+				.onChange(async (value) => {
+					this.ensureCafeSettings();
+					this.plugin.settings.cafeSettings!.includeComments = value;
+					await this.plugin.saveSettings();
+				}));
 	}
 
 	displaySubscriptions(containerEl: HTMLElement) {
@@ -441,7 +453,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				nidAut: '',
 				nidSes: '',
 				cafeImportFolder: 'Naver Cafe Posts',
-				includeComments: false,
+				includeComments: true,
 				downloadCafeImages: true,
 				excludeNotice: true,
 				excludeRecommended: false,

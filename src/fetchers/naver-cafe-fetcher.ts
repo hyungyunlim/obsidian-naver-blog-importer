@@ -2,12 +2,13 @@ import { requestUrl } from 'obsidian';
 import * as cheerio from 'cheerio';
 import type { CheerioAPI, Cheerio } from 'cheerio';
 import type { Element, AnyNode } from 'domhandler';
-import type { CafeArticle, CafeArticleDetail } from '../types';
+import type { CafeArticle, CafeArticleDetail, CafeComment } from '../types';
 import {
 	buildCafeArticleReadUrl,
 	buildCafeArticleListUrl,
 	buildCafeArticleDirectUrl,
 	buildCafeMobileArticleUrl,
+	buildCafeCommentListUrl,
 	parseCafeUrl,
 	CAFE_BASE_URL,
 } from '../constants';
@@ -103,7 +104,7 @@ export class NaverCafeFetcher {
 	/**
 	 * Fetch a single article by articleId
 	 */
-	async fetchSingleArticle(articleId: string): Promise<CafeArticleDetail> {
+	async fetchSingleArticle(articleId: string, includeComments = true): Promise<CafeArticleDetail> {
 		try {
 			// First, resolve the cafeId
 			const cafeId = await this.resolveCafeId();
@@ -131,7 +132,19 @@ export class NaverCafeFetcher {
 						if (result?.errorCode === 'UNAUTHORIZED' || result?.errorCode === 'NOT_LOGGED_IN') {
 							throw new Error('COOKIE_REQUIRED');
 						}
-						return this.parseArticleFromApiJson(jsonData, articleId, cafeId);
+						const article = this.parseArticleFromApiJson(jsonData, articleId, cafeId);
+
+						// Fetch comments if requested
+						if (includeComments) {
+							try {
+								article.comments = await this.fetchComments(cafeId, articleId);
+							} catch {
+								// Comments fetch failed, continue without comments
+								article.comments = [];
+							}
+						}
+
+						return article;
 					}
 				}
 			} catch (error) {
@@ -159,10 +172,27 @@ export class NaverCafeFetcher {
 
 					if (response.status === 200) {
 						if (response.headers['content-type']?.includes('application/json')) {
-							return this.parseArticleFromJson(response.json, articleId);
+							const article = this.parseArticleFromJson(response.json, articleId);
+							// Try to fetch comments for HTML parsed articles too
+							if (includeComments) {
+								try {
+									article.comments = await this.fetchComments(cafeId, articleId);
+								} catch {
+									article.comments = [];
+								}
+							}
+							return article;
 						}
 						const article = this.parseArticleFromHtml(response.text, articleId);
 						if (article.content && article.content.trim().length > 0) {
+							// Try to fetch comments for HTML parsed articles too
+							if (includeComments) {
+								try {
+									article.comments = await this.fetchComments(cafeId, articleId);
+								} catch {
+									article.comments = [];
+								}
+							}
 							return article;
 						}
 					}
@@ -175,6 +205,191 @@ export class NaverCafeFetcher {
 		} catch (error) {
 			throw new Error(`Failed to fetch article: ${error.message}`);
 		}
+	}
+
+	/**
+	 * Fetch comments for an article
+	 */
+	async fetchComments(cafeId: string, articleId: string): Promise<CafeComment[]> {
+		const allComments: CafeComment[] = [];
+		let page = 1;
+		let hasMore = true;
+		const maxPages = 10; // Safety limit
+
+		while (hasMore && page <= maxPages) {
+			try {
+				const url = buildCafeCommentListUrl(cafeId, articleId, page);
+				const response = await this.makeRequest(url, this.cookie || undefined);
+
+				if (response.status !== 200) {
+					break;
+				}
+
+				let jsonData;
+				try {
+					jsonData = JSON.parse(response.body);
+				} catch {
+					break;
+				}
+
+				const comments = this.parseCommentsFromApiJson(jsonData);
+				if (comments.length === 0) {
+					hasMore = false;
+				} else {
+					allComments.push(...comments);
+					page++;
+				}
+
+				// Check if there are more pages
+				const result = (jsonData as Record<string, unknown>).result as Record<string, unknown> | undefined;
+				const hasNextPage = result?.hasNext as boolean | undefined;
+				if (hasNextPage === false) {
+					hasMore = false;
+				}
+
+				// Add delay between requests
+				await this.delay(300);
+			} catch {
+				break;
+			}
+		}
+
+		return allComments;
+	}
+
+	/**
+	 * Parse comments from API JSON response
+	 * Handles multiple API response structures
+	 */
+	private parseCommentsFromApiJson(data: unknown): CafeComment[] {
+		const comments: CafeComment[] = [];
+		const json = data as Record<string, unknown>;
+		const result = json.result as Record<string, unknown> | undefined;
+
+		if (!result) return comments;
+
+		// Try different response structures
+		let commentList: Array<Record<string, unknown>> | undefined;
+
+		// Structure 1: result.comments.items (array)
+		const commentsObj = result.comments as Record<string, unknown> | Array<Record<string, unknown>> | undefined;
+		if (commentsObj) {
+			if (Array.isArray(commentsObj)) {
+				// Structure 2: result.comments is directly an array
+				commentList = commentsObj;
+			} else if (commentsObj.items && Array.isArray(commentsObj.items)) {
+				// Structure 1: result.comments.items
+				commentList = commentsObj.items as Array<Record<string, unknown>>;
+			}
+		}
+
+		// Structure 3: result.commentList
+		if (!commentList) {
+			const directList = result.commentList as Array<Record<string, unknown>> | undefined;
+			if (directList && Array.isArray(directList)) {
+				commentList = directList;
+			}
+		}
+
+		if (!commentList || !Array.isArray(commentList)) return comments;
+
+		for (const comment of commentList) {
+			// Parse main comment
+			const parsedComment = this.parseSingleComment(comment, false);
+			if (parsedComment) {
+				comments.push(parsedComment);
+			}
+
+			// Parse replies (nested in replyList)
+			const replyList = comment.replyList as Array<Record<string, unknown>> | undefined;
+			if (replyList && Array.isArray(replyList)) {
+				for (const reply of replyList) {
+					const parsedReply = this.parseSingleComment(reply, true, String(comment.commentId || ''));
+					if (parsedReply) {
+						comments.push(parsedReply);
+					}
+				}
+			}
+		}
+
+		return comments;
+	}
+
+	/**
+	 * Parse a single comment object
+	 * Handles actual Naver Cafe API response structure:
+	 * - id, refId, writer, content, updateDate, memberLevel, isRef, isArticleWriter
+	 */
+	private parseSingleComment(
+		comment: Record<string, unknown>,
+		isReply: boolean,
+		parentCommentId?: string
+	): CafeComment | null {
+		const writer = comment.writer as Record<string, unknown> | undefined;
+		const image = comment.image as Record<string, unknown> | undefined;
+
+		// Get content
+		const content = (comment.content as string) || '';
+
+		// Skip deleted comments
+		if (comment.isDeleted === true) return null;
+		if (!content.trim() && !image) return null;
+
+		// Parse timestamp - Naver uses updateDate
+		const writeTimestamp = (comment.updateDate as number) ||
+			(comment.writeDate as number) ||
+			(comment.createDate as number);
+		const writeDate = writeTimestamp
+			? this.formatCommentDate(new Date(writeTimestamp))
+			: '';
+
+		// Determine if reply - Naver uses isRef field or refId !== id
+		const commentId = comment.id as number | undefined;
+		const refId = comment.refId as number | undefined;
+		const actualIsReply = isReply ||
+			(comment.isRef === true) ||
+			(refId !== undefined && commentId !== undefined && refId !== commentId);
+		const actualParentId = parentCommentId ||
+			(actualIsReply && refId ? String(refId) : undefined);
+
+		// Get member level directly from comment
+		const memberLevel = (comment.memberLevel as number) || undefined;
+
+		// Get attachment image URL
+		let attachmentImageUrl: string | undefined;
+		if (image) {
+			attachmentImageUrl = (image.url as string) ||
+				(image.src as string) ||
+				(image.imageUrl as string);
+		}
+
+		return {
+			commentId: String(comment.id || comment.commentId || ''),
+			content: content.trim(),
+			writerNickname: ((writer?.nick as string) || (writer?.nickname as string) || 'Unknown').trim(),
+			writerId: (writer?.id as string) || (writer?.memberKey as string),
+			writeDate,
+			isReply: actualIsReply,
+			parentCommentId: actualParentId,
+			likeCount: (comment.sympathyCount as number) || (comment.likeCount as number),
+			profileImageUrl: (writer?.image as string) || (writer?.profileUrl as string),
+			memberLevel,
+			isWriter: (comment.isArticleWriter as boolean) || (comment.articleWriter as boolean),
+			attachmentImageUrl,
+			mentionedNickname: undefined, // Will be extracted from content if needed
+		};
+	}
+
+	/**
+	 * Format comment date to readable string
+	 */
+	private formatCommentDate(date: Date): string {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, '0');
+		const day = String(date.getDate()).padStart(2, '0');
+		const hours = String(date.getHours()).padStart(2, '0');
+		const minutes = String(date.getMinutes()).padStart(2, '0');
+		return `${year}.${month}.${day}. ${hours}:${minutes}`;
 	}
 
 	/**

@@ -228,6 +228,7 @@ export class NaverBlogImportModal extends Modal {
 				excerpt: article.content.substring(0, 150).replace(/\n/g, ' ') + '...',
 				viewCount: article.viewCount,
 				commentCount: article.commentCount,
+				comments: article.comments,
 			};
 
 			const createdFile = await this.plugin.createCafeMarkdownFile(processedPost);

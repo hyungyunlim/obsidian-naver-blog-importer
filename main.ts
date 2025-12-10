@@ -12,11 +12,11 @@ import { BlogService } from './src/services/blog-service';
 import { ImageService } from './src/services/image-service';
 import { NaverBlogImportModal } from './src/ui/modals/import-modal';
 import { NaverBlogSubscribeModal } from './src/ui/modals/subscribe-modal';
-import { NaverCafeImportModal } from './src/ui/modals/cafe-import-modal';
 import { NaverBlogSettingTab } from './src/ui/settings-tab';
 import { LocaleUtils } from './src/utils/locale-utils';
 import { ContentUtils } from './src/utils/content-utils';
 import { SettingsUtils } from './src/utils/settings-utils';
+import { convertCommentsToMarkdown } from './src/utils/comment-utils';
 import { APIClientFactory } from './src/api';
 import {
 	NaverBlogSettings,
@@ -132,15 +132,6 @@ export default class NaverBlogPlugin extends Plugin {
 				if (hasMarkdownFile) {
 					void this.deleteNoteWithImages(activeFile);
 				}
-			}
-		});
-
-		// Cafe import command
-		this.addCommand({
-			id: 'import-naver-cafe',
-			name: 'Import from Naver Cafe',
-			callback: () => {
-				new NaverCafeImportModal(this.app, this).open();
 			}
 		});
 
@@ -466,8 +457,15 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			// Create frontmatter for cafe post
 			const frontmatter = this.createCafeFrontmatter(post);
 
+			// Add comments section if enabled and comments exist
+			let commentsSection = '';
+			const includeComments = this.settings.cafeSettings?.includeComments ?? true;
+			if (includeComments && post.comments && post.comments.length > 0) {
+				commentsSection = '\n\n' + convertCommentsToMarkdown(post.comments);
+			}
+
 			// Create full content
-			const fullContent = `${frontmatter}\n${processedContent}`;
+			const fullContent = `${frontmatter}\n${processedContent}${commentsSection}`;
 
 			// Check if file already exists
 			const fileExists = this.app.vault.getAbstractFileByPath(filepath);

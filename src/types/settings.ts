@@ -45,7 +45,7 @@ export const DEFAULT_CAFE_SETTINGS: CafeSettings = {
 	nidAut: '',
 	nidSes: '',
 	cafeImportFolder: 'Naver Cafe Posts',
-	includeComments: false,
+	includeComments: true,
 	downloadCafeImages: true,
 	excludeNotice: true,
 	excludeRecommended: false,

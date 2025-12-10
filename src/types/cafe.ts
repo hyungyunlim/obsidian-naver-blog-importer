@@ -48,6 +48,11 @@ export interface CafeComment {
 	isReply: boolean;          // 대댓글 여부
 	parentCommentId?: string;  // 부모 댓글 ID
 	likeCount?: number;
+	profileImageUrl?: string;  // 프로필 이미지 URL
+	memberLevel?: number;      // 회원 레벨
+	isWriter?: boolean;        // 글쓴이 여부
+	attachmentImageUrl?: string; // 첨부 이미지 URL
+	mentionedNickname?: string;  // 멘션된 닉네임 (대댓글에서)
 }
 
 // 게시판 (메뉴) 정보
