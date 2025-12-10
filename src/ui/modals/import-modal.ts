@@ -322,6 +322,7 @@ export class NaverBlogImportModal extends Modal {
 						successCount++;
 					}
 				} catch {
+					// Failed to create markdown file for this post
 					errorCount++;
 				}
 				await new Promise(resolve => setTimeout(resolve, 500));
@@ -349,6 +350,7 @@ export class NaverBlogImportModal extends Modal {
 				await this.openFile(lastCreatedFile);
 			}
 		} catch {
+			// Import process failed
 			cancelNotice.hide();
 			new Notice("Import failed. Check console for details.");
 		}

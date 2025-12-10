@@ -91,8 +91,8 @@ export class ImageService {
 						try {
 							filename = decodeURIComponent(filename);
 						} catch {
-						// Keep original filename if decoding fails
-					}
+							// Keep original filename if decoding fails
+						}
 						
 						// If filename is too long or problematic, use a simpler name
 						if (filename.length > MAX_FILENAME_LENGTH || !filename.includes('.')) {
@@ -173,8 +173,9 @@ export class ImageService {
 			}
 
 			return processedContent;
-		} catch (error) {
-			return content; // Return original content on error
+		} catch {
+			// Return original content on error
+			return content;
 		}
 	}
 

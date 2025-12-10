@@ -486,16 +486,6 @@ export class NaverBlogFetcher {
             }
 
             // First, try to extract from meta tags (like Python script)
-            
-            // Debug: list all meta tags
-            $('meta').each((_, meta) => {
-                const $meta = $(meta);
-                
-                
-                
-                
-            });
-
             const metaSelectors = [
                 'meta[property="article:published_time"]',
                 'meta[property="article:modified_time"]', 
@@ -528,7 +518,6 @@ export class NaverBlogFetcher {
 
             // If no meta date found, try visible elements
             if (!date) {
-                
                 const dateSelectors = [
                     '.se_publishDate',  // This is what naver_blog_md uses!
                     '.se-publishDate',
@@ -584,7 +573,6 @@ export class NaverBlogFetcher {
 
             // If still no date found, try to extract from script tags
             if (!date) {
-                
                 $('script').each((_, script) => {
                     const scriptContent = $(script).html();
                     if (scriptContent) {

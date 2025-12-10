@@ -96,35 +96,25 @@ export class BlogService {
 				try {
 					new Notice(`Syncing blog ${blogProgress}: ${blogId} (${postCount} posts)`, 5000);
 					const posts = await this.fetchNaverBlogPosts(blogId, postCount);
-					
-					
-					
-					
-					
+
 					for (let j = 0; j < posts.length; j++) {
 						const post = posts[j];
 						const postProgress = `${blogProgress} post (${j + 1}/${posts.length})`;
-						const isErrorPost = post.title.startsWith('[오류]');
-						
+
 						try {
 							new Notice(`Creating ${postProgress}: ${post.title}`, 3000);
 							await this.createMarkdownFile(post);
-							
-							if (isErrorPost) {
-								// Error post - already handled
-							} else {
-								// Regular post - already processed
-							}
 							totalNewPosts++;
-						} catch (error) {
-							
+						} catch {
+							// Failed to create markdown file for this post
 							totalErrors++;
 						}
 						await new Promise(resolve => setTimeout(resolve, 500));
 					}
 					
 					// Blog sync completed for this blog
-				} catch (error) {
+				} catch {
+					// Failed to sync this blog
 					totalErrors++;
 				}
 				
