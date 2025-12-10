@@ -223,7 +223,9 @@ export class ImageService {
 			'cafefiles.pstatic.net',
 			'cafe.pstatic.net',
 			// Naver store/sticker images
-			'storep-phinf.pstatic.net'
+			'storep-phinf.pstatic.net',
+			// Naver News image domain
+			'imgnews.pstatic.net',
 		];
 		
 		const isValidDomain = validDomains.some(domain => imageUrl.includes(domain));
@@ -278,6 +280,16 @@ export class ImageService {
 		if (directUrl.includes('storep-phinf.pstatic.net')) {
 			if (!directUrl.includes('type=')) {
 				directUrl += (directUrl.includes('?') ? '&' : '?') + 'type=p100_100';
+			}
+			return directUrl;
+		}
+
+		// For imgnews.pstatic.net (Naver News images), convert to high resolution
+		if (directUrl.includes('imgnews.pstatic.net')) {
+			if (directUrl.includes('type=')) {
+				directUrl = directUrl.replace(/type=w\d+/gi, 'type=w2000');
+			} else {
+				directUrl += (directUrl.includes('?') ? '&' : '?') + 'type=w2000';
 			}
 			return directUrl;
 		}

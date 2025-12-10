@@ -20,3 +20,12 @@ export type {
 	CafeSubscription,
 	NaverCafeSettings,
 } from './cafe';
+
+// News types
+export type {
+	NewsArticle,
+	NewsImage,
+	NewsComment,
+	NaverNewsSettings,
+} from './news';
+export { DEFAULT_NEWS_SETTINGS } from './news';

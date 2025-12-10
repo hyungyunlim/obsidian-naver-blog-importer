@@ -12,6 +12,7 @@ import { BlogService } from './src/services/blog-service';
 import { ImageService } from './src/services/image-service';
 import { NaverBlogImportModal } from './src/ui/modals/import-modal';
 import { NaverBlogSubscribeModal } from './src/ui/modals/subscribe-modal';
+import { NaverNewsImportModal } from './src/ui/modals/news-import-modal';
 import { NaverBlogSettingTab } from './src/ui/settings-tab';
 import { LocaleUtils } from './src/utils/locale-utils';
 import { ContentUtils } from './src/utils/content-utils';
@@ -22,6 +23,7 @@ import {
 	NaverBlogSettings,
 	DEFAULT_SETTINGS,
 	DEFAULT_CAFE_SETTINGS,
+	DEFAULT_NEWS_SETTINGS,
 	ProcessedBlogPost,
 	ProcessedCafePost
 } from './src/types';
@@ -135,6 +137,15 @@ export default class NaverBlogPlugin extends Plugin {
 			}
 		});
 
+		// Naver News import command
+		this.addCommand({
+			id: 'import-naver-news',
+			name: this.i18n.t('commands.import-naver-news'),
+			callback: () => {
+				new NaverNewsImportModal(this.app, this).open();
+			}
+		});
+
 		// Auto-sync subscribed blogs on startup
 		if (this.settings.subscribedBlogs.length > 0) {
 			setTimeout(() => void this.blogService.syncSubscribedBlogs(), UI_DELAYS.autoSync);
@@ -156,6 +167,12 @@ export default class NaverBlogPlugin extends Plugin {
 			this.settings.cafeSettings = { ...DEFAULT_CAFE_SETTINGS };
 		} else {
 			this.settings.cafeSettings = Object.assign({}, DEFAULT_CAFE_SETTINGS, this.settings.cafeSettings);
+		}
+		// Ensure newsSettings exists with defaults
+		if (!this.settings.newsSettings) {
+			this.settings.newsSettings = { ...DEFAULT_NEWS_SETTINGS };
+		} else {
+			this.settings.newsSettings = Object.assign({}, DEFAULT_NEWS_SETTINGS, this.settings.newsSettings);
 		}
 	}
 

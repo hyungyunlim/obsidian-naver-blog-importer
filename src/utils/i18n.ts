@@ -49,7 +49,8 @@ export class I18n {
 				'import-blog-url': 'Import all posts from blog',
 				'sync-subscribed-blogs': 'Sync subscribed blogs',
 				'ai-fix-layout': 'AI fix layout and format (preserve content 100%)',
-				'delete-note-with-images': 'Delete note with embedded images'
+				'delete-note-with-images': 'Delete note with embedded images',
+				'import-naver-news': 'Import Naver News article'
 			},
 			settings: {
 				ai_configuration: 'AI',
@@ -86,7 +87,17 @@ export class I18n {
 				remove_button: 'Remove',
 				sync_button: 'Sync',
 				no_subscribed_blogs: 'No subscribed blogs',
-				posts_label: 'Posts'
+				posts_label: 'Posts',
+				// News settings
+				news_settings: 'Naver News',
+				news_folder: 'News folder',
+				news_folder_desc: 'Folder where imported news articles will be saved',
+				news_organize_by_press: 'Organize by press',
+				news_organize_by_press_desc: 'Create subfolders for each press/media outlet',
+				news_download_images: 'Download images',
+				news_download_images_desc: 'Download article images locally',
+				news_include_comments: 'Include comments',
+				news_include_comments_desc: 'Include reader comments at the bottom of articles (default: off)'
 			},
 			notices: {
 				api_key_required: '{{provider}} API key required for AI formatting',
@@ -140,6 +151,18 @@ export class I18n {
 					blog_id_desc: 'Enter the Naver blog ID to subscribe to',
 					blog_id_placeholder: 'Blog ID',
 					subscribe_button: 'Subscribe'
+				},
+				news_import: {
+					title: 'Import Naver News Article',
+					placeholder: 'Paste Naver News URL (n.news.naver.com/...)',
+					detected: 'Naver News article detected',
+					invalid_url: 'Invalid Naver News URL',
+					enter_url: 'Please enter a news article URL',
+					importing: 'Importing news article...',
+					fetch_failed: 'Failed to fetch article',
+					success: 'Article imported',
+					image_download_partial: 'Some images could not be downloaded',
+					import_button: 'Import'
 				}
 			},
 			errors: {
@@ -170,7 +193,8 @@ export class I18n {
 				'import-blog-url': '블로그 전체 포스트 가져오기',
 				'sync-subscribed-blogs': '구독 블로그 동기화',
 				'ai-fix-layout': 'AI 레이아웃 수정 및 포맷 (내용 100% 보존)',
-				'delete-note-with-images': '노트와 포함된 이미지 함께 삭제'
+				'delete-note-with-images': '노트와 포함된 이미지 함께 삭제',
+				'import-naver-news': '네이버 뉴스 기사 가져오기'
 			},
 			settings: {
 				ai_configuration: 'AI',
@@ -207,7 +231,17 @@ export class I18n {
 				remove_button: '제거',
 				sync_button: '동기화',
 				no_subscribed_blogs: '구독한 블로그가 없습니다',
-				posts_label: '포스트'
+				posts_label: '포스트',
+				// News settings
+				news_settings: '네이버 뉴스',
+				news_folder: '뉴스 폴더',
+				news_folder_desc: '가져온 뉴스 기사가 저장될 폴더',
+				news_organize_by_press: '언론사별 분류',
+				news_organize_by_press_desc: '각 언론사/매체별로 하위 폴더 생성',
+				news_download_images: '이미지 다운로드',
+				news_download_images_desc: '기사 이미지를 로컬에 다운로드',
+				news_include_comments: '댓글 포함',
+				news_include_comments_desc: '기사 하단에 독자 댓글 포함 (기본: 비활성)'
 			},
 			notices: {
 				api_key_required: '{{provider}} API 키가 AI 포맷팅에 필요합니다',
@@ -261,6 +295,18 @@ export class I18n {
 					blog_id_desc: '구독할 네이버 블로그 ID를 입력하세요',
 					blog_id_placeholder: '블로그 ID',
 					subscribe_button: '구독하기'
+				},
+				news_import: {
+					title: '네이버 뉴스 기사 가져오기',
+					placeholder: '네이버 뉴스 URL 붙여넣기 (n.news.naver.com/...)',
+					detected: '네이버 뉴스 기사 감지됨',
+					invalid_url: '올바른 네이버 뉴스 URL이 아닙니다',
+					enter_url: '뉴스 기사 URL을 입력해주세요',
+					importing: '뉴스 기사 가져오는 중...',
+					fetch_failed: '기사 가져오기 실패',
+					success: '기사 가져오기 완료',
+					image_download_partial: '일부 이미지를 다운로드하지 못했습니다',
+					import_button: '가져오기'
 				}
 			},
 			errors: {

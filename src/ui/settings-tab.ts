@@ -344,6 +344,74 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					this.plugin.settings.cafeSettings!.includeComments = value;
 					await this.plugin.saveSettings();
 				}));
+
+		// Naver News settings section
+		new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.news_settings'))
+			.setHeading();
+
+		// News folder
+		new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.news_folder'))
+			.setDesc(this.plugin.i18n.t('settings.news_folder_desc'))
+			.addText(text => {
+				text.setPlaceholder('NaverNews')
+					.setValue(this.plugin.settings.newsSettings?.newsFolder || 'NaverNews')
+					.onChange(async (value) => {
+						this.ensureNewsSettings();
+						this.plugin.settings.newsSettings!.newsFolder = normalizePath(value || 'NaverNews');
+						await this.plugin.saveSettings();
+					});
+
+				// Setup folder dropdown
+				this.setupFolderDropdown(
+					text.inputEl,
+					(folder: string) => {
+						text.setValue(folder);
+						void (async () => {
+							this.ensureNewsSettings();
+							this.plugin.settings.newsSettings!.newsFolder = folder;
+							await this.plugin.saveSettings();
+						})();
+					}
+				);
+			});
+
+		// Organize by press toggle
+		new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.news_organize_by_press'))
+			.setDesc(this.plugin.i18n.t('settings.news_organize_by_press_desc'))
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.newsSettings?.organizeByPress ?? true)
+				.onChange(async (value) => {
+					this.ensureNewsSettings();
+					this.plugin.settings.newsSettings!.organizeByPress = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// Download news images toggle
+		new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.news_download_images'))
+			.setDesc(this.plugin.i18n.t('settings.news_download_images_desc'))
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.newsSettings?.downloadNewsImages ?? true)
+				.onChange(async (value) => {
+					this.ensureNewsSettings();
+					this.plugin.settings.newsSettings!.downloadNewsImages = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// Include news comments toggle
+		new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.news_include_comments'))
+			.setDesc(this.plugin.i18n.t('settings.news_include_comments_desc'))
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.newsSettings?.includeNewsComments ?? false)
+				.onChange(async (value) => {
+					this.ensureNewsSettings();
+					this.plugin.settings.newsSettings!.includeNewsComments = value;
+					await this.plugin.saveSettings();
+				}));
 	}
 
 	displaySubscriptions(containerEl: HTMLElement) {
@@ -460,6 +528,22 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				minContentLength: 0,
 				subscribedCafes: [],
 				enableCafeDuplicateCheck: true
+			};
+		}
+	}
+
+	/**
+	 * Ensure newsSettings object exists
+	 */
+	private ensureNewsSettings(): void {
+		if (!this.plugin.settings.newsSettings) {
+			this.plugin.settings.newsSettings = {
+				newsFolder: 'NaverNews',
+				organizeByPress: true,
+				downloadNewsImages: true,
+				newsImageFolder: 'attachments',
+				includeNewsComments: false,
+				includeOriginalUrl: true
 			};
 		}
 	}

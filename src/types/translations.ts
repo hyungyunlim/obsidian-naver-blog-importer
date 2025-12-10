@@ -5,6 +5,7 @@ export interface Translations {
 		'sync-subscribed-blogs': string;
 		'ai-fix-layout': string;
 		'delete-note-with-images': string;
+		'import-naver-news': string;
 	};
 	settings: {
 		ai_configuration: string;
@@ -42,6 +43,16 @@ export interface Translations {
 		sync_button: string;
 		no_subscribed_blogs: string;
 		posts_label: string;
+		// News settings
+		news_settings: string;
+		news_folder: string;
+		news_folder_desc: string;
+		news_organize_by_press: string;
+		news_organize_by_press_desc: string;
+		news_download_images: string;
+		news_download_images_desc: string;
+		news_include_comments: string;
+		news_include_comments_desc: string;
 	};
 	notices: {
 		api_key_required: string;
@@ -95,6 +106,18 @@ export interface Translations {
 			blog_id_desc: string;
 			blog_id_placeholder: string;
 			subscribe_button: string;
+		};
+		news_import: {
+			title: string;
+			placeholder: string;
+			detected: string;
+			invalid_url: string;
+			enter_url: string;
+			importing: string;
+			fetch_failed: string;
+			success: string;
+			image_download_partial: string;
+			import_button: string;
 		};
 	};
 	errors: {

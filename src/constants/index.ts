@@ -25,3 +25,6 @@ export * from './messages';
 
 // Regular expressions and patterns
 export * from './regex-patterns';
+
+// Naver News selectors and patterns
+export * from './news-selectors';

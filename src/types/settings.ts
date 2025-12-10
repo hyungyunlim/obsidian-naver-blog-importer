@@ -1,4 +1,6 @@
 import type { CafeSubscription } from './cafe';
+import type { NaverNewsSettings } from './news';
+import { DEFAULT_NEWS_SETTINGS } from './news';
 
 export interface BlogSubscription {
 	blogId: string;
@@ -38,6 +40,8 @@ export interface NaverBlogSettings {
 	postImportLimit: number;
 	// Cafe settings
 	cafeSettings: CafeSettings;
+	// News settings
+	newsSettings: NaverNewsSettings;
 }
 
 export const DEFAULT_CAFE_SETTINGS: CafeSettings = {
@@ -72,4 +76,5 @@ export const DEFAULT_SETTINGS: NaverBlogSettings = {
 	blogSubscriptions: [],
 	postImportLimit: 0, // 0 means no limit
 	cafeSettings: DEFAULT_CAFE_SETTINGS,
+	newsSettings: DEFAULT_NEWS_SETTINGS,
 };

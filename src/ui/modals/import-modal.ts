@@ -1,6 +1,8 @@
 import { App, Modal, Notice, TFile } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
 import { NaverCafeFetcher } from '../../fetchers/naver-cafe-fetcher';
+import { NaverNewsFetcher } from '../../fetchers/naver-news-fetcher';
+import { ImageService } from '../../services/image-service';
 import { UI_DEFAULTS, NOTICE_TIMEOUTS, parseCafeUrl } from '../../constants';
 import { isNaverBlogUrl, parseNaverBlogUrl, extractBlogIdFromUrl } from '../../utils/url-utils';
 import type NaverBlogPlugin from '../../../main';
@@ -24,7 +26,7 @@ export class NaverBlogImportModal extends Modal {
 
 		const input = inputContainer.createEl('input', {
 			type: 'text',
-			placeholder: 'Blog/Cafe URL (blog.naver.com/... or cafe.naver.com/...)',
+			placeholder: 'Blog/Cafe/News URL (blog.naver.com, cafe.naver.com, n.news.naver.com)',
 			cls: 'naver-blog-input'
 		});
 
@@ -46,7 +48,8 @@ export class NaverBlogImportModal extends Modal {
 
 			const icon = detection.type === 'single' ? '📄' :
 						 detection.type === 'bulk' ? '📚' :
-						 detection.type === 'cafe' ? '☕' : '⚠️';
+						 detection.type === 'cafe' ? '☕' :
+						 detection.type === 'news' ? '📰' : '⚠️';
 			detectionDiv.setText(`${icon} ${detection.message}`);
 			detectionDiv.style.color = detection.type === 'invalid' ?
 				'var(--text-error)' : 'var(--text-muted)';
@@ -83,7 +86,7 @@ export class NaverBlogImportModal extends Modal {
 
 			try {
 				const clipboardText = await navigator.clipboard.readText();
-				if (clipboardText && (isNaverBlogUrl(clipboardText) || this.isNaverCafeUrl(clipboardText))) {
+				if (clipboardText && (isNaverBlogUrl(clipboardText) || this.isNaverCafeUrl(clipboardText) || this.isNaverNewsUrl(clipboardText))) {
 					input.value = clipboardText.trim();
 					input.select();
 					updateDetection();
@@ -98,8 +101,25 @@ export class NaverBlogImportModal extends Modal {
 		return value.includes('cafe.naver.com');
 	}
 
-	detectInputType(value: string): { type: 'single' | 'bulk' | 'cafe' | 'invalid'; message: string } {
-		// Check for Cafe URL first
+	isNaverNewsUrl(value: string): boolean {
+		return value.includes('n.news.naver.com') || value.includes('m.news.naver.com') || value.includes('news.naver.com/article');
+	}
+
+	detectInputType(value: string): { type: 'single' | 'bulk' | 'cafe' | 'news' | 'invalid'; message: string } {
+		// Check for News URL first
+		if (this.isNaverNewsUrl(value)) {
+			const newsMatch = value.match(/article\/(\d+)\/(\d+)/);
+			if (newsMatch) {
+				const [, oid, aid] = newsMatch;
+				return {
+					type: 'news',
+					message: `📰 News article (oid: ${oid}, aid: ${aid})`
+				};
+			}
+			return { type: 'invalid', message: 'Could not parse news article ID from URL' };
+		}
+
+		// Check for Cafe URL
 		if (this.isNaverCafeUrl(value)) {
 			const parsed = parseCafeUrl(value);
 			if (parsed && parsed.articleId) {
@@ -149,7 +169,19 @@ export class NaverBlogImportModal extends Modal {
 
 		this.close();
 
-		// Check for Cafe URL first
+		// Check for News URL first
+		if (this.isNaverNewsUrl(inputValue)) {
+			const newsMatch = inputValue.match(/article\/(\d+)\/(\d+)/);
+			if (newsMatch) {
+				const [, oid, aid] = newsMatch;
+				await this.importNewsArticle(inputValue, oid, aid);
+			} else {
+				new Notice('Invalid Naver News URL. Please include the article ID.');
+			}
+			return;
+		}
+
+		// Check for Cafe URL
 		if (this.isNaverCafeUrl(inputValue)) {
 			const parsed = parseCafeUrl(inputValue);
 			if (parsed && parsed.articleId) {
@@ -237,6 +269,39 @@ export class NaverBlogImportModal extends Modal {
 
 			if (createdFile) {
 				await this.openFile(createdFile);
+			}
+		} catch (error) {
+			new Notice(`❌ Import failed: ${error.message}`, NOTICE_TIMEOUTS.medium);
+		}
+	}
+
+	async importNewsArticle(url: string, oid: string, aid: string) {
+		try {
+			new Notice(`📰 Importing news article...`, NOTICE_TIMEOUTS.short);
+
+			const newsSettings = this.plugin.settings.newsSettings;
+			if (!newsSettings) {
+				new Notice('News settings not configured', NOTICE_TIMEOUTS.medium);
+				return;
+			}
+
+			const fetcher = new NaverNewsFetcher(this.plugin.app, newsSettings);
+			const article = await fetcher.fetchArticle(url);
+
+			if (!article) {
+				new Notice('Failed to fetch news article', NOTICE_TIMEOUTS.medium);
+				return;
+			}
+
+			const filePath = await fetcher.saveArticle(article);
+
+			new Notice(`✅ Imported: "${article.title}"`, NOTICE_TIMEOUTS.medium);
+
+			if (filePath) {
+				const file = this.plugin.app.vault.getAbstractFileByPath(filePath);
+				if (file instanceof TFile) {
+					await this.openFile(file);
+				}
 			}
 		} catch (error) {
 			new Notice(`❌ Import failed: ${error.message}`, NOTICE_TIMEOUTS.medium);
