@@ -309,10 +309,10 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				.setPlaceholder('Paste NID_AUT value here')
 				.setValue(this.plugin.settings.cafeSettings?.nidAut || '')
 				.onChange(async (value) => {
-					this.ensureCafeSettings();
+					const cafeSettings = this.ensureCafeSettings();
 					// Clean the value - remove "NID_AUT=" prefix if user pasted it
 					const cleanValue = value.replace(/^NID_AUT\s*=\s*/i, '').trim();
-					this.plugin.settings.cafeSettings!.nidAut = cleanValue;
+					cafeSettings.nidAut = cleanValue;
 					this.updateCookieString();
 					await this.plugin.saveSettings();
 				}));
@@ -325,10 +325,10 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				.setPlaceholder('Paste NID_SES value here')
 				.setValue(this.plugin.settings.cafeSettings?.nidSes || '')
 				.onChange(async (value) => {
-					this.ensureCafeSettings();
+					const cafeSettings = this.ensureCafeSettings();
 					// Clean the value - remove "NID_SES=" prefix if user pasted it
 					const cleanValue = value.replace(/^NID_SES\s*=\s*/i, '').trim();
-					this.plugin.settings.cafeSettings!.nidSes = cleanValue;
+					cafeSettings.nidSes = cleanValue;
 					this.updateCookieString();
 					await this.plugin.saveSettings();
 				}));
@@ -340,8 +340,8 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.cafeSettings?.includeComments ?? true)
 				.onChange(async (value) => {
-					this.ensureCafeSettings();
-					this.plugin.settings.cafeSettings!.includeComments = value;
+					const cafeSettings = this.ensureCafeSettings();
+					cafeSettings.includeComments = value;
 					await this.plugin.saveSettings();
 				}));
 
@@ -358,8 +358,8 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				text.setPlaceholder('NaverNews')
 					.setValue(this.plugin.settings.newsSettings?.newsFolder || 'NaverNews')
 					.onChange(async (value) => {
-						this.ensureNewsSettings();
-						this.plugin.settings.newsSettings!.newsFolder = normalizePath(value || 'NaverNews');
+						const newsSettings = this.ensureNewsSettings();
+						newsSettings.newsFolder = normalizePath(value || 'NaverNews');
 						await this.plugin.saveSettings();
 					});
 
@@ -369,8 +369,8 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					(folder: string) => {
 						text.setValue(folder);
 						void (async () => {
-							this.ensureNewsSettings();
-							this.plugin.settings.newsSettings!.newsFolder = folder;
+							const newsSettings = this.ensureNewsSettings();
+							newsSettings.newsFolder = folder;
 							await this.plugin.saveSettings();
 						})();
 					}
@@ -384,8 +384,8 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.newsSettings?.organizeByPress ?? true)
 				.onChange(async (value) => {
-					this.ensureNewsSettings();
-					this.plugin.settings.newsSettings!.organizeByPress = value;
+					const newsSettings = this.ensureNewsSettings();
+					newsSettings.organizeByPress = value;
 					await this.plugin.saveSettings();
 				}));
 
@@ -396,8 +396,8 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.newsSettings?.downloadNewsImages ?? true)
 				.onChange(async (value) => {
-					this.ensureNewsSettings();
-					this.plugin.settings.newsSettings!.downloadNewsImages = value;
+					const newsSettings = this.ensureNewsSettings();
+					newsSettings.downloadNewsImages = value;
 					await this.plugin.saveSettings();
 				}));
 
@@ -408,8 +408,8 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.newsSettings?.includeNewsComments ?? false)
 				.onChange(async (value) => {
-					this.ensureNewsSettings();
-					this.plugin.settings.newsSettings!.includeNewsComments = value;
+					const newsSettings = this.ensureNewsSettings();
+					newsSettings.includeNewsComments = value;
 					await this.plugin.saveSettings();
 				}));
 	}
@@ -512,9 +512,9 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 	}
 
 	/**
-	 * Ensure cafeSettings object exists
+	 * Ensure cafeSettings object exists and return it
 	 */
-	private ensureCafeSettings(): void {
+	private ensureCafeSettings(): NonNullable<typeof this.plugin.settings.cafeSettings> {
 		if (!this.plugin.settings.cafeSettings) {
 			this.plugin.settings.cafeSettings = {
 				naverCookie: '',
@@ -530,12 +530,13 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				enableCafeDuplicateCheck: true
 			};
 		}
+		return this.plugin.settings.cafeSettings;
 	}
 
 	/**
-	 * Ensure newsSettings object exists
+	 * Ensure newsSettings object exists and return it
 	 */
-	private ensureNewsSettings(): void {
+	private ensureNewsSettings(): NonNullable<typeof this.plugin.settings.newsSettings> {
 		if (!this.plugin.settings.newsSettings) {
 			this.plugin.settings.newsSettings = {
 				newsFolder: 'NaverNews',
@@ -546,6 +547,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				includeOriginalUrl: true
 			};
 		}
+		return this.plugin.settings.newsSettings;
 	}
 
 	/**

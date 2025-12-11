@@ -77,19 +77,18 @@ export class NaverNewsImportModal extends Modal {
 		});
 
 		// Focus and auto-fill from clipboard
-		setTimeout(async () => {
+		setTimeout(() => {
 			input.focus();
 
-			try {
-				const clipboardText = await navigator.clipboard.readText();
+			navigator.clipboard.readText().then((clipboardText) => {
 				if (clipboardText && this.isNaverNewsUrl(clipboardText)) {
 					input.value = clipboardText.trim();
 					input.select();
 					updateDetection();
 				}
-			} catch {
+			}).catch(() => {
 				// Clipboard access denied - silently ignore
-			}
+			});
 		}, UI_DEFAULTS.modalTimeout);
 	}
 

@@ -108,6 +108,8 @@ export interface CafeSubscription {
 export interface NaverCafeSettings {
 	// 인증
 	naverCookie: string;           // NID_AUT, NID_SES 쿠키값
+	nidAut?: string;               // NID_AUT 쿠키값 (개별)
+	nidSes?: string;               // NID_SES 쿠키값 (개별)
 
 	// 가져오기 옵션
 	cafeImportFolder: string;      // 저장 폴더
