@@ -73,13 +73,13 @@ export const buildCafeArticleDirectUrl = (cafeUrl: string, articleId: string): s
 // URL parsing patterns
 export const CAFE_URL_PATTERNS = {
 	// https://cafe.naver.com/cafename/12345
-	directUrl: /cafe\.naver\.com\/([^\/]+)\/(\d+)/,
+	directUrl: /cafe\.naver\.com\/([^/]+)\/(\d+)/,
 	// https://cafe.naver.com/ArticleRead.nhn?clubid=123&articleid=456
 	articleReadUrl: /ArticleRead\.nhn\?.*clubid=(\d+).*articleid=(\d+)/,
 	// https://cafe.naver.com/cafename?articleid=12345
-	queryUrl: /cafe\.naver\.com\/([^\/\?]+)\?.*articleid=(\d+)/,
+	queryUrl: /cafe\.naver\.com\/([^/?]+)\?.*articleid=(\d+)/,
 	// Mobile URL: https://m.cafe.naver.com/cafename/12345
-	mobileUrl: /m\.cafe\.naver\.com\/([^\/]+)\/(\d+)/,
+	mobileUrl: /m\.cafe\.naver\.com\/([^/]+)\/(\d+)/,
 } as const;
 
 // Parse cafe URL to extract cafeUrl/cafeId and articleId

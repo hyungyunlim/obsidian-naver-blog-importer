@@ -31,9 +31,6 @@ export class NaverBlogImportModal extends Modal {
 		});
 
 		const detectionDiv = inputContainer.createDiv({ cls: 'naver-blog-detection' });
-		detectionDiv.style.marginTop = '8px';
-		detectionDiv.style.fontSize = '12px';
-		detectionDiv.style.color = 'var(--text-muted)';
 
 		// Update detection status on input
 		const updateDetection = () => {
@@ -51,8 +48,10 @@ export class NaverBlogImportModal extends Modal {
 						 detection.type === 'cafe' ? '☕' :
 						 detection.type === 'news' ? '📰' : '⚠️';
 			detectionDiv.setText(`${icon} ${detection.message}`);
-			detectionDiv.style.color = detection.type === 'invalid' ?
-				'var(--text-error)' : 'var(--text-muted)';
+			detectionDiv.removeClass('naver-blog-detection--error');
+			if (detection.type === 'invalid') {
+				detectionDiv.addClass('naver-blog-detection--error');
+			}
 		};
 
 		input.addEventListener('input', updateDetection);

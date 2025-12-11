@@ -27,6 +27,12 @@ export class NaverNewsFetcher {
 			return { oid: match[1], aid: match[2] };
 		}
 
+		// Try mnews URL pattern: https://n.news.naver.com/mnews/article/{oid}/{aid}
+		match = url.match(NAVER_NEWS_URL_PATTERNS.mnewsUrl);
+		if (match) {
+			return { oid: match[1], aid: match[2] };
+		}
+
 		// Try mobile URL pattern: https://m.news.naver.com/article/{oid}/{aid}
 		match = url.match(NAVER_NEWS_URL_PATTERNS.mobileUrl);
 		if (match) {

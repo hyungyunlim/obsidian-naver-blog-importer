@@ -133,8 +133,8 @@ export class I18n {
 					title: 'Import single post by URL',
 					blog_id_label: 'Blog ID',
 					blog_id_placeholder: 'e.g., myblog',
-					log_no_label: 'Post URL or LogNo',
-					log_no_placeholder: 'URL or LogNo (e.g., https://blog.naver.com/yonofbooks/220883239733)',
+					log_no_label: 'Post URL or logNo',
+					log_no_placeholder: 'URL or logNo (e.g., https://blog.naver.com/yonofbooks/220883239733)',
 					import_button: 'Import post',
 					cancel_button: 'Cancel'
 				},
@@ -146,14 +146,14 @@ export class I18n {
 					cancel_button: 'Cancel'
 				},
 				subscribe_blog: {
-					title: 'Subscribe to Naver blog',
+					title: 'Subscribe to Naver Blog',
 					blog_id_label: 'Blog ID',
-					blog_id_desc: 'Enter the Naver blog ID to subscribe to',
+					blog_id_desc: 'Enter the Naver Blog ID to subscribe to',
 					blog_id_placeholder: 'Blog ID',
 					subscribe_button: 'Subscribe'
 				},
 				news_import: {
-					title: 'Import Naver News Article',
+					title: 'Import Naver News article',
 					placeholder: 'Paste Naver News URL (n.news.naver.com/...)',
 					detected: 'Naver News article detected',
 					invalid_url: 'Invalid Naver News URL',

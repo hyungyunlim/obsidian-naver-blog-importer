@@ -30,6 +30,9 @@ export const NAVER_NEWS_URL_PATTERNS = {
 	// https://n.news.naver.com/article/{oid}/{aid}
 	shortUrl: /^https?:\/\/n\.news\.naver\.com\/article\/(\d+)\/(\d+)/,
 
+	// https://n.news.naver.com/mnews/article/{oid}/{aid}
+	mnewsUrl: /^https?:\/\/n\.news\.naver\.com\/mnews\/article\/(\d+)\/(\d+)/,
+
 	// https://news.naver.com/main/read.naver?mode=LSD&mid=sec&oid={oid}&aid={aid}
 	longUrl: /[?&]oid=(\d+).*[?&]aid=(\d+)|[?&]aid=(\d+).*[?&]oid=(\d+)/,
 

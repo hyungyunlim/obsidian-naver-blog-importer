@@ -27,9 +27,6 @@ export class NaverNewsImportModal extends Modal {
 		});
 
 		const detectionDiv = inputContainer.createDiv({ cls: 'naver-blog-detection' });
-		detectionDiv.style.marginTop = '8px';
-		detectionDiv.style.fontSize = '12px';
-		detectionDiv.style.color = 'var(--text-muted)';
 
 		// Update detection status on input
 		const updateDetection = () => {
@@ -42,15 +39,15 @@ export class NaverNewsImportModal extends Modal {
 			const isValid = this.isNaverNewsUrl(value);
 			detectionDiv.empty();
 
+			detectionDiv.removeClass('naver-blog-detection--error');
 			if (isValid) {
 				const parsed = this.parseNewsUrl(value);
 				if (parsed) {
 					detectionDiv.setText(`📰 ${this.plugin.i18n.t('modals.news_import.detected')} (oid: ${parsed.oid}, aid: ${parsed.aid})`);
-					detectionDiv.style.color = 'var(--text-muted)';
 				}
 			} else {
 				detectionDiv.setText(`⚠️ ${this.plugin.i18n.t('modals.news_import.invalid_url')}`);
-				detectionDiv.style.color = 'var(--text-error)';
+				detectionDiv.addClass('naver-blog-detection--error');
 			}
 		};
 

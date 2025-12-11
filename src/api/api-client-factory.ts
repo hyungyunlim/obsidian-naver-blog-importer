@@ -23,8 +23,10 @@ export class APIClientFactory {
 				return new GoogleClient(settings.googleApiKey);
 			case 'ollama':
 				return new OllamaClient(settings.ollamaEndpoint);
-			default:
-				throw new Error(`Unsupported AI provider: ${provider}`);
+			default: {
+				const unsupportedProvider: string = provider;
+				throw new Error(`Unsupported AI provider: ${unsupportedProvider}`);
+			}
 		}
 	}
 

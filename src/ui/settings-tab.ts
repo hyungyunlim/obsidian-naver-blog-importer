@@ -286,9 +286,9 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					}
 				}));
 
-		// Naver Cafe settings section
+		// Naver Cafe section
 		new Setting(containerEl)
-			.setName('Naver Cafe settings')
+			.setName('Naver Cafe')
 			.setHeading();
 
 		// Cookie description
@@ -298,7 +298,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		cookieDesc.appendText('Get from Chrome: F12 → Application → Cookies → naver.com');
 
 		new Setting(containerEl)
-			.setName('Cookie authentication')
+			.setName('Cookie')
 			.setDesc(cookieDesc);
 
 		// NID_AUT input
@@ -336,7 +336,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		// Include comments toggle
 		new Setting(containerEl)
 			.setName('Include comments')
-			.setDesc('Include comments at the bottom of imported cafe posts')
+			.setDesc('Include comments at the bottom of imported Cafe posts')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.cafeSettings?.includeComments ?? true)
 				.onChange(async (value) => {

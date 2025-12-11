@@ -238,7 +238,7 @@ export class CafeService {
 			articleId: article.articleId,
 			cafeId: article.cafeId,
 			cafeName: overrideCafeName || article.cafeName || '',
-			cafeUrl: article.url.match(/cafe\.naver\.com\/([^\/]+)/)?.[1] || article.cafeId,
+			cafeUrl: article.url.match(/cafe\.naver\.com\/([^/]+)/)?.[1] || article.cafeId,
 			menuId: article.menuId,
 			menuName: article.menuName || '',
 			author: article.writerNickname,
