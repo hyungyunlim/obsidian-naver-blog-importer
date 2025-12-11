@@ -1,4 +1,4 @@
-import { requestUrl, Notice } from 'obsidian';
+import { requestUrl } from 'obsidian';
 import { 
 	GOOGLE_MODELS_ENDPOINT, 
 	GOOGLE_GENERATE_CONTENT_ENDPOINT,

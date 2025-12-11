@@ -304,7 +304,10 @@ export class NaverCafeFetcher {
 			const replyList = comment.replyList as Array<Record<string, unknown>> | undefined;
 			if (replyList && Array.isArray(replyList)) {
 				for (const reply of replyList) {
-					const parsedReply = this.parseSingleComment(reply, true, String(comment.commentId || ''));
+					const parentId = typeof comment.commentId === 'string' || typeof comment.commentId === 'number'
+						? String(comment.commentId)
+						: '';
+					const parsedReply = this.parseSingleComment(reply, true, parentId);
 					if (parsedReply) {
 						comments.push(parsedReply);
 					}
@@ -344,11 +347,11 @@ export class NaverCafeFetcher {
 			: '';
 
 		// Determine if reply - Naver uses isRef field or refId !== id
-		const commentId = comment.id as number | undefined;
+		const numericId = comment.id as number | undefined;
 		const refId = comment.refId as number | undefined;
 		const actualIsReply = isReply ||
 			(comment.isRef === true) ||
-			(refId !== undefined && commentId !== undefined && refId !== commentId);
+			(refId !== undefined && numericId !== undefined && refId !== numericId);
 		const actualParentId = parentCommentId ||
 			(actualIsReply && refId ? String(refId) : undefined);
 
@@ -363,8 +366,14 @@ export class NaverCafeFetcher {
 				(image.imageUrl as string);
 		}
 
+		// Safely extract commentId - avoid stringifying objects
+		const rawCommentId = comment.id ?? comment.commentId;
+		const commentId = typeof rawCommentId === 'string' || typeof rawCommentId === 'number'
+			? String(rawCommentId)
+			: '';
+
 		return {
-			commentId: String(comment.id || comment.commentId || ''),
+			commentId,
 			content: content.trim(),
 			writerNickname: ((writer?.nick as string) || (writer?.nickname as string) || 'Unknown').trim(),
 			writerId: (writer?.id as string) || (writer?.memberKey as string),

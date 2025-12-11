@@ -659,7 +659,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 					for (const tryPath of pathsToTry) {
 						const imageFile = this.app.vault.getAbstractFileByPath(tryPath);
 						if (imageFile instanceof TFile) {
-							await this.app.vault.delete(imageFile);
+							await this.app.fileManager.trashFile(imageFile);
 							deletedImageCount++;
 							break; // Found and deleted, move to next image
 						}
@@ -670,7 +670,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			}
 
 			// Delete the note itself
-			await this.app.vault.delete(file);
+			await this.app.fileManager.trashFile(file);
 
 			// Show result notice
 			if (deletedImageCount > 0) {

@@ -2,7 +2,6 @@ import { App, Modal, Notice, TFile } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
 import { NaverCafeFetcher } from '../../fetchers/naver-cafe-fetcher';
 import { NaverNewsFetcher } from '../../fetchers/naver-news-fetcher';
-import { ImageService } from '../../services/image-service';
 import { UI_DEFAULTS, NOTICE_TIMEOUTS, parseCafeUrl } from '../../constants';
 import { isNaverBlogUrl, parseNaverBlogUrl, extractBlogIdFromUrl } from '../../utils/url-utils';
 import type NaverBlogPlugin from '../../../main';

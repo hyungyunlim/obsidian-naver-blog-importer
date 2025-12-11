@@ -1,4 +1,4 @@
-import { App, getLanguage } from 'obsidian';
+import { getLanguage } from 'obsidian';
 
 
 export class LocaleUtils {

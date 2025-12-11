@@ -1,4 +1,4 @@
-import { requestUrl, Notice } from 'obsidian';
+import { requestUrl } from 'obsidian';
 import * as cheerio from 'cheerio';
 import type { CheerioAPI, Cheerio } from 'cheerio';
 import type { Element, AnyNode } from 'domhandler';

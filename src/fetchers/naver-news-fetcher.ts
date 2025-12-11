@@ -245,7 +245,6 @@ export class NaverNewsFetcher {
 
 		let markdown = '';
 		const images: NewsImage[] = [];
-		let imageCount = 0;
 
 		// Process all child nodes in DOM order
 		const processNode = (node: AnyNode) => {
@@ -269,7 +268,6 @@ export class NaverNewsFetcher {
 						const alt = caption.text().trim() || img.attr('alt') || '';
 
 						if (src && this.isValidImageUrl(src)) {
-							imageCount++;
 							const imageInfo: NewsImage = {
 								src: this.convertToHighResUrl(src),
 								alt,
