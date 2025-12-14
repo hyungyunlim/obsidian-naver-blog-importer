@@ -105,8 +105,7 @@ export class NaverBlogFetcher {
             
             for (let i = 0; i < posts.length; i++) {
                 const post = posts[i];
-                const progress = `(${i + 1}/${totalPosts})`;
-                
+
                 try {
                     const parsed = await this.fetchPostContent(post.logNo);
                     postsWithContent.push({

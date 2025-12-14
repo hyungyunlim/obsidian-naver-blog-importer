@@ -134,9 +134,6 @@ export class ImageService {
 						// Failed to download image - trying alternative method
 					}
 				} catch {
-					const imageProgress = `(${imageCount + 1}/${totalImages})`;
-					let directUrl = this.convertToDirectImageUrl(imageUrl);
-					
 					// Try alternative download method for postfiles.pstatic.net
 					if (imageUrl.includes('postfiles.pstatic.net')) {
 						try {

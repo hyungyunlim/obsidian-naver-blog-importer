@@ -25,7 +25,7 @@ export class NaverBlogImportModal extends Modal {
 
 		const input = inputContainer.createEl('input', {
 			type: 'text',
-			placeholder: 'Blog/Cafe/News URL (blog.naver.com, cafe.naver.com, n.news.naver.com)',
+			placeholder: 'Blog/cafe/news URL (blog.naver.com, cafe.naver.com, n.news.naver.com)',
 			cls: 'naver-blog-input'
 		});
 
@@ -110,7 +110,7 @@ export class NaverBlogImportModal extends Modal {
 				const [, oid, aid] = newsMatch;
 				return {
 					type: 'news',
-					message: `📰 News article (oid: ${oid}, aid: ${aid})`
+					message: `📰 News article (OID: ${oid}, AID: ${aid})`
 				};
 			}
 			return { type: 'invalid', message: 'Could not parse news article ID from URL' };
@@ -123,7 +123,7 @@ export class NaverBlogImportModal extends Modal {
 				const cafeIdentifier = parsed.cafeUrl || parsed.cafeId || 'unknown';
 				return {
 					type: 'cafe',
-					message: `☕ Cafe article from "${cafeIdentifier}" (articleId: ${parsed.articleId})`
+					message: `☕ Cafe article from "${cafeIdentifier}" (article ID: ${parsed.articleId})`
 				};
 			}
 			return { type: 'invalid', message: 'Could not parse cafe article ID from URL' };
@@ -173,7 +173,7 @@ export class NaverBlogImportModal extends Modal {
 				const [, oid, aid] = newsMatch;
 				await this.importNewsArticle(inputValue, oid, aid);
 			} else {
-				new Notice('Invalid Naver News URL. Please include the article ID.');
+				new Notice('Invalid Naver news URL. Please include the article ID.');
 			}
 			return;
 		}
@@ -189,7 +189,7 @@ export class NaverBlogImportModal extends Modal {
 					new Notice('Could not extract cafe identifier from URL');
 				}
 			} else {
-				new Notice('Invalid Naver Cafe URL. Please include the article ID.');
+				new Notice('Invalid Naver cafe URL. Please include the article ID.');
 			}
 			return;
 		}
@@ -278,7 +278,7 @@ export class NaverBlogImportModal extends Modal {
 
 			const newsSettings = this.plugin.settings.newsSettings;
 			if (!newsSettings) {
-				new Notice('News settings not configured', NOTICE_TIMEOUTS.medium);
+				new Notice('News settings not configured.', NOTICE_TIMEOUTS.medium);
 				return;
 			}
 

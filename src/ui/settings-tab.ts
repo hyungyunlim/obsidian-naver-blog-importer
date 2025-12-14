@@ -286,9 +286,9 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					}
 				}));
 
-		// Naver Cafe section
+		// Naver cafe section
 		new Setting(containerEl)
-			.setName('Naver Cafe')
+			.setName('Naver cafe')
 			.setHeading();
 
 		// Cookie description
@@ -306,7 +306,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.setName('NID_AUT')
 			.setDesc('Copy the NID_AUT cookie value')
 			.addText(text => text
-				.setPlaceholder('Paste NID_AUT value here')
+				.setPlaceholder('Paste NID_AUT value')
 				.setValue(this.plugin.settings.cafeSettings?.nidAut || '')
 				.onChange(async (value) => {
 					const cafeSettings = this.ensureCafeSettings();
@@ -322,7 +322,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.setName('NID_SES')
 			.setDesc('Copy the NID_SES cookie value')
 			.addText(text => text
-				.setPlaceholder('Paste NID_SES value here')
+				.setPlaceholder('Paste NID_SES value')
 				.setValue(this.plugin.settings.cafeSettings?.nidSes || '')
 				.onChange(async (value) => {
 					const cafeSettings = this.ensureCafeSettings();
@@ -336,7 +336,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		// Include comments toggle
 		new Setting(containerEl)
 			.setName('Include comments')
-			.setDesc('Include comments at the bottom of imported Cafe posts')
+			.setDesc('Include comments at the bottom of imported cafe posts')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.cafeSettings?.includeComments ?? true)
 				.onChange(async (value) => {
