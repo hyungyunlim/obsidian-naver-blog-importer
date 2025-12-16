@@ -288,7 +288,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 		// Naver cafe section
 		new Setting(containerEl)
-			.setName('Naver cafe')
+			.setName('Naver Cafe')
 			.setHeading();
 
 		// Cookie description

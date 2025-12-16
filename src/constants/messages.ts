@@ -36,7 +36,7 @@ export const AI_PROMPTS = {
 // Placeholder texts
 export const PLACEHOLDERS = {
 	blogId: 'Blog ID (e.g., yonofbooks)',
-	postUrl: 'Enter Naver blog post URL...',
+	postUrl: 'Enter Naver Blog post URL...',
 	apiKey: {
 		openai: 'sk-...',
 		anthropic: 'sk-ant-...',

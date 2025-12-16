@@ -25,7 +25,7 @@ export class NaverBlogImportModal extends Modal {
 
 		const input = inputContainer.createEl('input', {
 			type: 'text',
-			placeholder: 'Blog/cafe/news URL (blog.naver.com, cafe.naver.com, n.news.naver.com)',
+			placeholder: 'Blog/Cafe/News URL (blog.naver.com, cafe.naver.com, n.news.naver.com)',
 			cls: 'naver-blog-input'
 		});
 
@@ -173,7 +173,7 @@ export class NaverBlogImportModal extends Modal {
 				const [, oid, aid] = newsMatch;
 				await this.importNewsArticle(inputValue, oid, aid);
 			} else {
-				new Notice('Invalid Naver news URL. Please include the article ID.');
+				new Notice('Invalid Naver News URL. Please include the article ID.');
 			}
 			return;
 		}
@@ -189,7 +189,7 @@ export class NaverBlogImportModal extends Modal {
 					new Notice('Could not extract cafe identifier from URL');
 				}
 			} else {
-				new Notice('Invalid Naver cafe URL. Please include the article ID.');
+				new Notice('Invalid Naver Cafe URL. Please include the article ID.');
 			}
 			return;
 		}
@@ -207,7 +207,7 @@ export class NaverBlogImportModal extends Modal {
 				if (blogId) {
 					await this.importAllPosts(blogId);
 				} else {
-					new Notice('Invalid Naver blog URL format');
+					new Notice('Invalid Naver Blog URL format');
 				}
 			}
 		} else {
