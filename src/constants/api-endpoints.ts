@@ -34,3 +34,13 @@ export const NAVER_BLOG_POST_URL_TEMPLATE = (blogId: string, logNo: string) =>
 export const NAVER_CDN_POSTFILES = 'postfiles';
 export const NAVER_CDN_BLOGFILES = 'blogfiles';
 export const NAVER_PROFILE_IMAGE_PATH = 'ssl.pstatic.net/static/blog/profile/';
+
+// Naver Video API endpoints
+export const NAVER_VIDEO_API_BASE = 'https://apis.naver.com/rmcnmv/rmcnmv/vod/play/v2.0';
+export const NAVER_VIDEO_API_ENDPOINT = (vid: string, inkey: string, sid = 5) =>
+	`${NAVER_VIDEO_API_BASE}/${vid}?key=${inkey}&sid=${sid}`;
+
+// Naver Cafe Article API endpoints
+export const NAVER_CAFE_ARTICLE_API_BASE = 'https://article.cafe.naver.com/gw/v4/cafes';
+export const NAVER_CAFE_ARTICLE_ENDPOINT = (cafeId: string, articleId: string) =>
+	`${NAVER_CAFE_ARTICLE_API_BASE}/${cafeId}/articles/${articleId}`;

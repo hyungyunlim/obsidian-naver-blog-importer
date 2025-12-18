@@ -24,6 +24,7 @@ export interface CafeArticle {
 // 카페 게시글 상세 정보
 export interface CafeArticleDetail extends CafeArticle {
 	content: string;           // HTML 또는 마크다운
+	contentHtml?: string;      // 원본 HTML (비디오 추출용)
 	images: string[];          // 이미지 URL 목록
 	attachments: CafeAttachment[]; // 첨부 파일
 	comments?: CafeComment[];  // 댓글 (옵션)
@@ -78,6 +79,7 @@ export interface CafeInfo {
 export interface ProcessedCafePost {
 	title: string;
 	content: string;           // 마크다운 변환된 콘텐츠
+	contentHtml?: string;      // 원본 HTML (비디오 추출용)
 	date: string;
 	articleId: string;
 	cafeId: string;

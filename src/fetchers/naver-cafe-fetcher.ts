@@ -525,6 +525,7 @@ export class NaverCafeFetcher {
 			cafeId,
 			cafeName,
 			content,
+			contentHtml: mainContentHtml, // 비디오 추출용 원본 HTML
 			images,
 			attachments: [],
 			tags: [],
@@ -969,10 +970,15 @@ export class NaverCafeFetcher {
 		const $ = cheerio.load(html);
 		let content = '';
 
+		// Check if post has video components - if so, skip approaches 1 & 2 and use approach 3
+		// which handles videos in correct DOM order
+		const hasVideoComponents = $('.se-component.se-video, .se-video').length > 0;
+
 		// First, try to extract from .se-component-content structure (used in scraped posts)
 		// Process all wrapper divs in DOM order to maintain text/image sequence
+		// Skip this approach if videos exist - they need approach 3 for correct ordering
 		const seViewer = $('.se-viewer, .se-components-wrap');
-		if (seViewer.length > 0) {
+		if (seViewer.length > 0 && !hasVideoComponents) {
 			// Find all direct content wrapper divs (they have inline margin style)
 			seViewer.find('div[style*="margin:30px auto"]').each((_, wrapperDiv) => {
 				const $wrapper = $(wrapperDiv);
@@ -1021,8 +1027,9 @@ export class NaverCafeFetcher {
 		}
 
 		// Alternative: Process .se-component-content in order
+		// Skip this approach if videos exist - they need approach 3 for correct ordering
 		const componentContents = $('.se-component-content');
-		if (componentContents.length > 0) {
+		if (componentContents.length > 0 && !hasVideoComponents) {
 			componentContents.each((_, contentEl) => {
 				const $contentEl = $(contentEl);
 
@@ -1299,9 +1306,30 @@ export class NaverCafeFetcher {
 						}
 					});
 				}
-				// Video
+				// Video - extract vid for placeholder
 				else if ($component.hasClass('se-video')) {
-					content += '[비디오]\n\n';
+					// Try to extract video ID from data-module-v2
+					const scriptEl = $component.find('script.__se_module_data');
+					if (scriptEl.length > 0) {
+						const moduleData = scriptEl.attr('data-module-v2');
+						if (moduleData) {
+							try {
+								const data = JSON.parse(moduleData);
+								if (data.type === 'v2_video' && data.data?.vid) {
+									// Use placeholder with vid for later replacement
+									content += `\n\n<!--VIDEO:${data.data.vid}-->\n\n`;
+								} else {
+									content += '[비디오]\n\n';
+								}
+							} catch {
+								content += '[비디오]\n\n';
+							}
+						} else {
+							content += '[비디오]\n\n';
+						}
+					} else {
+						content += '[비디오]\n\n';
+					}
 				}
 				// Embedded content (YouTube, etc.)
 				else if ($component.hasClass('se-oembed')) {

@@ -31,6 +31,7 @@ export interface NaverBlogPost {
     title: string;
     date: string;
     content: string;
+    contentHtml?: string;  // 원본 HTML (비디오 추출용)
     logNo: string;
     url: string;
     thumbnail?: string;
@@ -57,6 +58,7 @@ export class NaverBlogFetcher {
                 url: `https://blog.naver.com/${this.blogId}/${logNo}`,
                 thumbnail: undefined,
                 content: parsed.content,
+                contentHtml: parsed.contentHtml,
                 blogId: this.blogId,
                 originalTags: parsed.tags
             };
@@ -115,6 +117,7 @@ export class NaverBlogFetcher {
                         url: post.url,
                         thumbnail: post.thumbnail,
                         content: parsed.content,
+                        contentHtml: parsed.contentHtml,
                         blogId: this.blogId,
                         originalTags: parsed.tags
                     });
@@ -133,6 +136,7 @@ export class NaverBlogFetcher {
                         url: post.url,
                         thumbnail: post.thumbnail,
                         content: errorContent,
+                        contentHtml: '',
                         blogId: this.blogId,
                         originalTags: []
                     });
@@ -385,7 +389,7 @@ export class NaverBlogFetcher {
         return posts;
     }
 
-    private async fetchPostContent(logNo: string): Promise<{ content: string; title: string; date: string; tags: string[] }> {
+    private async fetchPostContent(logNo: string): Promise<{ content: string; contentHtml: string; title: string; date: string; tags: string[] }> {
         try {
             // Try different URL formats for Naver blog posts
             const urlFormats = [
@@ -415,20 +419,23 @@ export class NaverBlogFetcher {
                     continue;
                 }
             }
-            
+
             throw new Error(`All URL formats failed for logNo: ${logNo}`);
         } catch (error) {
             throw new Error(`Failed to fetch content: ${error.message}`);
         }
     }
 
-    private parsePostContent(html: string): { content: string; title: string; date: string; tags: string[] } {
+    private parsePostContent(html: string): { content: string; contentHtml: string; title: string; date: string; tags: string[] } {
         try {
             const $ = cheerio.load(html);
             let content = '';
             let title = '';
             let date = '';
             const tags: string[] = [];
+
+            // 원본 HTML 저장 (비디오 추출용) - 전체 HTML 저장하여 video script 태그도 포함
+            const contentHtml = html;
 
             // Extract title from various selectors - improved with more specific selectors
             const titleSelectors = [
@@ -682,6 +689,7 @@ export class NaverBlogFetcher {
 
             return {
                 content: content || '[No content could be extracted]',
+                contentHtml: contentHtml,
                 title: title || 'Untitled',
                 date: date || new Date().toISOString().split('T')[0],
                 tags: tags
@@ -1083,8 +1091,27 @@ export class NaverBlogFetcher {
                         }
                     }
                 } else if ($el.hasClass('se-video')) {
-                    // Video component
-                    content += '[비디오]\n';
+                    // Video component - extract vid for placeholder
+                    const scriptEl = $el.find('script.__se_module_data');
+                    if (scriptEl.length > 0) {
+                        const moduleData = scriptEl.attr('data-module-v2');
+                        if (moduleData) {
+                            try {
+                                const data = JSON.parse(moduleData);
+                                if (data.type === 'v2_video' && data.data?.vid) {
+                                    content += `\n\n<!--VIDEO:${data.data.vid}-->\n\n`;
+                                } else {
+                                    content += '[비디오]\n';
+                                }
+                            } catch {
+                                content += '[비디오]\n';
+                            }
+                        } else {
+                            content += '[비디오]\n';
+                        }
+                    } else {
+                        content += '[비디오]\n';
+                    }
                 } else if ($el.hasClass('se-oembed')) {
                     // Embedded content (YouTube, etc.)
                     content += this.parseOembedComponent($el, $);
@@ -1231,7 +1258,12 @@ export class NaverBlogFetcher {
                     }
                     break;
                 case 'se-video':
-                    content += '[비디오]\n';
+                    // Video component - add placeholder with vid if available
+                    if (data.vid) {
+                        content += `\n\n<!--VIDEO:${data.vid}-->\n\n`;
+                    } else {
+                        content += '[비디오]\n';
+                    }
                     break;
                 case 'se-oembed': {
                     // Embedded content (YouTube, etc.) - Use Obsidian native embed syntax

@@ -10,6 +10,7 @@ import { I18n } from './src/utils/i18n';
 import { AIService } from './src/services/ai-service';
 import { BlogService } from './src/services/blog-service';
 import { ImageService } from './src/services/image-service';
+import { VideoService } from './src/services/video-service';
 import { NaverBlogImportModal } from './src/ui/modals/import-modal';
 import { NaverBlogSubscribeModal } from './src/ui/modals/subscribe-modal';
 import { NaverNewsImportModal } from './src/ui/modals/news-import-modal';
@@ -40,6 +41,7 @@ export default class NaverBlogPlugin extends Plugin {
 	aiService: AIService;
 	blogService: BlogService;
 	imageService: ImageService;
+	videoService: VideoService;
 	
 	// Cached API models
 	private openai_models: string[] = [];
@@ -63,6 +65,9 @@ export default class NaverBlogPlugin extends Plugin {
 
 		// Initialize Image service
 		this.imageService = new ImageService(this.app, this.settings);
+
+		// Initialize Video service
+		this.videoService = new VideoService(this.app, this.settings);
 
 		// Fetch models from APIs in background
 		void this.refreshModels().catch(() => {
@@ -185,6 +190,7 @@ export default class NaverBlogPlugin extends Plugin {
 		this.aiService = new AIService(this.settings);
 		this.blogService.updateSettings(this.settings);
 		this.imageService.updateSettings(this.settings);
+		this.videoService.updateSettings(this.settings);
 	}
 
 	async fetchNaverBlogPosts(blogId: string, maxPosts?: number): Promise<ProcessedBlogPost[]> {
@@ -376,17 +382,30 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 				post.excerpt = await this.generateAIExcerpt(post.title, post.content);
 			}
 
-			// Process images if enabled
-			let processedContent = post.content;
-			if (this.settings.enableImageDownload) {
-				processedContent = await this.imageService.downloadAndProcessImages(post.content, post.logNo);
-			}
-
-			// Create filename - just title.md without date prefix and hyphen replacements
+			// Create filename and folder paths first (needed for video processing)
 			const filename = this.imageService.sanitizeFilename(`${post.title}.md`);
 			const baseFolder = normalizePath(this.settings.defaultFolder || DEFAULT_SETTINGS.defaultFolder);
 			// Store posts under blogId subfolder
 			const folder = normalizePath(`${baseFolder}/${post.blogId}`);
+			// Blog images/videos go to attachments subfolder inside the blog folder
+			const blogImageFolder = normalizePath(`${folder}/attachments`);
+
+			// Process images if enabled
+			let processedContent = post.content;
+			if (this.settings.enableImageDownload) {
+				processedContent = await this.imageService.downloadAndProcessImages(post.content, post.logNo, blogImageFolder, folder);
+			}
+
+			// Process videos if contentHtml is available (video metadata extraction requires raw HTML)
+			if (post.contentHtml && this.settings.enableImageDownload) {
+				processedContent = await this.videoService.downloadAndProcessVideos(
+					processedContent,
+					post.contentHtml,
+					post.logNo,
+					blogImageFolder, // Videos stored in same folder as images
+					folder
+				);
+			}
 
 			// Ensure base folder exists
 			const baseFolderExists = this.app.vault.getAbstractFileByPath(baseFolder);
@@ -455,6 +474,17 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			if (shouldDownloadImages) {
 				// Pass custom folders: images go to cafe's attachments folder, notes are in cafe folder
 				processedContent = await this.imageService.downloadAndProcessImages(post.content, post.articleId, cafeImageFolder, folder);
+			}
+
+			// Process videos if contentHtml is available (video metadata extraction requires raw HTML)
+			if (post.contentHtml && shouldDownloadImages) {
+				processedContent = await this.videoService.downloadAndProcessVideos(
+					processedContent,
+					post.contentHtml,
+					post.articleId,
+					cafeImageFolder, // Videos stored in same folder as images
+					folder
+				);
 			}
 
 			// Ensure base folder exists

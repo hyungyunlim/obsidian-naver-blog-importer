@@ -244,6 +244,7 @@ export class NaverBlogImportModal extends Modal {
 			const processedPost: ProcessedCafePost = {
 				title: article.title.replace(/^\[.*?\]\s*/, '').replace(/\s*\[.*?\]$/, '').trim(),
 				content: article.content,
+				contentHtml: article.contentHtml, // 비디오 추출용 원본 HTML
 				date: article.writeDate,
 				articleId: article.articleId,
 				cafeId: article.cafeId,

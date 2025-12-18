@@ -234,6 +234,7 @@ export class CafeService {
 		return {
 			title: this.cleanTitle(article.title),
 			content: article.content,
+			contentHtml: article.contentHtml, // 비디오 추출용 원본 HTML
 			date: article.writeDate,
 			articleId: article.articleId,
 			cafeId: article.cafeId,
