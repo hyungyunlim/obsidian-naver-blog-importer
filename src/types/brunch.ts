@@ -69,6 +69,56 @@ export interface BrunchSeries {
 	episode?: number;
 }
 
+/**
+ * Brunch comment author information
+ * Compatible with social-archiver's Author interface
+ */
+export interface BrunchCommentAuthor {
+	id: string;              // commentUserId (internal ID, e.g., "i4XQ")
+	name: string;            // commentUserName (display name, e.g., "ZHTU")
+	profileUrl?: string;     // URL to author's Brunch profile (if available)
+	isMembership?: boolean;  // Whether the user has membership (userMembershipActive)
+}
+
+/**
+ * Brunch comment structure
+ * Designed for reusability across platforms (Brunch, Naver Cafe, etc.)
+ */
+export interface BrunchComment {
+	id: string;              // comment no (unique identifier)
+	author: BrunchCommentAuthor;
+	content: string;         // message content
+	timestamp: string;       // ISO date string (converted from createTime)
+	likes?: number;          // Like count (if available)
+	parentId?: string;       // parentNo - for nested replies
+	replies?: BrunchComment[]; // children.list - nested replies
+}
+
+/**
+ * Raw Brunch API comment response structure
+ * Used internally for parsing API response
+ */
+export interface BrunchApiCommentResponse {
+	code: number;
+	data: {
+		list: BrunchApiComment[];
+		totalCount: number;
+	};
+}
+
+export interface BrunchApiComment {
+	no: number;
+	commentUserName: string;
+	commentUserId: string;
+	message: string;
+	createTime: number;      // Unix timestamp in milliseconds
+	parentNo: number | null;
+	children?: {
+		list: BrunchApiComment[];
+	};
+	userMembershipActive?: boolean;
+}
+
 export interface BrunchSubscription {
 	id: string;
 	platform: 'brunch';
@@ -94,11 +144,13 @@ export interface ProcessedBrunchPost {
 	url: string;
 	thumbnail?: string;
 	username: string;
+	userId?: string;            // Internal user ID for API calls (e.g., "ftEI")
 	authorName: string;
 	originalTags: string[];
 	series?: BrunchSeries;
 	likes?: number;
-	comments?: number;
+	commentCount?: number;      // Comment count for metadata
+	commentData?: BrunchComment[]; // Actual comment content (if fetched)
 	subtitle?: string;
 	videos?: BrunchVideo[];     // Videos found in the post
 }
@@ -110,6 +162,7 @@ export interface BrunchSettings {
 	brunchImportFolder: string;
 	downloadBrunchImages: boolean;
 	downloadBrunchVideos: boolean;
+	downloadBrunchComments: boolean;  // Whether to fetch and include comments
 	subscribedBrunchAuthors: BrunchSubscription[];
 	enableBrunchDuplicateCheck: boolean;
 }
@@ -118,6 +171,7 @@ export const DEFAULT_BRUNCH_SETTINGS: BrunchSettings = {
 	brunchImportFolder: 'Brunch Posts',
 	downloadBrunchImages: true,
 	downloadBrunchVideos: true,
+	downloadBrunchComments: true,     // Default to fetching comments
 	subscribedBrunchAuthors: [],
 	enableBrunchDuplicateCheck: true,
 };

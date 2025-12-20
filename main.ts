@@ -19,7 +19,8 @@ import { NaverBlogSettingTab } from './src/ui/settings-tab';
 import { LocaleUtils } from './src/utils/locale-utils';
 import { ContentUtils } from './src/utils/content-utils';
 import { SettingsUtils } from './src/utils/settings-utils';
-import { convertCommentsToMarkdown } from './src/utils/comment-utils';
+import { convertCommentsToMarkdown, convertBrunchCommentsToMarkdown } from './src/utils/comment-utils';
+import { BrunchFetcher } from './brunch-fetcher';
 import { APIClientFactory } from './src/api';
 import {
 	NaverBlogSettings,
@@ -586,7 +587,9 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			}
 
 			// Create filename and folder paths
-			const filename = this.imageService.sanitizeFilename(`${post.title}.md`);
+			// Sanitize title for filename - replace newlines with spaces
+			const sanitizedTitleForFilename = post.title.replace(/[\r\n]+/g, ' ').trim();
+			const filename = this.imageService.sanitizeFilename(`${sanitizedTitleForFilename}.md`);
 			const baseFolder = normalizePath(this.settings.brunchSettings?.brunchImportFolder || DEFAULT_BRUNCH_SETTINGS.brunchImportFolder);
 			// Store posts under username subfolder
 			const subfolderName = this.imageService.sanitizeFilename(post.username);
@@ -605,6 +608,24 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const shouldDownloadVideos = this.settings.brunchSettings?.downloadBrunchVideos ?? true;
 			if (shouldDownloadVideos && post.videos && post.videos.length > 0) {
 				processedContent = await this.downloadBrunchVideos(processedContent, post.videos, post.postId, brunchImageFolder, folder);
+			}
+
+			// Fetch and append comments if enabled
+			const shouldDownloadComments = this.settings.brunchSettings?.downloadBrunchComments ?? true;
+			if (shouldDownloadComments && post.userId && post.commentCount && post.commentCount > 0) {
+				try {
+					console.log(`[Brunch] Fetching comments for @${post.username}/${post.postId}...`);
+					const fetcher = new BrunchFetcher(post.username);
+					const comments = await fetcher.fetchComments(post.userId, post.postId);
+					if (comments.length > 0) {
+						const commentsMarkdown = convertBrunchCommentsToMarkdown(comments);
+						processedContent += commentsMarkdown;
+						console.log(`[Brunch] Added ${comments.length} comments to markdown`);
+					}
+				} catch (error) {
+					console.error('[Brunch] Failed to fetch comments:', error);
+					// Continue without comments
+				}
 			}
 
 			// Ensure base folder exists
@@ -647,10 +668,14 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 	private createBrunchFrontmatter(post: ProcessedBrunchPost): string {
 		const lines: string[] = ['---'];
 
+		// Sanitize title and subtitle - replace newlines with spaces for valid YAML
+		const sanitizedTitle = post.title.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"').trim();
+		const sanitizedSubtitle = post.subtitle?.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"').trim();
+
 		lines.push(`platform: brunch`);
-		lines.push(`title: "${post.title.replace(/"/g, '\\"')}"`);
-		if (post.subtitle) {
-			lines.push(`subtitle: "${post.subtitle.replace(/"/g, '\\"')}"`);
+		lines.push(`title: "${sanitizedTitle}"`);
+		if (sanitizedSubtitle) {
+			lines.push(`subtitle: "${sanitizedSubtitle}"`);
 		}
 		lines.push(`date: ${post.date}`);
 		lines.push(`author: "${post.authorName}"`);
@@ -659,7 +684,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 		lines.push(`url: "${post.url}"`);
 
 		if (post.series) {
-			lines.push(`series: "${post.series.title.replace(/"/g, '\\"')}"`);
+			const sanitizedSeriesTitle = post.series.title.replace(/[\r\n]+/g, ' ').replace(/"/g, '\\"').trim();
+			lines.push(`series: "${sanitizedSeriesTitle}"`);
 			if (post.series.episode) {
 				lines.push(`episode: ${post.series.episode}`);
 			}
@@ -676,8 +702,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 		if (post.likes !== undefined) {
 			lines.push(`likes: ${post.likes}`);
 		}
-		if (post.comments !== undefined) {
-			lines.push(`comments: ${post.comments}`);
+		if (post.commentCount !== undefined) {
+			lines.push(`comments: ${post.commentCount}`);
 		}
 
 		if (post.thumbnail) {

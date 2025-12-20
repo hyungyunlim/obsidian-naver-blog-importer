@@ -1,6 +1,6 @@
 import { App, Modal, Notice, TFile } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
-import { BrunchFetcher, BrunchKeywordFetcher } from '../../../brunch-fetcher';
+import { BrunchFetcher, BrunchKeywordFetcher, BrunchBookFetcher } from '../../../brunch-fetcher';
 import { NaverCafeFetcher } from '../../fetchers/naver-cafe-fetcher';
 import { NaverNewsFetcher } from '../../fetchers/naver-news-fetcher';
 import { UI_DEFAULTS, NOTICE_TIMEOUTS, parseCafeUrl, BRUNCH_URL_PATTERNS } from '../../constants';
@@ -213,7 +213,18 @@ export class NaverBlogImportModal extends Modal {
 
 		// Check for Brunch URL first
 		if (this.isBrunchUrl(value)) {
-			// Check for keyword/magazine URL first
+			// Check for brunchbook URL first
+			if (BrunchFetcher.isBookUrl(value)) {
+				const bookId = BrunchFetcher.parseBookUrl(value);
+				if (bookId) {
+					return {
+						type: 'brunch',
+						message: `📖 Brunch book "${bookId}" (all posts)`
+					};
+				}
+			}
+
+			// Check for keyword/magazine URL
 			if (BrunchFetcher.isKeywordUrl(value)) {
 				const keyword = BrunchFetcher.parseKeywordUrl(value);
 				if (keyword) {
@@ -317,7 +328,18 @@ export class NaverBlogImportModal extends Modal {
 
 		// Check for Brunch URL first
 		if (this.isBrunchUrl(inputValue)) {
-			// Check for keyword/magazine URL first
+			// Check for brunchbook URL first
+			if (BrunchFetcher.isBookUrl(inputValue)) {
+				const bookId = BrunchFetcher.parseBookUrl(inputValue);
+				if (bookId) {
+					await this.importBrunchBook(bookId, maxPosts);
+				} else {
+					new Notice('Invalid Brunch book URL format');
+				}
+				return;
+			}
+
+			// Check for keyword/magazine URL
 			if (BrunchFetcher.isKeywordUrl(inputValue)) {
 				const keyword = BrunchFetcher.parseKeywordUrl(inputValue);
 				if (keyword) {
@@ -784,6 +806,105 @@ export class NaverBlogImportModal extends Modal {
 		} catch (error) {
 			cancelNotice.hide();
 			new Notice(`Brunch keyword import failed: ${error.message}`);
+		}
+	}
+
+	async importBrunchBook(bookId: string, maxPosts?: number) {
+		let importCancelled = false;
+		const cancelNotice = new Notice("Click here to cancel import", 0);
+		// @ts-ignore - accessing private messageEl property
+		const messageEl = cancelNotice.messageEl;
+		if (messageEl) {
+			messageEl.addEventListener('click', () => {
+				importCancelled = true;
+				cancelNotice.hide();
+				new Notice("Import cancelled by user", NOTICE_TIMEOUTS.medium);
+			});
+		}
+
+		try {
+			const limitText = maxPosts ? ` (max ${maxPosts})` : '';
+			new Notice(`📖 Fetching posts from brunchbook "${bookId}"${limitText}...`);
+
+			const fetcher = new BrunchBookFetcher(bookId);
+
+			// First fetch article list to show progress
+			const articles = await fetcher.fetchArticleList(maxPosts);
+
+			if (articles.length === 0) {
+				cancelNotice.hide();
+				new Notice("No posts found in this brunchbook");
+				return;
+			}
+
+			const bookTitle = await fetcher.getBookTitle();
+			new Notice(`Found ${articles.length} posts in "${bookTitle}". Fetching content...`);
+
+			let successCount = 0;
+			let errorCount = 0;
+			let lastCreatedFile: TFile | null = null;
+			const totalPosts = articles.length;
+
+			// Fetch and save posts one by one
+			for (let i = 0; i < articles.length; i++) {
+				if (importCancelled) break;
+
+				const article = articles[i];
+				const progress = `(${i + 1}/${totalPosts})`;
+
+				try {
+					new Notice(`Fetching ${progress}: @${article.profileId}/${article.articleNo}`, 3000);
+
+					const postFetcher = new BrunchFetcher(article.profileId);
+					const post = await postFetcher.fetchSinglePost(article.articleNo);
+
+					// Add book info to series if not already set
+					if (!post.series) {
+						post.series = {
+							title: bookTitle,
+							url: `https://brunch.co.kr/brunchbook/${bookId}`,
+						};
+					}
+
+					const createdFile = await this.plugin.createBrunchMarkdownFile(post);
+
+					if (createdFile) {
+						lastCreatedFile = createdFile;
+					}
+					successCount++;
+				} catch (error) {
+					console.error(`Failed to import @${article.profileId}/${article.articleNo}:`, error);
+					errorCount++;
+				}
+
+				// Rate limiting
+				if (i < articles.length - 1) {
+					await new Promise(resolve => setTimeout(resolve, 1000));
+				}
+			}
+
+			cancelNotice.hide();
+
+			let summary = importCancelled ?
+				`Import cancelled: ${successCount} successful` :
+				`Import complete: ${successCount} successful`;
+
+			if (errorCount > 0) summary += `, ${errorCount} errors`;
+
+			const processed = successCount + errorCount;
+			summary += ` (${processed}/${totalPosts})`;
+
+			if (!importCancelled && errorCount === 0) summary += ' ✅';
+			else if (errorCount > 0) summary += ' ⚠️';
+
+			new Notice(summary, 8000);
+
+			if (lastCreatedFile && !importCancelled) {
+				await this.openFile(lastCreatedFile);
+			}
+		} catch (error) {
+			cancelNotice.hide();
+			new Notice(`Brunch book import failed: ${error.message}`);
 		}
 	}
 

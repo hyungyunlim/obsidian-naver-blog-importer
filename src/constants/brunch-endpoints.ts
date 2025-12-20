@@ -32,6 +32,15 @@ export const BRUNCH_KEYWORD_API = (groupId: string, publishTime?: number, pickCo
 	return `${BRUNCH_API_URL}/v1/top/keyword/group/${groupId}${queryString ? '?' + queryString : ''}`;
 };
 
+// API endpoint for brunchbook/magazine article list
+export const BRUNCH_MAGAZINE_ARTICLES_API = (magazineId: string) =>
+	`${BRUNCH_API_URL}/v1/magazine/${magazineId}/articles`;
+
+// API endpoint for fetching comments
+// userId is the internal user ID (e.g., "ftEI"), articleNo is the post number
+export const BRUNCH_COMMENTS_API = (userId: string, articleNo: string) =>
+	`${BRUNCH_API_URL}/v2/@@${userId}/${articleNo}/comments`;
+
 // URL patterns
 export const BRUNCH_AUTHOR_URL = (username: string) =>
 	`${BRUNCH_BASE_URL}/@${username}`;

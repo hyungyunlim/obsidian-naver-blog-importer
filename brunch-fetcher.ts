@@ -2,14 +2,17 @@ import { requestUrl } from 'obsidian';
 import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
 import type { Element } from 'domhandler';
-import type { ProcessedBrunchPost, BrunchSeries, BrunchVideo } from './src/types/brunch';
+import type { ProcessedBrunchPost, BrunchSeries, BrunchVideo, BrunchComment, BrunchApiComment } from './src/types/brunch';
 import {
 	BRUNCH_BASE_URL,
 	BRUNCH_POST_URL,
 	BRUNCH_AUTHOR_URL,
+	BRUNCH_BOOK_URL,
 	BRUNCH_ARTICLE_LIST_API,
 	BRUNCH_KEYWORD_API,
 	BRUNCH_KEYWORD_URL,
+	BRUNCH_MAGAZINE_ARTICLES_API,
+	BRUNCH_COMMENTS_API,
 	BRUNCH_URL_PATTERNS,
 	BRUNCH_SELECTORS,
 	BRUNCH_IMAGE_PATTERNS,
@@ -372,6 +375,12 @@ export class BrunchFetcher {
 		// Extract subtitle from page
 		const subtitle = this.extractSubtitle($);
 
+		// Extract internal userId for API calls (e.g., for fetching comments)
+		const userId = this.extractUserId($);
+		if (userId) {
+			console.log(`[Brunch] Extracted userId: ${userId}`);
+		}
+
 		// Convert body to markdown (also extracts video IDs)
 		const { markdown, contentHtml, videoIds } = this.convertBodyToMarkdown($);
 
@@ -394,11 +403,12 @@ export class BrunchFetcher {
 			url,
 			thumbnail: thumbnail ? this.normalizeImageUrl(thumbnail) : undefined,
 			username: this.username,
+			userId,  // Include for comment fetching
 			authorName,
 			originalTags: keywords,
 			series,
 			likes,
-			comments,
+			commentCount: comments,
 			videos: videos.length > 0 ? videos : undefined,
 		};
 	}
@@ -1005,6 +1015,103 @@ export class BrunchFetcher {
 	}
 
 	/**
+	 * Fetch comments for a post using the Brunch API
+	 * @param userId Internal user ID (e.g., "ftEI"), not profileId
+	 * @param articleNo Post number
+	 */
+	async fetchComments(userId: string, articleNo: string): Promise<BrunchComment[]> {
+		try {
+			const apiUrl = BRUNCH_COMMENTS_API(userId, articleNo);
+			console.log(`[Brunch] Fetching comments from: ${apiUrl}`);
+
+			const response = await requestUrl({
+				url: apiUrl,
+				method: 'GET',
+				headers: {
+					'Accept': '*/*',
+					'User-Agent': BRUNCH_REQUEST_HEADERS['User-Agent'],
+					'Cookie': 'b_s_a_l=1'
+				},
+				throw: false
+			});
+
+			if (response.status !== 200) {
+				console.log(`[Brunch] Comments API failed: HTTP ${response.status}`);
+				return [];
+			}
+
+			const data = JSON.parse(response.text);
+
+			if (data.code !== 200 || !data.data?.list) {
+				console.log('[Brunch] Comments API returned non-200 or empty list');
+				return [];
+			}
+
+			const comments = this.parseComments(data.data.list);
+			console.log(`[Brunch] Fetched ${comments.length} comments (total count: ${data.data.totalCount})`);
+
+			return comments;
+		} catch (error) {
+			console.error('[Brunch] Failed to fetch comments:', error);
+			return [];
+		}
+	}
+
+	/**
+	 * Parse API comment response into BrunchComment structure
+	 */
+	private parseComments(apiComments: BrunchApiComment[]): BrunchComment[] {
+		return apiComments.map(comment => this.parseComment(comment));
+	}
+
+	/**
+	 * Parse a single API comment (with nested replies)
+	 */
+	private parseComment(apiComment: BrunchApiComment): BrunchComment {
+		const comment: BrunchComment = {
+			id: apiComment.no.toString(),
+			author: {
+				id: apiComment.commentUserId,
+				name: apiComment.commentUserName,
+				isMembership: apiComment.userMembershipActive || false,
+			},
+			content: apiComment.message,
+			timestamp: new Date(apiComment.createTime).toISOString(),
+			parentId: apiComment.parentNo ? apiComment.parentNo.toString() : undefined,
+		};
+
+		// Parse nested replies
+		if (apiComment.children?.list && apiComment.children.list.length > 0) {
+			comment.replies = apiComment.children.list.map(reply => this.parseComment(reply));
+		}
+
+		return comment;
+	}
+
+	/**
+	 * Extract internal userId from HTML (data-tiara-author_id="@@userId")
+	 */
+	private extractUserId($: CheerioAPI): string | undefined {
+		// Method 1: Look for data-tiara-author_id attribute
+		const html = $.html();
+		const authorIdMatch = html.match(/data-tiara-author_id="@@([^"]+)"/);
+		if (authorIdMatch) {
+			return authorIdMatch[1];
+		}
+
+		// Method 2: Extract from RSS link (https://brunch.co.kr/rss/@@userId)
+		const rssLink = $(BRUNCH_SELECTORS.rssLink).attr('href');
+		if (rssLink) {
+			const rssMatch = rssLink.match(BRUNCH_URL_PATTERNS.rssUserId);
+			if (rssMatch) {
+				return rssMatch[1];
+			}
+		}
+
+		return undefined;
+	}
+
+	/**
 	 * Extract video ID from Kakao TV embed URL
 	 */
 	private extractKakaoVideoId(url: string): string | null {
@@ -1169,6 +1276,91 @@ export class BrunchFetcher {
 			return decodeURIComponent(match[1]);
 		}
 		return null;
+	}
+
+	/**
+	 * Static method to check if URL is a brunchbook page
+	 */
+	static isBookUrl(url: string): boolean {
+		return BRUNCH_URL_PATTERNS.book.test(url);
+	}
+
+	/**
+	 * Static method to parse brunchbook URL
+	 */
+	static parseBookUrl(url: string): string | null {
+		const match = url.match(BRUNCH_URL_PATTERNS.book);
+		if (match) {
+			return match[1];
+		}
+		return null;
+	}
+
+	/**
+	 * Format comments to markdown
+	 * Designed for reusability across platforms
+	 */
+	static formatCommentsToMarkdown(comments: BrunchComment[]): string {
+		if (!comments || comments.length === 0) {
+			return '';
+		}
+
+		const lines: string[] = [];
+		lines.push('');
+		lines.push('---');
+		lines.push('');
+		lines.push('## 댓글');
+		lines.push('');
+
+		for (const comment of comments) {
+			lines.push(BrunchFetcher.formatSingleComment(comment, 0));
+		}
+
+		return lines.join('\n');
+	}
+
+	/**
+	 * Format a single comment with indentation for nested replies
+	 */
+	private static formatSingleComment(comment: BrunchComment, depth: number): string {
+		const lines: string[] = [];
+		const indent = '  '.repeat(depth);
+		const replyPrefix = depth > 0 ? '↳ ' : '';
+
+		// Format timestamp
+		const date = new Date(comment.timestamp);
+		const formattedDate = date.toLocaleDateString('ko-KR', {
+			year: 'numeric',
+			month: 'long',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+
+		// Author name with membership indicator
+		const authorDisplay = comment.author.isMembership
+			? `**${comment.author.name}** 🌟`
+			: `**${comment.author.name}**`;
+
+		// Comment header
+		lines.push(`${indent}${replyPrefix}${authorDisplay} · ${formattedDate}`);
+
+		// Comment content (preserve line breaks)
+		const contentLines = comment.content.split('\n');
+		for (const contentLine of contentLines) {
+			lines.push(`${indent}${depth > 0 ? '  ' : ''}${contentLine}`);
+		}
+
+		lines.push('');
+
+		// Nested replies
+		if (comment.replies && comment.replies.length > 0) {
+			for (const reply of comment.replies) {
+				lines.push(BrunchFetcher.formatSingleComment(reply, depth + 1));
+			}
+		}
+
+		return lines.join('\n');
 	}
 }
 
@@ -1389,6 +1581,243 @@ export class BrunchKeywordFetcher {
 		const keyword = BrunchFetcher.parseKeywordUrl(url);
 		if (keyword) {
 			return new BrunchKeywordFetcher(keyword);
+		}
+		return null;
+	}
+}
+
+/**
+ * Brunch Book Fetcher
+ * Fetches all posts from a brunchbook (series) page
+ */
+export class BrunchBookFetcher {
+	private bookId: string;
+	private bookTitle: string | null = null;
+	private authorProfileId: string | null = null;
+
+	constructor(bookId: string) {
+		this.bookId = bookId;
+		console.log(`[Brunch Book] Constructor: bookId="${bookId}"`);
+	}
+
+	/**
+	 * Fetch book page and extract article list with author profileId
+	 * Uses data-tiara attributes and magazine API for reliable article list
+	 */
+	private async fetchBookPage(): Promise<{
+		articles: Array<{ userId: string; articleNo: string; profileId: string; title: string }>;
+		bookTitle: string;
+		authorProfileId: string;
+		totalCount: number;
+	}> {
+		const url = BRUNCH_BOOK_URL(this.bookId);
+		console.log(`[Brunch Book] Fetching book page: ${url}`);
+
+		try {
+			const response = await requestUrl({
+				url: url,
+				method: 'GET',
+				headers: BRUNCH_REQUEST_HEADERS,
+				throw: false
+			});
+
+			if (response.status !== 200) {
+				throw new Error(`Failed to fetch book page: HTTP ${response.status}`);
+			}
+
+			const html = response.text;
+			console.log('[Brunch Book] HTML length:', html.length);
+
+			const $ = cheerio.load(html);
+
+			// Extract book title from og:title
+			let bookTitle = $('meta[property="og:title"]').attr('content') || this.bookId;
+			// Remove prefix like "[연재 브런치북] "
+			bookTitle = bookTitle.replace(/^\[.*?\]\s*/, '').trim();
+			this.bookTitle = bookTitle;
+
+			// Extract magazineId from data-tiara-id attribute
+			const magazineIdMatch = html.match(/data-tiara-id="(\d+)"/);
+			const magazineId = magazineIdMatch?.[1];
+			console.log('[Brunch Book] MagazineId from data-tiara-id:', magazineId);
+
+			// Extract profileId from data-tiara-category_id attribute
+			// Format: data-tiara-category_id="@profileId"
+			let authorProfileId: string | null = null;
+			const tiaraCategoryMatch = html.match(/data-tiara-category_id="@([^"]+)"/);
+			if (tiaraCategoryMatch) {
+				authorProfileId = tiaraCategoryMatch[1];
+				console.log('[Brunch Book] Found profileId from data-tiara-category_id:', authorProfileId);
+			}
+
+			// Fallback - look for /@profileId links in the page
+			if (!authorProfileId) {
+				const profileLinkMatch = html.match(/href="\/@([a-zA-Z0-9_]+)"/);
+				if (profileLinkMatch && profileLinkMatch[1] !== 'brunch') {
+					authorProfileId = profileLinkMatch[1];
+					console.log('[Brunch Book] Found profileId from link:', authorProfileId);
+				}
+			}
+
+			if (!authorProfileId) {
+				console.error('[Brunch Book] Could not find author profileId');
+				throw new Error('Could not find author profileId in book page');
+			}
+
+			if (!magazineId) {
+				console.error('[Brunch Book] Could not find magazineId');
+				throw new Error('Could not find magazineId in book page');
+			}
+
+			this.authorProfileId = authorProfileId;
+
+			// Fetch article list from magazine API
+			const articles = await this.fetchArticlesFromApi(magazineId, authorProfileId);
+
+			console.log(`[Brunch Book] Found ${articles.length} articles in book "${bookTitle}" by @${authorProfileId}`);
+
+			return {
+				articles,
+				bookTitle,
+				authorProfileId,
+				totalCount: articles.length,
+			};
+		} catch (error) {
+			console.error('[Brunch Book] Failed to fetch book page:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Fetch article list from magazine API
+	 */
+	private async fetchArticlesFromApi(
+		magazineId: string,
+		profileId: string
+	): Promise<Array<{ userId: string; articleNo: string; profileId: string; title: string }>> {
+		const apiUrl = BRUNCH_MAGAZINE_ARTICLES_API(magazineId);
+		console.log(`[Brunch Book] Fetching articles from API: ${apiUrl}`);
+
+		try {
+			const response = await requestUrl({
+				url: apiUrl,
+				method: 'GET',
+				headers: {
+					'Accept': '*/*',
+					'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+					'Cookie': 'b_s_a_l=1'
+				},
+				throw: false
+			});
+
+			if (response.status !== 200) {
+				throw new Error(`Magazine API failed: HTTP ${response.status}`);
+			}
+
+			const data = JSON.parse(response.text);
+
+			if (data.code !== 200 || !data.data?.list) {
+				throw new Error('Invalid API response');
+			}
+
+			const articles = data.data.list.map((item: { article: { no: number; userId: string; title: string } }) => ({
+				userId: item.article.userId,
+				articleNo: item.article.no.toString(),
+				profileId: profileId,
+				title: item.article.title || '',
+			}));
+
+			console.log(`[Brunch Book] API returned ${articles.length} articles`);
+			return articles;
+		} catch (error) {
+			console.error('[Brunch Book] Failed to fetch articles from API:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Get list of articles in the book
+	 */
+	async fetchArticleList(maxPosts?: number): Promise<Array<{ userId: string; articleNo: string; profileId: string; title: string }>> {
+		const { articles } = await this.fetchBookPage();
+		return maxPosts ? articles.slice(0, maxPosts) : articles;
+	}
+
+	/**
+	 * Fetch all posts from the book
+	 */
+	async fetchPosts(maxPosts?: number, onProgress?: (current: number, total: number, title: string) => void): Promise<ProcessedBrunchPost[]> {
+		const { articles, bookTitle } = await this.fetchBookPage();
+		const posts: ProcessedBrunchPost[] = [];
+		const limit = maxPosts ? Math.min(maxPosts, articles.length) : articles.length;
+
+		console.log(`[Brunch Book] Fetching ${limit} posts from "${bookTitle}"...`);
+
+		for (let i = 0; i < limit; i++) {
+			const article = articles[i];
+
+			if (onProgress) {
+				onProgress(i + 1, limit, article.title || `Article ${article.articleNo}`);
+			}
+
+			try {
+				// Use the profileId (not userId) for fetching individual posts
+				const fetcher = new BrunchFetcher(article.profileId);
+				const post = await fetcher.fetchSinglePost(article.articleNo);
+
+				// Add book info to the post's series
+				if (!post.series) {
+					post.series = {
+						title: bookTitle,
+						url: BRUNCH_BOOK_URL(this.bookId),
+					};
+				}
+
+				posts.push(post);
+
+				// Rate limiting
+				if (i < limit - 1) {
+					await this.delay(BRUNCH_RATE_LIMITS.requestDelay);
+				}
+			} catch (error) {
+				console.error(`[Brunch Book] Failed to fetch post @${article.profileId}/${article.articleNo}:`, error);
+			}
+		}
+
+		return posts;
+	}
+
+	/**
+	 * Get book title
+	 */
+	async getBookTitle(): Promise<string> {
+		if (!this.bookTitle) {
+			await this.fetchBookPage();
+		}
+		return this.bookTitle || this.bookId;
+	}
+
+	/**
+	 * Get book ID
+	 */
+	getBookId(): string {
+		return this.bookId;
+	}
+
+	/**
+	 * Delay helper
+	 */
+	private delay(ms: number): Promise<void> {
+		return new Promise(resolve => setTimeout(resolve, ms));
+	}
+
+	/**
+	 * Static method to create fetcher from URL
+	 */
+	static fromUrl(url: string): BrunchBookFetcher | null {
+		const bookId = BrunchFetcher.parseBookUrl(url);
+		if (bookId) {
+			return new BrunchBookFetcher(bookId);
 		}
 		return null;
 	}
