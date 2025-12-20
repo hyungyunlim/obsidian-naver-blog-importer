@@ -3,7 +3,8 @@ import {
 	Notice,
 	TFile,
 	normalizePath,
-	getFrontMatterInfo
+	getFrontMatterInfo,
+	requestUrl
 } from 'obsidian';
 
 import { I18n } from './src/utils/i18n';
@@ -25,8 +26,10 @@ import {
 	DEFAULT_SETTINGS,
 	DEFAULT_CAFE_SETTINGS,
 	DEFAULT_NEWS_SETTINGS,
+	DEFAULT_BRUNCH_SETTINGS,
 	ProcessedBlogPost,
-	ProcessedCafePost
+	ProcessedCafePost,
+	ProcessedBrunchPost
 } from './src/types';
 import {
 	NOTICE_TIMEOUTS,
@@ -178,6 +181,12 @@ export default class NaverBlogPlugin extends Plugin {
 			this.settings.newsSettings = { ...DEFAULT_NEWS_SETTINGS };
 		} else {
 			this.settings.newsSettings = Object.assign({}, DEFAULT_NEWS_SETTINGS, this.settings.newsSettings);
+		}
+		// Ensure brunchSettings exists with defaults
+		if (!this.settings.brunchSettings) {
+			this.settings.brunchSettings = { ...DEFAULT_BRUNCH_SETTINGS };
+		} else {
+			this.settings.brunchSettings = Object.assign({}, DEFAULT_BRUNCH_SETTINGS, this.settings.brunchSettings);
 		}
 	}
 
@@ -567,6 +576,220 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 		lines.push('---');
 		return lines.join('\n');
+	}
+
+	async createBrunchMarkdownFile(post: ProcessedBrunchPost): Promise<TFile | null> {
+		try {
+			// Generate AI tags if enabled and no original tags
+			if (this.settings.enableAiTags && (!post.originalTags || post.originalTags.length === 0)) {
+				post.originalTags = await this.generateAITags(post.title, post.content);
+			}
+
+			// Create filename and folder paths
+			const filename = this.imageService.sanitizeFilename(`${post.title}.md`);
+			const baseFolder = normalizePath(this.settings.brunchSettings?.brunchImportFolder || DEFAULT_BRUNCH_SETTINGS.brunchImportFolder);
+			// Store posts under username subfolder
+			const subfolderName = this.imageService.sanitizeFilename(post.username);
+			const folder = normalizePath(`${baseFolder}/${subfolderName}`);
+			// Brunch images go to attachments subfolder
+			const brunchImageFolder = normalizePath(`${folder}/attachments`);
+
+			// Process images if enabled
+			let processedContent = post.content;
+			const shouldDownloadImages = this.settings.brunchSettings?.downloadBrunchImages ?? this.settings.enableImageDownload;
+			if (shouldDownloadImages) {
+				processedContent = await this.imageService.downloadAndProcessImages(post.content, post.postId, brunchImageFolder, folder);
+			}
+
+			// Process videos if enabled
+			const shouldDownloadVideos = this.settings.brunchSettings?.downloadBrunchVideos ?? true;
+			if (shouldDownloadVideos && post.videos && post.videos.length > 0) {
+				processedContent = await this.downloadBrunchVideos(processedContent, post.videos, post.postId, brunchImageFolder, folder);
+			}
+
+			// Ensure base folder exists
+			const baseFolderExists = this.app.vault.getAbstractFileByPath(baseFolder);
+			if (!baseFolderExists) {
+				await this.app.vault.createFolder(baseFolder);
+			}
+
+			// Ensure username subfolder exists
+			const folderExists = this.app.vault.getAbstractFileByPath(folder);
+			if (!folderExists) {
+				await this.app.vault.createFolder(folder);
+			}
+
+			const filepath = normalizePath(`${folder}/${filename}`);
+
+			// Create frontmatter
+			const frontmatter = this.createBrunchFrontmatter(post);
+
+			// Create full content
+			const fullContent = `${frontmatter}\n${processedContent}`;
+
+			// Check if file already exists
+			const fileExists = this.app.vault.getAbstractFileByPath(filepath);
+			if (fileExists) {
+				return null;
+			}
+
+			// Create the file
+			const createdFile = await this.app.vault.create(filepath, fullContent);
+
+			new Notice(`Created: ${filename}`);
+			return createdFile;
+		} catch (error) {
+			new Notice(`Failed to create file for: ${post.title}`);
+			return null;
+		}
+	}
+
+	private createBrunchFrontmatter(post: ProcessedBrunchPost): string {
+		const lines: string[] = ['---'];
+
+		lines.push(`platform: brunch`);
+		lines.push(`title: "${post.title.replace(/"/g, '\\"')}"`);
+		if (post.subtitle) {
+			lines.push(`subtitle: "${post.subtitle.replace(/"/g, '\\"')}"`);
+		}
+		lines.push(`date: ${post.date}`);
+		lines.push(`author: "${post.authorName}"`);
+		lines.push(`author_username: "@${post.username}"`);
+		lines.push(`postId: "${post.postId}"`);
+		lines.push(`url: "${post.url}"`);
+
+		if (post.series) {
+			lines.push(`series: "${post.series.title.replace(/"/g, '\\"')}"`);
+			if (post.series.episode) {
+				lines.push(`episode: ${post.series.episode}`);
+			}
+			lines.push(`series_url: "${post.series.url}"`);
+		}
+
+		if (post.originalTags && post.originalTags.length > 0) {
+			lines.push('tags:');
+			post.originalTags.forEach(tag => {
+				lines.push(`  - "${tag.trim().replace(/"/g, '\\"')}"`);
+			});
+		}
+
+		if (post.likes !== undefined) {
+			lines.push(`likes: ${post.likes}`);
+		}
+		if (post.comments !== undefined) {
+			lines.push(`comments: ${post.comments}`);
+		}
+
+		if (post.thumbnail) {
+			lines.push(`thumbnail: "${post.thumbnail}"`);
+		}
+
+		lines.push('---');
+		return lines.join('\n');
+	}
+
+	/**
+	 * Download Brunch videos and update content with local paths
+	 */
+	private async downloadBrunchVideos(
+		content: string,
+		videos: { videoId?: string; mp4Url?: string; url: string }[],
+		postId: string,
+		videoFolder: string,
+		notesFolder: string
+	): Promise<string> {
+		let processedContent = content;
+
+		// Ensure video folder exists
+		const folderExists = this.app.vault.getAbstractFileByPath(videoFolder);
+		if (!folderExists) {
+			await this.app.vault.createFolder(videoFolder);
+		}
+
+		for (let i = 0; i < videos.length; i++) {
+			const video = videos[i];
+			if (!video.mp4Url || !video.videoId) {
+				console.log('[Brunch] No MP4 URL for video:', video.videoId);
+				continue;
+			}
+
+			try {
+				new Notice(`Downloading video ${i + 1}/${videos.length}...`, 3000);
+				console.log('[Brunch] Downloading video from:', video.mp4Url);
+
+				// Download the video file with proper headers
+				const response = await requestUrl({
+					url: video.mp4Url,
+					method: 'GET',
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+						'Accept': '*/*',
+						'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+						'Referer': 'https://play-tv.kakao.com/',
+						'Origin': 'https://play-tv.kakao.com',
+					},
+				});
+
+				if (response.status === 200 && response.arrayBuffer) {
+					// Generate filename
+					const filename = `${postId}_video_${i + 1}.mp4`;
+					const videoPath = normalizePath(`${videoFolder}/${filename}`);
+
+					// Save video file
+					await this.app.vault.createBinary(videoPath, response.arrayBuffer);
+
+					// Calculate relative path
+					const relativePath = this.calculateRelativePath(notesFolder, videoFolder);
+					const localVideoPath = `${relativePath}${filename}`;
+
+					// Replace video placeholder in content
+					// Pattern: [Video:videoId](url)
+					const videoPattern = new RegExp(
+						`\\[Video:${video.videoId}\\]\\([^)]*\\)`,
+						'g'
+					);
+					processedContent = processedContent.replace(
+						videoPattern,
+						`![Video](${localVideoPath})`
+					);
+
+					console.log('[Brunch] Downloaded video:', filename);
+					new Notice(`Downloaded video: ${filename}`, 2000);
+				}
+			} catch (error) {
+				console.error('[Brunch] Failed to download video:', error);
+				// Keep original video link on failure
+			}
+		}
+
+		return processedContent;
+	}
+
+	/**
+	 * Calculate relative path from notes folder to target folder
+	 */
+	private calculateRelativePath(notesFolder: string, targetFolder: string): string {
+		const notesParts = notesFolder.split('/');
+		const targetParts = targetFolder.split('/');
+
+		// Find common prefix
+		let commonIndex = 0;
+		while (
+			commonIndex < notesParts.length &&
+			commonIndex < targetParts.length &&
+			notesParts[commonIndex] === targetParts[commonIndex]
+		) {
+			commonIndex++;
+		}
+
+		// Go up from notes folder
+		const upLevels = notesParts.length - commonIndex;
+		const upPath = '../'.repeat(upLevels);
+
+		// Go down to target folder
+		const downPath = targetParts.slice(commonIndex).join('/');
+
+		return upPath + (downPath ? downPath + '/' : '');
 	}
 
 	async rewriteCurrentNote(file: TFile): Promise<void> {

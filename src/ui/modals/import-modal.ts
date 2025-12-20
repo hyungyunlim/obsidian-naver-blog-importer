@@ -1,8 +1,9 @@
 import { App, Modal, Notice, TFile } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
+import { BrunchFetcher } from '../../../brunch-fetcher';
 import { NaverCafeFetcher } from '../../fetchers/naver-cafe-fetcher';
 import { NaverNewsFetcher } from '../../fetchers/naver-news-fetcher';
-import { UI_DEFAULTS, NOTICE_TIMEOUTS, parseCafeUrl } from '../../constants';
+import { UI_DEFAULTS, NOTICE_TIMEOUTS, parseCafeUrl, BRUNCH_URL_PATTERNS } from '../../constants';
 import { isNaverBlogUrl, parseNaverBlogUrl, extractBlogIdFromUrl } from '../../utils/url-utils';
 import type NaverBlogPlugin from '../../../main';
 import type { ProcessedCafePost } from '../../types';
@@ -25,7 +26,7 @@ export class NaverBlogImportModal extends Modal {
 
 		const input = inputContainer.createEl('input', {
 			type: 'text',
-			placeholder: 'Blog/Cafe/News URL (blog.naver.com, cafe.naver.com, n.news.naver.com)',
+			placeholder: 'Blog/Cafe/News/Brunch URL (blog.naver.com, cafe.naver.com, brunch.co.kr)',
 			cls: 'naver-blog-input'
 		});
 
@@ -45,7 +46,8 @@ export class NaverBlogImportModal extends Modal {
 			const icon = detection.type === 'single' ? '📄' :
 						 detection.type === 'bulk' ? '📚' :
 						 detection.type === 'cafe' ? '☕' :
-						 detection.type === 'news' ? '📰' : '⚠️';
+						 detection.type === 'news' ? '📰' :
+						 detection.type === 'brunch' ? '🥐' : '⚠️';
 			detectionDiv.setText(`${icon} ${detection.message}`);
 			detectionDiv.removeClass('naver-blog-detection--error');
 			if (detection.type === 'invalid') {
@@ -83,7 +85,7 @@ export class NaverBlogImportModal extends Modal {
 			input.focus();
 
 			navigator.clipboard.readText().then((clipboardText) => {
-				if (clipboardText && (isNaverBlogUrl(clipboardText) || this.isNaverCafeUrl(clipboardText) || this.isNaverNewsUrl(clipboardText))) {
+				if (clipboardText && (isNaverBlogUrl(clipboardText) || this.isNaverCafeUrl(clipboardText) || this.isNaverNewsUrl(clipboardText) || this.isBrunchUrl(clipboardText))) {
 					input.value = clipboardText.trim();
 					input.select();
 					updateDetection();
@@ -102,7 +104,94 @@ export class NaverBlogImportModal extends Modal {
 		return value.includes('n.news.naver.com') || value.includes('m.news.naver.com') || value.includes('news.naver.com/article');
 	}
 
-	detectInputType(value: string): { type: 'single' | 'bulk' | 'cafe' | 'news' | 'invalid'; message: string } {
+	isBrunchUrl(value: string): boolean {
+		// Check for brunch.co.kr with or without @ (mobile may strip @)
+		return value.includes('brunch.co.kr');
+	}
+
+	/**
+	 * Try to fix Brunch URL if @ is missing (mobile issue)
+	 * e.g., "brunch.co.kr/whyart/170" -> "brunch.co.kr/@whyart/170"
+	 */
+	fixBrunchUrl(value: string): string {
+		if (!value.includes('brunch.co.kr')) return value;
+
+		// If already has @, return as-is
+		if (value.includes('@')) return value;
+
+		// Try to add @ after brunch.co.kr/
+		// Pattern: brunch.co.kr/username/postId or brunch.co.kr/username
+		return value.replace(
+			/(brunch\.co\.kr)\//,
+			'$1/@'
+		);
+	}
+
+	/**
+	 * Normalize URL to handle mobile-specific encoding issues
+	 * Removes invisible characters, normalizes Unicode, converts full-width to ASCII
+	 */
+	normalizeUrl(value: string): string {
+		if (!value) return '';
+
+		// Remove zero-width characters and other invisible Unicode
+		let normalized = value
+			.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, '') // Zero-width spaces, NBSP
+			.replace(/[\u2028\u2029]/g, '') // Line/paragraph separators
+			.replace(/\s+/g, ' ') // Normalize whitespace
+			.trim();
+
+		// Normalize Unicode (NFC form)
+		if (normalized.normalize) {
+			normalized = normalized.normalize('NFC');
+		}
+
+		// Convert full-width characters to ASCII (iOS smart punctuation issue)
+		// Full-width ASCII variants: U+FF01 to U+FF5E map to U+0021 to U+007E
+		normalized = normalized.replace(/[\uFF01-\uFF5E]/g, (char) => {
+			return String.fromCharCode(char.charCodeAt(0) - 0xFEE0);
+		});
+
+		// Convert other common smart punctuation
+		normalized = normalized
+			.replace(/['']/g, "'")  // Smart single quotes
+			.replace(/[""]/g, '"')  // Smart double quotes
+			.replace(/[–—]/g, '-')  // En-dash, em-dash
+			.replace(/…/g, '...')   // Ellipsis
+			.replace(/：/g, ':')    // Full-width colon
+			.replace(/／/g, '/')    // Full-width slash
+			.replace(/．/g, '.')    // Full-width period
+			.replace(/＠/g, '@');   // Full-width at sign
+
+		return normalized;
+	}
+
+	detectInputType(value: string): { type: 'single' | 'bulk' | 'cafe' | 'news' | 'brunch' | 'invalid'; message: string } {
+		// Normalize URL to handle mobile-specific encoding issues
+		value = this.normalizeUrl(value);
+		// Fix Brunch URL if @ is missing (mobile may strip @)
+		value = this.fixBrunchUrl(value);
+
+		// Check for Brunch URL first
+		if (this.isBrunchUrl(value)) {
+			const parsed = BrunchFetcher.parsePostUrl(value);
+			if (parsed) {
+				return {
+					type: 'brunch',
+					message: `🥐 Brunch post from @${parsed.username} (ID: ${parsed.postId})`
+				};
+			}
+			// Author page without post ID
+			const authorMatch = value.match(/@([^/]+)$/);
+			if (authorMatch) {
+				return {
+					type: 'brunch',
+					message: `🥐 Brunch author @${authorMatch[1]} (all posts)`
+				};
+			}
+			return { type: 'invalid', message: 'Could not parse Brunch URL' };
+		}
+
 		// Check for News URL first
 		if (this.isNaverNewsUrl(value)) {
 			const newsMatch = value.match(/article\/(\d+)\/(\d+)/);
@@ -164,7 +253,30 @@ export class NaverBlogImportModal extends Modal {
 			return;
 		}
 
+		// Normalize URL to handle mobile-specific encoding issues
+		inputValue = this.normalizeUrl(inputValue);
+
+		// Fix Brunch URL if @ is missing (mobile may strip @)
+		inputValue = this.fixBrunchUrl(inputValue);
+
 		this.close();
+
+		// Check for Brunch URL first
+		if (this.isBrunchUrl(inputValue)) {
+			const parsed = BrunchFetcher.parsePostUrl(inputValue);
+			if (parsed) {
+				await this.importBrunchPost(parsed.username, parsed.postId);
+			} else {
+				// Author page - import all posts
+				const authorMatch = inputValue.match(/@([^/]+)/);
+				if (authorMatch) {
+					await this.importBrunchAuthor(authorMatch[1]);
+				} else {
+					new Notice('Invalid Brunch URL format');
+				}
+			}
+			return;
+		}
 
 		// Check for News URL first
 		if (this.isNaverNewsUrl(inputValue)) {
@@ -417,6 +529,105 @@ export class NaverBlogImportModal extends Modal {
 			// Import process failed
 			cancelNotice.hide();
 			new Notice("Import failed. Check console for details.");
+		}
+	}
+
+	async importBrunchPost(username: string, postId: string) {
+		try {
+			new Notice(`🥐 Importing Brunch post from @${username}...`, NOTICE_TIMEOUTS.short);
+
+			const fetcher = new BrunchFetcher(username);
+			const post = await fetcher.fetchSinglePost(postId);
+
+			if (!post) {
+				new Notice('Failed to fetch Brunch post', NOTICE_TIMEOUTS.medium);
+				return;
+			}
+
+			const createdFile = await this.plugin.createBrunchMarkdownFile(post);
+
+			new Notice(`✅ Imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
+
+			if (createdFile) {
+				await this.openFile(createdFile);
+			}
+		} catch (error) {
+			new Notice(`❌ Brunch import failed: ${error.message}`, NOTICE_TIMEOUTS.medium);
+		}
+	}
+
+	async importBrunchAuthor(username: string) {
+		let importCancelled = false;
+		const cancelNotice = new Notice("Click here to cancel import", 0);
+		// @ts-ignore - accessing private messageEl property
+		const messageEl = cancelNotice.messageEl;
+		if (messageEl) {
+			messageEl.addEventListener('click', () => {
+				importCancelled = true;
+				cancelNotice.hide();
+				new Notice("Import cancelled by user", NOTICE_TIMEOUTS.medium);
+			});
+		}
+
+		try {
+			new Notice(`🥐 Fetching posts from @${username}...`);
+
+			const fetcher = new BrunchFetcher(username);
+			const posts = await fetcher.fetchPosts();
+
+			if (posts.length === 0) {
+				cancelNotice.hide();
+				new Notice("No posts found or failed to fetch posts");
+				return;
+			}
+
+			let successCount = 0;
+			let errorCount = 0;
+			let lastCreatedFile: TFile | null = null;
+			const totalPosts = posts.length;
+
+			for (let i = 0; i < posts.length; i++) {
+				if (importCancelled) break;
+
+				const post = posts[i];
+				const progress = `(${i + 1}/${totalPosts})`;
+
+				try {
+					new Notice(`Creating file ${progress}: ${post.title}`, 3000);
+					const createdFile = await this.plugin.createBrunchMarkdownFile(post);
+
+					if (createdFile) {
+						lastCreatedFile = createdFile;
+					}
+					successCount++;
+				} catch {
+					errorCount++;
+				}
+				await new Promise(resolve => setTimeout(resolve, 500));
+			}
+
+			cancelNotice.hide();
+
+			let summary = importCancelled ?
+				`Import cancelled: ${successCount} successful` :
+				`Import complete: ${successCount} successful`;
+
+			if (errorCount > 0) summary += `, ${errorCount} errors`;
+
+			const processed = successCount + errorCount;
+			summary += ` (${processed}/${totalPosts})`;
+
+			if (!importCancelled && errorCount === 0) summary += ' ✅';
+			else if (errorCount > 0) summary += ' ⚠️';
+
+			new Notice(summary, 8000);
+
+			if (lastCreatedFile && !importCancelled) {
+				await this.openFile(lastCreatedFile);
+			}
+		} catch {
+			cancelNotice.hide();
+			new Notice("Brunch import failed. Check console for details.");
 		}
 	}
 

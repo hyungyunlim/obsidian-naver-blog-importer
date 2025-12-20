@@ -29,3 +29,19 @@ export type {
 	NaverNewsSettings,
 } from './news';
 export { DEFAULT_NEWS_SETTINGS } from './news';
+
+// Brunch types
+export type {
+	BrunchPost,
+	BrunchAuthor,
+	BrunchContent,
+	BrunchMedia,
+	BrunchImage,
+	BrunchVideo,
+	BrunchMetadata,
+	BrunchSeries,
+	BrunchSubscription,
+	ProcessedBrunchPost,
+	BrunchSettings,
+} from './brunch';
+export { DEFAULT_BRUNCH_SETTINGS } from './brunch';

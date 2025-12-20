@@ -1,15 +1,16 @@
 # Naver Blog Plugin - Development Guide
 
 ## 프로젝트 개요
-네이버 블로그 포스트를 옵시디언으로 가져오는 플러그인입니다. AI 기반 태그 생성, 요약 생성, 이미지 다운로드, 레이아웃 수정 기능을 제공합니다.
+네이버 블로그, 카페, 뉴스 및 카카오 브런치 포스트를 옵시디언으로 가져오는 플러그인입니다. AI 기반 태그 생성, 요약 생성, 이미지 다운로드, 레이아웃 수정 기능을 제공합니다.
 
 ## 현재 아키텍처 구조
 
 ### 📁 디렉터리 구조
 ```
 obsidian-naver-blog-plugin/
-├── main.ts                          # 메인 플러그인 클래스 (801라인)
+├── main.ts                          # 메인 플러그인 클래스
 ├── naver-blog-fetcher.ts            # 네이버 블로그 API 클라이언트
+├── brunch-fetcher.ts                # 카카오 브런치 HTML 파서 (~400라인)
 ├── manifest.json                    # 플러그인 메타데이터
 ├── styles.css                       # 스타일시트
 ├── lang/                            # 다국어 지원
@@ -20,10 +21,12 @@ obsidian-naver-blog-plugin/
     │   ├── index.ts                # 타입 재수출
     │   ├── translations.ts         # 번역 인터페이스
     │   ├── settings.ts             # 설정 타입 및 기본값
-    │   └── blog.ts                 # 블로그 포스트 타입
+    │   ├── blog.ts                 # 블로그 포스트 타입
+    │   └── brunch.ts               # 브런치 포스트 타입 (~100라인)
     ├── constants/                  # 상수 정의
     │   ├── index.ts                # 상수 재수출
     │   ├── api-endpoints.ts        # API 엔드포인트 URL
+    │   ├── brunch-endpoints.ts     # 브런치 상수 및 패턴 (~80라인)
     │   ├── ai-models.ts            # AI 모델 정의
     │   ├── default-values.ts       # 기본값 및 제한값
     │   ├── timeouts.ts             # 타임아웃 및 지연 설정
@@ -33,10 +36,11 @@ obsidian-naver-blog-plugin/
     ├── services/                   # 비즈니스 로직 서비스
     │   ├── ai-service.ts           # AI 관련 로직 (500+ 라인)
     │   ├── blog-service.ts         # 블로그 데이터 처리 (150+ 라인)
+    │   ├── brunch-service.ts       # 브런치 데이터 처리 (~180라인)
     │   └── image-service.ts        # 이미지 처리 (320+ 라인)
     ├── ui/                         # UI 컴포넌트
     │   ├── modals/                 # 모달 컴포넌트
-    │   │   ├── import-modal.ts     # 블로그 가져오기 모달
+    │   │   ├── import-modal.ts     # 통합 가져오기 모달 (블로그/카페/뉴스/브런치)
     │   │   ├── subscribe-modal.ts  # 블로그 구독 모달
     │   │   ├── single-post-modal.ts # 단일 포스트 모달
     │   │   └── folder-suggest-modal.ts # 폴더 선택 모달
@@ -322,9 +326,20 @@ class SettingsUtils {
 
 ### 📝 블로그 가져오기
 - **네이버 블로그**: 전체/단일 포스트 가져오기
+- **네이버 카페**: 카페 게시글 가져오기 (쿠키 인증 지원)
+- **네이버 뉴스**: 뉴스 기사 가져오기
+- **카카오 브런치**: 브런치 포스트 가져오기 (HTML 파싱)
 - **구독 시스템**: 여러 블로그 자동 동기화
-- **중복 체크**: logNo 기반 중복 방지
+- **중복 체크**: logNo/postId 기반 중복 방지
 - **가져오기 제한**: 관리자 설정 가능 (0-1000개)
+
+### 🥐 브런치 가져오기 (신규)
+- **단일 포스트**: `https://brunch.co.kr/@username/postId` URL 지원
+- **작가 전체**: `https://brunch.co.kr/@username` 작가 페이지 전체 가져오기
+- **콘텐츠 파싱**: text, image, hr, quotation, video, opengraph 타입 지원
+- **메타데이터**: 시리즈 정보, 좋아요/댓글 수, 키워드 태그 추출
+- **이미지 다운로드**: daumcdn.net 이미지 로컬 저장
+- **저장 위치**: `Brunch Posts/@username/` 폴더에 저장
 
 ### 🖼️ 이미지 처리  
 - **자동 다운로드**: 네이버 CDN 이미지 로컬 저장

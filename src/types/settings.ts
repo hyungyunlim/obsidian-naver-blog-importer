@@ -1,6 +1,8 @@
 import type { CafeSubscription } from './cafe';
 import type { NaverNewsSettings } from './news';
 import { DEFAULT_NEWS_SETTINGS } from './news';
+import type { BrunchSettings } from './brunch';
+import { DEFAULT_BRUNCH_SETTINGS } from './brunch';
 
 export interface BlogSubscription {
 	blogId: string;
@@ -42,6 +44,8 @@ export interface NaverBlogSettings {
 	cafeSettings: CafeSettings;
 	// News settings
 	newsSettings: NaverNewsSettings;
+	// Brunch settings
+	brunchSettings: BrunchSettings;
 }
 
 export const DEFAULT_CAFE_SETTINGS: CafeSettings = {
@@ -77,4 +81,5 @@ export const DEFAULT_SETTINGS: NaverBlogSettings = {
 	postImportLimit: 0, // 0 means no limit
 	cafeSettings: DEFAULT_CAFE_SETTINGS,
 	newsSettings: DEFAULT_NEWS_SETTINGS,
+	brunchSettings: DEFAULT_BRUNCH_SETTINGS,
 };

@@ -209,7 +209,7 @@ export class ImageService {
 			return false;
 		}
 		
-		// Only download images from Naver CDN or direct image URLs
+		// Only download images from Naver/Kakao CDN or direct image URLs
 		const validDomains = [
 			'blogfiles.pstatic.net',
 			'postfiles.pstatic.net',
@@ -223,6 +223,13 @@ export class ImageService {
 			'storep-phinf.pstatic.net',
 			// Naver News image domain
 			'imgnews.pstatic.net',
+			// Brunch/Kakao image domains (Daum CDN)
+			'img1.daumcdn.net',
+			'img2.daumcdn.net',
+			'img3.daumcdn.net',
+			't1.daumcdn.net',
+			't2.daumcdn.net',
+			't3.daumcdn.net',
 		];
 		
 		const isValidDomain = validDomains.some(domain => imageUrl.includes(domain));
@@ -236,6 +243,26 @@ export class ImageService {
 	convertToDirectImageUrl(url: string): string {
 		// Convert Naver blog image URLs to direct download URLs - improved logic
 		let directUrl = url;
+
+		// Handle Brunch/Daum CDN thumbnail proxy URLs
+		// Format: https://img1.daumcdn.net/thumb/R1280x0.fwebp/?fname=http://t1.daumcdn.net/brunch/...
+		if (directUrl.includes('daumcdn.net/thumb/')) {
+			try {
+				const urlObj = new URL(directUrl);
+				const fnameParam = urlObj.searchParams.get('fname');
+				if (fnameParam) {
+					// Extract the original image URL from fname parameter
+					let extractedUrl = fnameParam;
+					// Convert http to https
+					if (extractedUrl.startsWith('http://')) {
+						extractedUrl = extractedUrl.replace('http://', 'https://');
+					}
+					directUrl = extractedUrl;
+				}
+			} catch {
+				// If URL parsing fails, continue with original
+			}
+		}
 
 		// Handle dthumb-phinf.pstatic.net thumbnail proxy URLs (used in cafe scrap posts)
 		// Format: https://dthumb-phinf.pstatic.net/?src=%22http%3A%2F%2Fpostfiles...%22&type=cafe_wa740
