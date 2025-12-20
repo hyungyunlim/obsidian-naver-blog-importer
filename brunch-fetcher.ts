@@ -7,6 +7,9 @@ import {
 	BRUNCH_BASE_URL,
 	BRUNCH_POST_URL,
 	BRUNCH_AUTHOR_URL,
+	BRUNCH_ARTICLE_LIST_API,
+	BRUNCH_KEYWORD_API,
+	BRUNCH_KEYWORD_URL,
 	BRUNCH_URL_PATTERNS,
 	BRUNCH_SELECTORS,
 	BRUNCH_IMAGE_PATTERNS,
@@ -100,6 +103,8 @@ export class BrunchFetcher {
 			}
 
 			console.log('[Brunch] Content length:', response.text?.length);
+			// Debug: show first 500 chars of HTML
+			console.log('[Brunch] HTML preview:', response.text?.substring(0, 500));
 			return this.parsePostContent(response.text, url, postId);
 		} catch (error) {
 			console.error('[Brunch] Error:', error);
@@ -134,9 +139,99 @@ export class BrunchFetcher {
 	}
 
 	/**
-	 * Get list of post IDs from author's page
+	 * Get list of post IDs from author using API with pagination
+	 * This fetches ALL posts, not just the 20 shown on the HTML page
 	 */
 	private async getPostList(maxPosts?: number): Promise<string[]> {
+		const postIds: string[] = [];
+		let lastTime: number | undefined = undefined;
+		let hasMore = true;
+
+		console.log(`[Brunch] Fetching post list for @${this.username} using API...`);
+
+		try {
+			while (hasMore) {
+				const apiUrl = BRUNCH_ARTICLE_LIST_API(this.username, lastTime);
+				console.log(`[Brunch] API request: ${apiUrl}`);
+
+				const response = await requestUrl({
+					url: apiUrl,
+					method: 'GET',
+					headers: {
+						'Accept': '*/*',
+						'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+						'Cookie': 'b_s_a_l=1'
+					},
+					throw: false
+				});
+
+				// Check if request was blocked or failed
+				if (response.status !== 200) {
+					console.log(`[Brunch] API request failed with status ${response.status}`);
+					throw new Error(`API request failed: ${response.status}`);
+				}
+
+				const data = JSON.parse(response.text);
+
+				if (data.code !== 200 || !data.data?.list) {
+					console.log('[Brunch] API returned non-200 or empty list');
+					break;
+				}
+
+				const articles = data.data.list;
+
+				if (articles.length === 0) {
+					hasMore = false;
+					break;
+				}
+
+				for (const article of articles) {
+					if (article.no) {
+						const postId = article.no.toString();
+						if (!postIds.includes(postId)) {
+							postIds.push(postId);
+						}
+					}
+					// Update lastTime for next pagination request
+					if (article.publishTimestamp) {
+						lastTime = article.publishTimestamp;
+					}
+				}
+
+				console.log(`[Brunch] Fetched ${articles.length} articles, total: ${postIds.length}`);
+
+				// Check if we've reached maxPosts limit
+				if (maxPosts && postIds.length >= maxPosts) {
+					hasMore = false;
+					break;
+				}
+
+				// Rate limiting between API calls
+				if (hasMore) {
+					await this.delay(500);
+				}
+			}
+
+		} catch (error) {
+			console.error('[Brunch] Failed to get post list from API:', error);
+
+			// Fallback to HTML parsing if API fails
+			console.log('[Brunch] Falling back to HTML parsing...');
+			return this.getPostListFromHtml(maxPosts);
+		}
+
+		console.log(`[Brunch] Total posts found: ${postIds.length}`);
+
+		// Sort by ID (descending - newest first)
+		postIds.sort((a, b) => parseInt(b) - parseInt(a));
+
+		return maxPosts ? postIds.slice(0, maxPosts) : postIds;
+	}
+
+	/**
+	 * Fallback: Get list of post IDs from author's HTML page
+	 */
+	private async getPostListFromHtml(maxPosts?: number): Promise<string[]> {
 		const url = BRUNCH_AUTHOR_URL(this.username);
 		const postIds: string[] = [];
 
@@ -175,7 +270,7 @@ export class BrunchFetcher {
 			}
 
 		} catch (error) {
-			console.error('Failed to get post list:', error);
+			console.error('[Brunch] Failed to get post list from HTML:', error);
 		}
 
 		// Sort by ID (descending - newest first)
@@ -228,8 +323,35 @@ export class BrunchFetcher {
 	private async parsePostContent(html: string, url: string, postId: string): Promise<ProcessedBrunchPost> {
 		const $ = cheerio.load(html);
 
-		// Extract metadata from OG tags
+		// Check for error page or empty shell (CSR page without content)
+		const hasAstroIsland = html.includes('astro-island');
+		const hasWrapBody = html.includes('wrap_body');
+		const hasOgTitle = html.includes('og:title');
+		console.log(`[Brunch] Page check - astro-island: ${hasAstroIsland}, wrap_body: ${hasWrapBody}, og:title: ${hasOgTitle}`);
+
+		if (html.includes('서비스 접속이 원활하지 않습니다') || html.includes('wrap_exception')) {
+			console.error('[Brunch] Error page detected for:', url);
+			throw new Error('Brunch service temporarily unavailable');
+		}
+
+		// Check if page is empty CSR shell without content
+		if (!hasAstroIsland && !hasWrapBody && html.length < 30000) {
+			console.error('[Brunch] Empty CSR shell detected, HTML length:', html.length);
+			console.log('[Brunch] HTML sample (1000-1500):', html.substring(1000, 1500));
+			throw new Error('Empty page received - server may be blocking requests');
+		}
+
+		// Check for login redirect page (only if it's actually a login page, not just contains login link)
+		if (html.includes('accounts.kakao.com/login') ||
+			(html.includes('로그인이 필요합니다') && !hasAstroIsland)) {
+			console.error('[Brunch] Login redirect detected for:', url);
+			throw new Error('Login required - check cookie settings');
+		}
+
+		// Use legacy parsing when wrap_body exists (proven to work with images)
+		// Only fall back to Astro parsing when wrap_body is not available
 		const title = this.extractOgMeta($, 'og:title') || 'Untitled';
+		console.log(`[Brunch] Parsed title: "${title}" for ${url}`);
 		const description = this.extractOgMeta($, 'og:description') || '';
 		const thumbnail = this.extractOgMeta($, 'og:image');
 		const regDate = this.extractOgMeta($, 'og:regDate');
@@ -279,6 +401,189 @@ export class BrunchFetcher {
 			comments,
 			videos: videos.length > 0 ? videos : undefined,
 		};
+	}
+
+	/**
+	 * Extract article data from Astro island props (new Brunch CSR structure)
+	 */
+	private extractAstroArticleData(html: string): {
+		title: string;
+		subTitle?: string;
+		userName?: string;
+		publishTime?: number;
+		thumbnail?: string;
+		markdown: string;
+		contentHtml: string;
+		keywords?: string[];
+		magazineTitle?: string;
+		magazineAddress?: string;
+		likeCount?: number;
+		commentCount?: number;
+	} | null {
+		try {
+			// Find the astro-island with article props
+			const propsMatch = html.match(/astro-island[^>]*props="([^"]+)"/);
+			if (!propsMatch) {
+				console.log('[Brunch] No astro-island props found');
+				return null;
+			}
+
+			// Decode HTML entities in props
+			let propsStr = propsMatch[1]
+				.replace(/&quot;/g, '"')
+				.replace(/&amp;/g, '&')
+				.replace(/&lt;/g, '<')
+				.replace(/&gt;/g, '>');
+
+			// Find the article object in the props
+			// Props format: {"article":[0,{...}],"content":[0,"..."]}
+			const articleMatch = propsStr.match(/"article":\[0,(\{[^}]+(?:\{[^}]*\}[^}]*)*\})\]/);
+			if (!articleMatch) {
+				console.log('[Brunch] No article data in props');
+				return null;
+			}
+
+			// Parse article metadata
+			const articleStr = articleMatch[1];
+			const titleMatch = articleStr.match(/"title":\[0,"([^"]+)"\]/);
+			const subTitleMatch = articleStr.match(/"subTitle":\[0,"([^"]*)"\]/);
+			const userNameMatch = articleStr.match(/"userName":\[0,"([^"]+)"\]/);
+			const publishTimeMatch = articleStr.match(/"publishTime":\[0,(\d+)\]/);
+			const likeCountMatch = articleStr.match(/"likeCount":\[0,(\d+)\]/);
+			const commentCountMatch = articleStr.match(/"commentCount":\[0,(\d+)\]/);
+			const magazineTitleMatch = articleStr.match(/"magazineTitle":\[0,"([^"]+)"\]/);
+			const magazineAddressMatch = articleStr.match(/"magazineAddress":\[0,"([^"]+)"\]/);
+
+			// Find the content JSON string
+			const contentMatch = propsStr.match(/"content":\[0,"((?:[^"\\]|\\.)*)"\]/);
+			if (!contentMatch) {
+				console.log('[Brunch] No content in props');
+				return null;
+			}
+
+			// Unescape the content JSON string
+			let contentJsonStr = contentMatch[1]
+				.replace(/\\"/g, '"')
+				.replace(/\\\\/g, '\\')
+				.replace(/\\n/g, '\n')
+				.replace(/\\t/g, '\t');
+
+			// Parse the content JSON
+			let contentJson;
+			try {
+				contentJson = JSON.parse(contentJsonStr);
+			} catch (e) {
+				console.error('[Brunch] Failed to parse content JSON:', e);
+				return null;
+			}
+
+			// Convert content body to markdown
+			const { markdown, contentHtml } = this.convertAstroBodyToMarkdown(contentJson);
+
+			// Extract thumbnail from cover
+			let thumbnail: string | undefined;
+			if (contentJson.cover?.style?.['background-image']) {
+				thumbnail = contentJson.cover.style['background-image'];
+			}
+
+			return {
+				title: titleMatch ? titleMatch[1] : 'Untitled',
+				subTitle: subTitleMatch ? subTitleMatch[1] : undefined,
+				userName: userNameMatch ? userNameMatch[1] : undefined,
+				publishTime: publishTimeMatch ? parseInt(publishTimeMatch[1]) : undefined,
+				thumbnail,
+				markdown,
+				contentHtml: contentHtml,
+				magazineTitle: magazineTitleMatch ? magazineTitleMatch[1] : undefined,
+				magazineAddress: magazineAddressMatch ? magazineAddressMatch[1] : undefined,
+				likeCount: likeCountMatch ? parseInt(likeCountMatch[1]) : undefined,
+				commentCount: commentCountMatch ? parseInt(commentCountMatch[1]) : undefined,
+			};
+		} catch (error) {
+			console.error('[Brunch] Error extracting Astro article data:', error);
+			return null;
+		}
+	}
+
+	/**
+	 * Convert Astro content body JSON to markdown
+	 */
+	private convertAstroBodyToMarkdown(contentJson: { body?: Array<{ type: string; data?: unknown[]; style?: Record<string, string> }> }): { markdown: string; contentHtml: string } {
+		const lines: string[] = [];
+		const htmlParts: string[] = [];
+
+		if (!contentJson.body || !Array.isArray(contentJson.body)) {
+			return { markdown: '', contentHtml: '' };
+		}
+
+		for (const item of contentJson.body) {
+			if (item.type === 'text') {
+				const text = this.extractTextFromAstroData(item.data);
+				if (text.trim()) {
+					lines.push(text);
+					lines.push('');
+					htmlParts.push(`<p>${text}</p>`);
+				}
+			} else if (item.type === 'image') {
+				const imgData = item.data as Array<{ url?: string; caption?: string }>;
+				if (imgData && imgData[0]?.url) {
+					const url = this.normalizeImageUrl(imgData[0].url);
+					const caption = imgData[0].caption || '';
+					lines.push(`![${caption}](${url})`);
+					if (caption) lines.push(`*${caption}*`);
+					lines.push('');
+					htmlParts.push(`<img src="${url}" alt="${caption}">`);
+				}
+			} else if (item.type === 'hr') {
+				lines.push('---');
+				lines.push('');
+				htmlParts.push('<hr>');
+			} else if (item.type === 'quote') {
+				const text = this.extractTextFromAstroData(item.data);
+				if (text.trim()) {
+					lines.push(`> ${text}`);
+					lines.push('');
+					htmlParts.push(`<blockquote>${text}</blockquote>`);
+				}
+			} else if (item.type === 'heading') {
+				const text = this.extractTextFromAstroData(item.data);
+				const level = (item as { level?: number }).level || 2;
+				if (text.trim()) {
+					lines.push(`${'#'.repeat(level)} ${text}`);
+					lines.push('');
+					htmlParts.push(`<h${level}>${text}</h${level}>`);
+				}
+			}
+		}
+
+		return {
+			markdown: lines.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
+			contentHtml: htmlParts.join('\n')
+		};
+	}
+
+	/**
+	 * Extract text from Astro data array
+	 */
+	private extractTextFromAstroData(data: unknown): string {
+		if (!data || !Array.isArray(data)) return '';
+
+		const texts: string[] = [];
+		for (const item of data) {
+			if (typeof item === 'string') {
+				texts.push(item);
+			} else if (item && typeof item === 'object') {
+				const obj = item as Record<string, unknown>;
+				if (obj.type === 'text' && typeof obj.text === 'string') {
+					texts.push(obj.text);
+				} else if (obj.type === 'br') {
+					texts.push('\n');
+				} else if (obj.text && typeof obj.text === 'string') {
+					texts.push(obj.text);
+				}
+			}
+		}
+		return texts.join('');
 	}
 
 	/**
@@ -372,6 +677,9 @@ export class BrunchFetcher {
 	 */
 	private convertBodyToMarkdown($: CheerioAPI): { markdown: string; contentHtml: string; videoIds: string[] } {
 		const wrapBody = $(BRUNCH_SELECTORS.wrapBody);
+		const wrapItems = wrapBody.find(BRUNCH_SELECTORS.wrapItem);
+		console.log(`[Brunch] wrap_body found: ${wrapBody.length > 0}, wrap_item count: ${wrapItems.length}`);
+
 		const contentHtml = wrapBody.html() || '';
 		const lines: string[] = [];
 		let currentParagraph: string[] = [];
@@ -843,5 +1151,245 @@ export class BrunchFetcher {
 	 */
 	static isBrunchUrl(url: string): boolean {
 		return url.includes('brunch.co.kr');
+	}
+
+	/**
+	 * Static method to check if URL is a keyword page
+	 */
+	static isKeywordUrl(url: string): boolean {
+		return BRUNCH_URL_PATTERNS.keyword.test(url);
+	}
+
+	/**
+	 * Static method to parse keyword URL
+	 */
+	static parseKeywordUrl(url: string): string | null {
+		const match = url.match(BRUNCH_URL_PATTERNS.keyword);
+		if (match) {
+			return decodeURIComponent(match[1]);
+		}
+		return null;
+	}
+}
+
+/**
+ * Brunch Keyword/Magazine Page Fetcher
+ * Fetches all posts from a keyword/magazine page
+ */
+export class BrunchKeywordFetcher {
+	private keyword: string;
+	private groupId: string | null = null;
+
+	constructor(keyword: string) {
+		// Decode if URL-encoded, replace underscores with spaces
+		console.log(`[Brunch Keyword] Constructor input: "${keyword}"`);
+		this.keyword = decodeURIComponent(keyword).replace(/_/g, ' ');
+		console.log(`[Brunch Keyword] Decoded keyword: "${this.keyword}"`);
+	}
+
+	/**
+	 * Fetch groupId from keyword page HTML
+	 */
+	private async fetchGroupId(): Promise<string> {
+		if (this.groupId) {
+			return this.groupId;
+		}
+
+		const keywordForUrl = this.keyword.replace(/ /g, '_');
+		const url = BRUNCH_KEYWORD_URL(keywordForUrl);
+		console.log(`[Brunch Keyword] Keyword: "${this.keyword}" -> "${keywordForUrl}"`);
+		console.log(`[Brunch Keyword] Fetching keyword page: ${url}`);
+
+		try {
+			const response = await requestUrl({
+				url: url,
+				method: 'GET',
+				headers: BRUNCH_REQUEST_HEADERS,
+			});
+
+			const html = response.text;
+
+			// Method 1: Look for hidden input with id="keywordParam"
+			// Pattern: <input ... id="keywordParam" value="38">
+			const inputMatch = html.match(/id=["']keywordParam["'][^>]*value=["'](\d+)["']/);
+			if (inputMatch) {
+				this.groupId = inputMatch[1];
+				console.log(`[Brunch Keyword] Found groupId from input: ${this.groupId}`);
+				return this.groupId;
+			}
+
+			// Method 2: Alternative input pattern (value before id)
+			const inputMatch2 = html.match(/keywordParam["']\s+value=["'](\d+)["']/);
+			if (inputMatch2) {
+				this.groupId = inputMatch2[1];
+				console.log(`[Brunch Keyword] Found groupId from input (alt): ${this.groupId}`);
+				return this.groupId;
+			}
+
+			// Method 3: JavaScript variable pattern
+			// Pattern: keywordParam: "38" or keywordParam:"38"
+			const paramMatch = html.match(/keywordParam['":\s]+['"](\d+)['"]/);
+			if (paramMatch) {
+				this.groupId = paramMatch[1];
+				console.log(`[Brunch Keyword] Found groupId from JS: ${this.groupId}`);
+				return this.groupId;
+			}
+
+			throw new Error('Could not find groupId in keyword page');
+		} catch (error) {
+			console.error('[Brunch Keyword] Failed to fetch groupId:', error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Fetch all article info from keyword API
+	 * Returns list of { userId, articleNo } for fetching individual posts
+	 */
+	async fetchArticleList(maxPosts?: number): Promise<Array<{ userId: string; articleNo: string; title: string }>> {
+		const groupId = await this.fetchGroupId();
+		const articles: Array<{ userId: string; articleNo: string; title: string }> = [];
+		let publishTime: number | undefined = undefined;
+		let pickContentId: string | undefined = undefined;
+		let hasMore = true;
+
+		console.log(`[Brunch Keyword] Fetching articles for keyword "${this.keyword}" (groupId: ${groupId})`);
+
+		try {
+			while (hasMore) {
+				const apiUrl = BRUNCH_KEYWORD_API(groupId, publishTime, pickContentId);
+				console.log(`[Brunch Keyword] API request: ${apiUrl}`);
+
+				const response = await requestUrl({
+					url: apiUrl,
+					method: 'GET',
+					headers: {
+						'Accept': '*/*',
+						'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+						'Cookie': 'b_s_a_l=1'
+					},
+					throw: false
+				});
+
+				if (response.status !== 200) {
+					console.log(`[Brunch Keyword] API request failed with status ${response.status}`);
+					break;
+				}
+
+				const data = JSON.parse(response.text);
+
+				if (data.code !== 200 || !data.data?.articleList) {
+					console.log('[Brunch Keyword] API returned non-200 or empty list');
+					break;
+				}
+
+				const articleList = data.data.articleList;
+
+				if (articleList.length === 0) {
+					hasMore = false;
+					break;
+				}
+
+				for (const item of articleList) {
+					const article = item.article;
+					// Use profileId (public username) instead of userId (internal ID)
+					const username = article?.profileId || article?.userId;
+					if (username && article?.no) {
+						articles.push({
+							userId: username,  // Actually profileId - the public username
+							articleNo: article.no.toString(),
+							title: article.title || ''
+						});
+						// Update pagination params
+						if (article.publishTimestamp) {
+							publishTime = article.publishTimestamp;
+						}
+					}
+				}
+
+				console.log(`[Brunch Keyword] Fetched ${articleList.length} articles, total: ${articles.length}`);
+
+				// Check if we've reached maxPosts limit
+				if (maxPosts && articles.length >= maxPosts) {
+					hasMore = false;
+					break;
+				}
+
+				// Check if there are more articles
+				if (articleList.length < 20) {
+					hasMore = false;
+				}
+
+				// Rate limiting between API calls
+				if (hasMore) {
+					await this.delay(500);
+				}
+			}
+		} catch (error) {
+			console.error('[Brunch Keyword] Failed to fetch article list:', error);
+		}
+
+		console.log(`[Brunch Keyword] Total articles found: ${articles.length}`);
+		return maxPosts ? articles.slice(0, maxPosts) : articles;
+	}
+
+	/**
+	 * Fetch all posts from keyword page
+	 */
+	async fetchPosts(maxPosts?: number, onProgress?: (current: number, total: number, title: string) => void): Promise<ProcessedBrunchPost[]> {
+		const articles = await this.fetchArticleList(maxPosts);
+		const posts: ProcessedBrunchPost[] = [];
+		const total = articles.length;
+
+		console.log(`[Brunch Keyword] Fetching ${total} posts...`);
+
+		for (let i = 0; i < articles.length; i++) {
+			const article = articles[i];
+
+			if (onProgress) {
+				onProgress(i + 1, total, article.title);
+			}
+
+			try {
+				// Use BrunchFetcher to get the full post content
+				const fetcher = new BrunchFetcher(article.userId);
+				const post = await fetcher.fetchSinglePost(article.articleNo);
+				posts.push(post);
+
+				// Rate limiting
+				if (i < articles.length - 1) {
+					await this.delay(BRUNCH_RATE_LIMITS.requestDelay);
+				}
+			} catch (error) {
+				console.error(`[Brunch Keyword] Failed to fetch post @${article.userId}/${article.articleNo}:`, error);
+			}
+		}
+
+		return posts;
+	}
+
+	/**
+	 * Get keyword name
+	 */
+	getKeyword(): string {
+		return this.keyword;
+	}
+
+	/**
+	 * Delay helper
+	 */
+	private delay(ms: number): Promise<void> {
+		return new Promise(resolve => setTimeout(resolve, ms));
+	}
+
+	/**
+	 * Static method to create fetcher from URL
+	 */
+	static fromUrl(url: string): BrunchKeywordFetcher | null {
+		const keyword = BrunchFetcher.parseKeywordUrl(url);
+		if (keyword) {
+			return new BrunchKeywordFetcher(keyword);
+		}
+		return null;
 	}
 }

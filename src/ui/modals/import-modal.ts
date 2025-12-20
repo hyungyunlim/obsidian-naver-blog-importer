@@ -1,6 +1,6 @@
 import { App, Modal, Notice, TFile } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
-import { BrunchFetcher } from '../../../brunch-fetcher';
+import { BrunchFetcher, BrunchKeywordFetcher } from '../../../brunch-fetcher';
 import { NaverCafeFetcher } from '../../fetchers/naver-cafe-fetcher';
 import { NaverNewsFetcher } from '../../fetchers/naver-news-fetcher';
 import { UI_DEFAULTS, NOTICE_TIMEOUTS, parseCafeUrl, BRUNCH_URL_PATTERNS } from '../../constants';
@@ -10,6 +10,7 @@ import type { ProcessedCafePost } from '../../types';
 
 export class NaverBlogImportModal extends Modal {
 	plugin: NaverBlogPlugin;
+	private postCountInput: HTMLInputElement | null = null;
 
 	constructor(app: App, plugin: NaverBlogPlugin) {
 		super(app);
@@ -32,11 +33,39 @@ export class NaverBlogImportModal extends Modal {
 
 		const detectionDiv = inputContainer.createDiv({ cls: 'naver-blog-detection' });
 
+		// Options container (shown for bulk imports like Brunch author/keyword)
+		const optionsContainer = contentEl.createDiv({ cls: 'naver-blog-options-container' });
+		optionsContainer.style.display = 'none';
+		optionsContainer.style.marginTop = '10px';
+
+		const postCountWrapper = optionsContainer.createDiv({ cls: 'naver-blog-post-count-wrapper' });
+		postCountWrapper.style.display = 'flex';
+		postCountWrapper.style.alignItems = 'center';
+		postCountWrapper.style.gap = '8px';
+
+		const postCountLabel = postCountWrapper.createEl('label', { text: 'Max posts:' });
+		postCountLabel.style.fontSize = '0.9em';
+		postCountLabel.style.color = 'var(--text-muted)';
+
+		this.postCountInput = postCountWrapper.createEl('input', {
+			type: 'number',
+			placeholder: 'All',
+			cls: 'naver-blog-post-count-input'
+		});
+		this.postCountInput.style.width = '80px';
+		this.postCountInput.min = '1';
+		this.postCountInput.max = '1000';
+
+		const postCountHint = postCountWrapper.createEl('span', { text: '(leave empty for all)' });
+		postCountHint.style.fontSize = '0.85em';
+		postCountHint.style.color = 'var(--text-faint)';
+
 		// Update detection status on input
 		const updateDetection = () => {
 			const value = input.value.trim();
 			if (!value) {
 				detectionDiv.empty();
+				optionsContainer.style.display = 'none';
 				return;
 			}
 
@@ -53,6 +82,11 @@ export class NaverBlogImportModal extends Modal {
 			if (detection.type === 'invalid') {
 				detectionDiv.addClass('naver-blog-detection--error');
 			}
+
+			// Show options for bulk brunch imports (author or keyword pages)
+			const showOptions = detection.type === 'brunch' &&
+				(detection.message.includes('all posts') || detection.message.includes('(all posts)'));
+			optionsContainer.style.display = showOptions ? 'block' : 'none';
 		};
 
 		input.addEventListener('input', updateDetection);
@@ -119,7 +153,12 @@ export class NaverBlogImportModal extends Modal {
 		// If already has @, return as-is
 		if (value.includes('@')) return value;
 
-		// Try to add @ after brunch.co.kr/
+		// Don't add @ for keyword, brunchbook, or other special paths
+		if (value.includes('/keyword/') || value.includes('/brunchbook/') || value.includes('/now') || value.includes('/publish')) {
+			return value;
+		}
+
+		// Try to add @ after brunch.co.kr/ for author pages
 		// Pattern: brunch.co.kr/username/postId or brunch.co.kr/username
 		return value.replace(
 			/(brunch\.co\.kr)\//,
@@ -174,6 +213,17 @@ export class NaverBlogImportModal extends Modal {
 
 		// Check for Brunch URL first
 		if (this.isBrunchUrl(value)) {
+			// Check for keyword/magazine URL first
+			if (BrunchFetcher.isKeywordUrl(value)) {
+				const keyword = BrunchFetcher.parseKeywordUrl(value);
+				if (keyword) {
+					return {
+						type: 'brunch',
+						message: `🏷️ Brunch keyword "${keyword}" (all posts)`
+					};
+				}
+			}
+
 			const parsed = BrunchFetcher.parsePostUrl(value);
 			if (parsed) {
 				return {
@@ -253,6 +303,10 @@ export class NaverBlogImportModal extends Modal {
 			return;
 		}
 
+		// Get max posts value before closing modal
+		const maxPostsValue = this.postCountInput?.value;
+		const maxPosts = maxPostsValue ? parseInt(maxPostsValue, 10) : undefined;
+
 		// Normalize URL to handle mobile-specific encoding issues
 		inputValue = this.normalizeUrl(inputValue);
 
@@ -263,6 +317,17 @@ export class NaverBlogImportModal extends Modal {
 
 		// Check for Brunch URL first
 		if (this.isBrunchUrl(inputValue)) {
+			// Check for keyword/magazine URL first
+			if (BrunchFetcher.isKeywordUrl(inputValue)) {
+				const keyword = BrunchFetcher.parseKeywordUrl(inputValue);
+				if (keyword) {
+					await this.importBrunchKeyword(keyword, maxPosts);
+				} else {
+					new Notice('Invalid Brunch keyword URL format');
+				}
+				return;
+			}
+
 			const parsed = BrunchFetcher.parsePostUrl(inputValue);
 			if (parsed) {
 				await this.importBrunchPost(parsed.username, parsed.postId);
@@ -270,7 +335,7 @@ export class NaverBlogImportModal extends Modal {
 				// Author page - import all posts
 				const authorMatch = inputValue.match(/@([^/]+)/);
 				if (authorMatch) {
-					await this.importBrunchAuthor(authorMatch[1]);
+					await this.importBrunchAuthor(authorMatch[1], maxPosts);
 				} else {
 					new Notice('Invalid Brunch URL format');
 				}
@@ -556,7 +621,7 @@ export class NaverBlogImportModal extends Modal {
 		}
 	}
 
-	async importBrunchAuthor(username: string) {
+	async importBrunchAuthor(username: string, maxPosts?: number) {
 		let importCancelled = false;
 		const cancelNotice = new Notice("Click here to cancel import", 0);
 		// @ts-ignore - accessing private messageEl property
@@ -570,10 +635,11 @@ export class NaverBlogImportModal extends Modal {
 		}
 
 		try {
-			new Notice(`🥐 Fetching posts from @${username}...`);
+			const limitText = maxPosts ? ` (max ${maxPosts})` : '';
+			new Notice(`🥐 Fetching posts from @${username}${limitText}...`);
 
 			const fetcher = new BrunchFetcher(username);
-			const posts = await fetcher.fetchPosts();
+			const posts = await fetcher.fetchPosts(maxPosts);
 
 			if (posts.length === 0) {
 				cancelNotice.hide();
@@ -628,6 +694,96 @@ export class NaverBlogImportModal extends Modal {
 		} catch {
 			cancelNotice.hide();
 			new Notice("Brunch import failed. Check console for details.");
+		}
+	}
+
+	async importBrunchKeyword(keyword: string, maxPosts?: number) {
+		let importCancelled = false;
+		const cancelNotice = new Notice("Click here to cancel import", 0);
+		// @ts-ignore - accessing private messageEl property
+		const messageEl = cancelNotice.messageEl;
+		if (messageEl) {
+			messageEl.addEventListener('click', () => {
+				importCancelled = true;
+				cancelNotice.hide();
+				new Notice("Import cancelled by user", NOTICE_TIMEOUTS.medium);
+			});
+		}
+
+		try {
+			const limitText = maxPosts ? ` (max ${maxPosts})` : '';
+			new Notice(`🏷️ Fetching posts from keyword "${keyword}"${limitText}...`);
+
+			const fetcher = new BrunchKeywordFetcher(keyword);
+
+			// First fetch article list to show progress
+			const articles = await fetcher.fetchArticleList(maxPosts);
+
+			if (articles.length === 0) {
+				cancelNotice.hide();
+				new Notice("No posts found in this keyword");
+				return;
+			}
+
+			new Notice(`Found ${articles.length} posts. Fetching content...`);
+
+			let successCount = 0;
+			let errorCount = 0;
+			let lastCreatedFile: TFile | null = null;
+			const totalPosts = articles.length;
+
+			// Fetch and save posts one by one
+			for (let i = 0; i < articles.length; i++) {
+				if (importCancelled) break;
+
+				const article = articles[i];
+				const progress = `(${i + 1}/${totalPosts})`;
+
+				try {
+					new Notice(`Fetching ${progress}: ${article.title || `@${article.userId}/${article.articleNo}`}`, 3000);
+
+					const postFetcher = new BrunchFetcher(article.userId);
+					const post = await postFetcher.fetchSinglePost(article.articleNo);
+
+					const createdFile = await this.plugin.createBrunchMarkdownFile(post);
+
+					if (createdFile) {
+						lastCreatedFile = createdFile;
+					}
+					successCount++;
+				} catch (error) {
+					console.error(`Failed to import @${article.userId}/${article.articleNo}:`, error);
+					errorCount++;
+				}
+
+				// Rate limiting
+				if (i < articles.length - 1) {
+					await new Promise(resolve => setTimeout(resolve, 1000));
+				}
+			}
+
+			cancelNotice.hide();
+
+			let summary = importCancelled ?
+				`Import cancelled: ${successCount} successful` :
+				`Import complete: ${successCount} successful`;
+
+			if (errorCount > 0) summary += `, ${errorCount} errors`;
+
+			const processed = successCount + errorCount;
+			summary += ` (${processed}/${totalPosts})`;
+
+			if (!importCancelled && errorCount === 0) summary += ' ✅';
+			else if (errorCount > 0) summary += ' ⚠️';
+
+			new Notice(summary, 8000);
+
+			if (lastCreatedFile && !importCancelled) {
+				await this.openFile(lastCreatedFile);
+			}
+		} catch (error) {
+			cancelNotice.hide();
+			new Notice(`Brunch keyword import failed: ${error.message}`);
 		}
 	}
 

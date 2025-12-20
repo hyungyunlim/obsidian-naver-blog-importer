@@ -4,7 +4,33 @@
 
 // Base URLs
 export const BRUNCH_BASE_URL = 'https://brunch.co.kr';
+export const BRUNCH_API_URL = 'https://api.brunch.co.kr';
 export const BRUNCH_IMAGE_CDN = 'https://img1.daumcdn.net';
+
+// API endpoints for fetching article list (pagination)
+export const BRUNCH_ARTICLE_LIST_API = (username: string, lastTime?: number) => {
+	const params = new URLSearchParams({
+		thumbnail: 'Y',
+		membershipContent: 'false'
+	});
+	if (lastTime) {
+		params.set('lastTime', lastTime.toString());
+	}
+	return `${BRUNCH_API_URL}/v2/article/@${username}?${params.toString()}`;
+};
+
+// API endpoint for keyword/magazine article list (pagination)
+export const BRUNCH_KEYWORD_API = (groupId: string, publishTime?: number, pickContentId?: string) => {
+	const params = new URLSearchParams();
+	if (publishTime) {
+		params.set('publishTime', publishTime.toString());
+	}
+	if (pickContentId) {
+		params.set('pickContentId', pickContentId);
+	}
+	const queryString = params.toString();
+	return `${BRUNCH_API_URL}/v1/top/keyword/group/${groupId}${queryString ? '?' + queryString : ''}`;
+};
 
 // URL patterns
 export const BRUNCH_AUTHOR_URL = (username: string) =>
@@ -19,6 +45,9 @@ export const BRUNCH_RSS_URL = (userId: string) =>
 export const BRUNCH_BOOK_URL = (bookId: string) =>
 	`${BRUNCH_BASE_URL}/brunchbook/${bookId}`;
 
+export const BRUNCH_KEYWORD_URL = (keyword: string, keywordType: string = 'g') =>
+	`${BRUNCH_BASE_URL}/keyword/${encodeURIComponent(keyword)}?q=${keywordType}`;
+
 // Regex patterns for URL parsing
 export const BRUNCH_URL_PATTERNS = {
 	// Match @username/postId from URL
@@ -29,6 +58,8 @@ export const BRUNCH_URL_PATTERNS = {
 	rssUserId: /@@(\w+)/,
 	// Match brunchbook ID
 	book: /\/brunchbook\/([^/]+)/,
+	// Match keyword page URL
+	keyword: /\/keyword\/([^/?]+)/,
 } as const;
 
 // HTML selectors for content extraction
