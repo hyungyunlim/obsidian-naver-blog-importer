@@ -8,6 +8,7 @@ import {
 } from '../constants';
 import { AIProviderUtils } from '../utils/ai-provider-utils';
 import { BrunchFetcher } from '../../brunch-fetcher';
+import { NaverBlogFetcher } from '../../naver-blog-fetcher';
 import type NaverBlogPlugin from '../../main';
 
 export class NaverBlogSettingTab extends PluginSettingTab {
@@ -234,29 +235,49 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.setName(this.plugin.i18n.t('settings.add_blog_id'))
 			.setDesc(this.plugin.i18n.t('settings.add_blog_id_desc'))
 			.addText(text => {
-				text.setPlaceholder(PLACEHOLDERS.blogId);
+				text.setPlaceholder(this.plugin.i18n.t('settings.blog_id_placeholder'));
 				return text;
 			})
 			.addButton(button => button
 				.setButtonText(this.plugin.i18n.t('settings.add_button'))
 				.onClick(async () => {
 					const input = button.buttonEl.previousElementSibling as HTMLInputElement;
-					const blogId = input.value.trim();
-					if (blogId && !this.plugin.settings.subscribedBlogs.includes(blogId)) {
-						this.plugin.settings.subscribedBlogs.push(blogId);
+					const inputValue = input.value.trim();
 
-						// Initialize blog subscription with metadata
-						this.plugin.settings.blogSubscriptions.push({
-							id: `naver-${blogId}-${Date.now()}`,
-							blogId: blogId,
-							postCount: DEFAULT_BLOG_POST_COUNT,
-							createdAt: new Date().toISOString()
-						});
-						
-						await this.plugin.saveSettings();
-						input.value = '';
-						this.displaySubscriptions(subscriptionDiv);
+					// Parse blog ID from URL or direct input
+					const blogId = NaverBlogFetcher.parseBlogIdFromInput(inputValue);
+					if (!blogId) {
+						new Notice(this.plugin.i18n.t('notices.invalid_blog_id'));
+						return;
 					}
+
+					// Check if already subscribed
+					if (this.plugin.settings.subscribedBlogs.includes(blogId)) {
+						new Notice(`Already subscribed to ${blogId}`);
+						return;
+					}
+
+					// Fetch profile info
+					new Notice(this.plugin.i18n.t('notices.fetching_profile'), 2000);
+					const profile = await NaverBlogFetcher.fetchProfileInfoStatic(blogId);
+
+					this.plugin.settings.subscribedBlogs.push(blogId);
+
+					// Initialize blog subscription with metadata
+					this.plugin.settings.blogSubscriptions.push({
+						id: `naver-${blogId}-${Date.now()}`,
+						blogId: blogId,
+						blogName: profile.nickname,
+						profileImageUrl: profile.profileImageUrl,
+						bio: profile.bio,
+						postCount: DEFAULT_BLOG_POST_COUNT,
+						createdAt: new Date().toISOString()
+					});
+
+					await this.plugin.saveSettings();
+					input.value = '';
+					this.displaySubscriptions(subscriptionDiv);
+					new Notice(`Subscribed to ${profile.nickname} (${blogId})`);
 				}));
 
 		// Brunch Subscriptions section
@@ -439,31 +460,65 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		}
 
 		this.plugin.settings.subscribedBlogs.forEach((blogId: string, index: number) => {
-			const wrapper = containerEl.createDiv({ cls: 'naver-subscription-wrapper' });
-			const blogDiv = wrapper.createDiv({ cls: 'naver-blog-item' });
+			const subscription = this.plugin.settings.blogSubscriptions.find(sub => sub.blogId === blogId);
+			const currentCount = subscription?.postCount || DEFAULT_BLOG_POST_COUNT;
 
-			// Blog ID
-			blogDiv.createEl('span', { text: blogId });
+			const card = containerEl.createDiv({ cls: 'naver-subscription-card' });
 
-			// Post count setting
-			const countDiv = blogDiv.createDiv({ cls: 'naver-blog-count-container' });
+			// Header with profile image, info, and controls
+			const header = card.createDiv({ cls: 'naver-subscription-header' });
 
-			countDiv.createEl('span', {
-				text: this.plugin.i18n.t('settings.posts_label') + ':',
-				cls: 'naver-blog-count-label'
+			// Profile image
+			if (subscription?.profileImageUrl) {
+				const imgWrapper = header.createDiv({ cls: 'naver-profile-image' });
+				const img = imgWrapper.createEl('img', {
+					attr: { src: subscription.profileImageUrl, alt: subscription.blogName || blogId }
+				});
+				img.onerror = () => {
+					imgWrapper.empty();
+					imgWrapper.createEl('span', { text: '📝', cls: 'naver-profile-placeholder' });
+				};
+			} else {
+				const imgWrapper = header.createDiv({ cls: 'naver-profile-image' });
+				imgWrapper.createEl('span', { text: '📝', cls: 'naver-profile-placeholder' });
+			}
+
+			// Author info
+			const infoDiv = header.createDiv({ cls: 'naver-author-info' });
+
+			// Author name and blogId
+			const nameRow = infoDiv.createDiv({ cls: 'naver-author-name-row' });
+			nameRow.createEl('span', {
+				text: subscription?.blogName || blogId,
+				cls: 'naver-author-name'
 			});
+			if (subscription?.blogName && subscription.blogName !== blogId) {
+				nameRow.createEl('span', {
+					text: blogId,
+					cls: 'naver-author-blogid'
+				});
+			}
 
-			const blogSubscription = this.plugin.settings.blogSubscriptions.find(sub => sub.blogId === blogId);
-			const currentCount = blogSubscription?.postCount || DEFAULT_BLOG_POST_COUNT;
+			// Bio (description)
+			if (subscription?.bio) {
+				infoDiv.createEl('div', {
+					text: subscription.bio,
+					cls: 'naver-author-bio'
+				});
+			}
 
+			// Controls (right side of header)
+			const controlsDiv = header.createDiv({ cls: 'naver-subscription-controls' });
+
+			// Post count
+			const countDiv = controlsDiv.createDiv({ cls: 'naver-post-count' });
 			const countInput = countDiv.createEl('input', {
 				type: 'number',
 				value: currentCount.toString(),
-				cls: 'naver-blog-count-input'
+				cls: 'naver-count-input'
 			});
 			countInput.min = '1';
 			countInput.max = MAX_SUBSCRIPTION_POST_COUNT.toString();
-
 			countInput.onchange = async () => {
 				const newCount = parseInt(countInput.value) || DEFAULT_BLOG_POST_COUNT;
 
@@ -483,14 +538,16 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				await this.plugin.saveSettings();
 			};
 
-			// Sync button
-			const syncButton = blogDiv.createEl('button', {
+			// Buttons
+			const buttonsDiv = controlsDiv.createDiv({ cls: 'naver-subscription-buttons' });
+
+			const syncButton = buttonsDiv.createEl('button', {
 				text: this.plugin.i18n.t('settings.sync_button'),
-				cls: 'naver-blog-sync-button'
+				cls: 'naver-sync-button'
 			});
 			syncButton.onclick = async () => {
 				try {
-					new Notice(`Syncing ${blogId}...`);
+					new Notice(`Syncing ${subscription?.blogName || blogId}...`);
 					const posts = await this.plugin.fetchNaverBlogPosts(blogId, currentCount);
 
 					let successCount = 0;
@@ -513,16 +570,15 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					// Refresh display to show updated metadata
 					this.displaySubscriptions(containerEl);
 
-					new Notice(`Synced ${successCount} posts from ${blogId}`);
+					new Notice(`Synced ${successCount} posts from ${subscription?.blogName || blogId}`);
 				} catch (error) {
 					new Notice(`Failed to sync ${blogId}: ${error.message}`);
 				}
 			};
 
-			// Remove button
-			const removeButton = blogDiv.createEl('button', {
+			const removeButton = buttonsDiv.createEl('button', {
 				text: this.plugin.i18n.t('settings.remove_button'),
-				cls: 'naver-blog-remove-button'
+				cls: 'naver-remove-button'
 			});
 			removeButton.onclick = async () => {
 				// Remove from subscribed blogs
@@ -536,26 +592,22 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 				await this.plugin.saveSettings();
 				this.displaySubscriptions(containerEl);
+				new Notice(`Unsubscribed from ${subscription?.blogName || blogId}`);
 			};
 
-			// Metadata row
-			const metaDiv = wrapper.createDiv({ cls: 'naver-subscription-meta' });
+			// Metadata footer
 			const metaParts: string[] = [];
-
-			if (blogSubscription?.createdAt) {
-				const createdDate = new Date(blogSubscription.createdAt).toLocaleDateString();
-				metaParts.push(`Added: ${createdDate}`);
+			if (subscription?.createdAt) {
+				metaParts.push(`Added: ${new Date(subscription.createdAt).toLocaleDateString()}`);
 			}
-			if (blogSubscription?.lastSyncedAt) {
-				const lastSyncDate = new Date(blogSubscription.lastSyncedAt).toLocaleDateString();
-				metaParts.push(`Last sync: ${lastSyncDate}`);
+			if (subscription?.lastSyncedAt) {
+				metaParts.push(`Last sync: ${new Date(subscription.lastSyncedAt).toLocaleDateString()}`);
 			}
-			if (blogSubscription?.lastLogNo) {
-				metaParts.push(`Last post: #${blogSubscription.lastLogNo}`);
-			}
-
 			if (metaParts.length > 0) {
-				metaDiv.setText(metaParts.join(' · '));
+				card.createEl('div', {
+					text: metaParts.join(' · '),
+					cls: 'naver-subscription-meta'
+				});
 			}
 		});
 	}

@@ -44,6 +44,7 @@ export interface Translations {
 		add_brunch_author_desc: string;
 		brunch_author_placeholder: string;
 		no_subscribed_brunch: string;
+		blog_id_placeholder: string;
 		add_button: string;
 		remove_button: string;
 		sync_button: string;
@@ -84,6 +85,8 @@ export interface Translations {
 		image_download_complete: string;
 		generating_ai_tags: string;
 		generating_ai_excerpt: string;
+		invalid_blog_id: string;
+		fetching_profile: string;
 		post_limit_exceeded: string;
 		note_deleted: string;
 		note_deleted_no_images: string;

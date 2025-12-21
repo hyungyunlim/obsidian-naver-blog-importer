@@ -423,6 +423,137 @@
     border-top: 1px solid var(--background-modifier-border);
 }
 
+/* Naver Blog Subscription Card Styles */
+.naver-subscription-card {
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-primary);
+}
+
+.naver-subscription-header {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.naver-profile-image {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--background-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.naver-profile-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.naver-profile-placeholder {
+    font-size: 20px;
+}
+
+.naver-author-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.naver-author-name-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.naver-author-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.naver-author-blogid {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.naver-author-bio {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.naver-subscription-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.naver-post-count {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.naver-count-input {
+    width: 50px;
+    padding: 3px 6px;
+    font-size: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+}
+
+.naver-subscription-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.naver-sync-button,
+.naver-remove-button {
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.naver-sync-button {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+}
+
+.naver-sync-button:hover {
+    background: var(--interactive-accent-hover);
+}
+
+.naver-remove-button {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--background-modifier-border);
+}
+
+.naver-remove-button:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
 .naver-blog-item {
     display: grid;
     grid-template-columns: 1fr auto auto auto;

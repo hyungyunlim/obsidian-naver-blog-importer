@@ -1900,7 +1900,123 @@ export class NaverBlogFetcher {
         return tagMap;
     }
 
+    /**
+     * Fetch blog profile info from WidgetListAsync API
+     * Returns: { nickname, profileImageUrl, bio }
+     */
+    async fetchProfileInfo(): Promise<NaverBlogProfile> {
+        return NaverBlogFetcher.fetchProfileInfoStatic(this.blogId);
+    }
+
+    /**
+     * Static method to fetch blog profile without instantiating
+     */
+    static async fetchProfileInfoStatic(blogId: string): Promise<NaverBlogProfile> {
+        const defaultProfile: NaverBlogProfile = {
+            blogId,
+            nickname: blogId,
+            profileImageUrl: undefined,
+            bio: undefined
+        };
+
+        try {
+            const apiUrl = `https://blog.naver.com/mylog/WidgetListAsync.naver?blogId=${blogId}&enableWidgetKeys=profile`;
+
+            const response = await requestUrl({
+                url: apiUrl,
+                method: 'GET',
+                headers: {
+                    'Accept': '*/*',
+                    'Referer': `https://blog.naver.com/${blogId}`
+                }
+            });
+
+            if (response.status !== 200 || !response.text) {
+                return defaultProfile;
+            }
+
+            // Response is JavaScript object notation (not valid JSON)
+            // Extract profile.content using regex
+            const profileMatch = response.text.match(/profile\s*:\s*\{\s*content\s*:\s*'([\s\S]*?)'\s*\}/);
+            if (!profileMatch) {
+                return defaultProfile;
+            }
+
+            // Unescape the content
+            const html = profileMatch[1]
+                .replace(/\\'/g, "'")
+                .replace(/\\n/g, '\n')
+                .replace(/\\\\/g, '\\');
+
+            // Extract nickname
+            const nicknameMatch = html.match(/<strong[^>]*id="nickNameArea"[^>]*>([^<]+)<\/strong>/i);
+            const nickname = nicknameMatch ? nicknameMatch[1].trim() : blogId;
+
+            // Extract profile image (filter out default/system images)
+            let profileImageUrl: string | undefined;
+            const avatarMatch = html.match(/<p[^>]*class="[^"]*image[^"]*"[^>]*>[\s\S]*?<img[^>]+src=["']([^"']+)["'][^>]*>/i);
+            if (avatarMatch) {
+                const imgUrl = avatarMatch[1];
+                // Filter out default/placeholder avatars
+                const isDefaultAvatar =
+                    imgUrl.includes('blogimgs.pstatic.net') ||
+                    imgUrl.includes('login_basic.gif') ||
+                    imgUrl.includes('default_avatar');
+
+                if (!isDefaultAvatar && imgUrl.includes('blogpfthumb-phinf.pstatic.net')) {
+                    profileImageUrl = imgUrl;
+                }
+            }
+
+            // Extract bio
+            let bio: string | undefined;
+            const bioMatch = html.match(/<p[^>]*class="[^"]*caption[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*itemfont[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+            if (bioMatch) {
+                bio = bioMatch[1].replace(/<[^>]+>/g, '').trim();
+                if (bio.length === 0) bio = undefined;
+            }
+
+            return {
+                blogId,
+                nickname,
+                profileImageUrl,
+                bio
+            };
+        } catch {
+            return defaultProfile;
+        }
+    }
+
+    /**
+     * Parse blog URL or ID from various input formats
+     * Supports: blogId, blog.naver.com/blogId, https://blog.naver.com/blogId, etc.
+     */
+    static parseBlogIdFromInput(input: string): string | null {
+        const trimmed = input.trim();
+        if (!trimmed) return null;
+
+        // Try URL pattern first
+        const urlMatch = trimmed.match(/(?:https?:\/\/)?blog\.naver\.com\/([a-zA-Z0-9_-]+)/i);
+        if (urlMatch) {
+            return urlMatch[1];
+        }
+
+        // If no URL pattern, treat as direct blogId (alphanumeric, underscore, hyphen)
+        if (/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+            return trimmed;
+        }
+
+        return null;
+    }
+
     private delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
+}
+
+export interface NaverBlogProfile {
+    blogId: string;
+    nickname: string;
+    profileImageUrl?: string;
+    bio?: string;
 }
