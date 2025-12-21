@@ -43,6 +43,9 @@ export class NaverBlogImportModal extends Modal {
 		// Platform detection badge
 		const detectionDiv = inputContainer.createDiv({ cls: 'naver-import-platform-badge' });
 
+		// Subscriptions quick-select section
+		this.displaySubscriptionsSection(contentEl, input, () => updateDetection());
+
 		// Options container (shown for bulk imports like Brunch author/keyword)
 		const optionsContainer = contentEl.createDiv({ cls: 'naver-import-options-container' });
 		optionsContainer.style.display = 'none';
@@ -970,6 +973,93 @@ export class NaverBlogImportModal extends Modal {
 		// Use plugin.app since modal may be closed
 		const leaf = this.plugin.app.workspace.getLeaf(false);
 		await leaf.openFile(file, { active: true });
+	}
+
+	/**
+	 * Display subscriptions as quick-select chips in the modal
+	 */
+	displaySubscriptionsSection(containerEl: HTMLElement, input: HTMLInputElement, onSelect: () => void) {
+		const naverSubs = this.plugin.settings.blogSubscriptions || [];
+		const brunchSubs = this.plugin.settings.brunchSettings?.subscribedBrunchAuthors || [];
+
+		// Only show if there are subscriptions
+		if (naverSubs.length === 0 && brunchSubs.length === 0) {
+			return;
+		}
+
+		const section = containerEl.createDiv({ cls: 'naver-import-subscriptions-section' });
+
+		// Naver blog subscriptions
+		if (naverSubs.length > 0) {
+			const naverChips = section.createDiv({ cls: 'naver-import-subscription-chips' });
+
+			for (const sub of naverSubs) {
+				const chip = naverChips.createDiv({ cls: 'naver-import-subscription-chip naver-import-subscription-chip--naver' });
+
+				// Profile image or placeholder
+				if (sub.profileImageUrl) {
+					const img = chip.createEl('img', {
+						cls: 'naver-import-chip-avatar',
+						attr: { src: sub.profileImageUrl, alt: sub.blogName || sub.blogId }
+					});
+					img.onerror = () => {
+						img.remove();
+						chip.createEl('span', { text: '📝', cls: 'naver-import-chip-avatar-placeholder' });
+					};
+				} else {
+					chip.createEl('span', { text: '📝', cls: 'naver-import-chip-avatar-placeholder' });
+				}
+
+				chip.createEl('span', {
+					text: sub.blogName || sub.blogId,
+					cls: 'naver-import-chip-name'
+				});
+
+				chip.addEventListener('click', () => {
+					input.value = `https://blog.naver.com/${sub.blogId}`;
+					onSelect();
+					input.focus();
+				});
+
+				chip.title = sub.bio || sub.blogId;
+			}
+		}
+
+		// Brunch subscriptions
+		if (brunchSubs.length > 0) {
+			const brunchChips = section.createDiv({ cls: 'naver-import-subscription-chips' });
+
+			for (const sub of brunchSubs) {
+				const chip = brunchChips.createDiv({ cls: 'naver-import-subscription-chip naver-import-subscription-chip--brunch' });
+
+				// Profile image or placeholder
+				if (sub.profileImageUrl) {
+					const img = chip.createEl('img', {
+						cls: 'naver-import-chip-avatar',
+						attr: { src: sub.profileImageUrl, alt: sub.authorName || sub.authorUsername }
+					});
+					img.onerror = () => {
+						img.remove();
+						chip.createEl('span', { text: '🥐', cls: 'naver-import-chip-avatar-placeholder' });
+					};
+				} else {
+					chip.createEl('span', { text: '🥐', cls: 'naver-import-chip-avatar-placeholder' });
+				}
+
+				chip.createEl('span', {
+					text: sub.authorName || `@${sub.authorUsername}`,
+					cls: 'naver-import-chip-name'
+				});
+
+				chip.addEventListener('click', () => {
+					input.value = `https://brunch.co.kr/@${sub.authorUsername}`;
+					onSelect();
+					input.focus();
+				});
+
+				chip.title = sub.authorDescription || `@${sub.authorUsername}`;
+			}
+		}
 	}
 
 	onClose() {
