@@ -44,3 +44,7 @@ export const NAVER_VIDEO_API_ENDPOINT = (vid: string, inkey: string, sid = 5) =>
 export const NAVER_CAFE_ARTICLE_API_BASE = 'https://article.cafe.naver.com/gw/v4/cafes';
 export const NAVER_CAFE_ARTICLE_ENDPOINT = (cafeId: string, articleId: string) =>
 	`${NAVER_CAFE_ARTICLE_API_BASE}/${cafeId}/articles/${articleId}`;
+
+// Naver Blog Tag API endpoint
+export const NAVER_BLOG_TAG_API_ENDPOINT = (blogId: string, logNoList: string) =>
+	`${NAVER_BLOG_BASE_URL}/BlogTagListInfo.naver?blogId=${blogId}&logNoList=${logNoList}&logType=mylog`;

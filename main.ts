@@ -10,11 +10,11 @@ import {
 import { I18n } from './src/utils/i18n';
 import { AIService } from './src/services/ai-service';
 import { BlogService } from './src/services/blog-service';
+import { BrunchService } from './src/services/brunch-service';
 import { ImageService } from './src/services/image-service';
 import { VideoService } from './src/services/video-service';
 import { NaverBlogImportModal } from './src/ui/modals/import-modal';
 import { NaverBlogSubscribeModal } from './src/ui/modals/subscribe-modal';
-import { NaverNewsImportModal } from './src/ui/modals/news-import-modal';
 import { NaverBlogSettingTab } from './src/ui/settings-tab';
 import { LocaleUtils } from './src/utils/locale-utils';
 import { ContentUtils } from './src/utils/content-utils';
@@ -44,6 +44,7 @@ export default class NaverBlogPlugin extends Plugin {
 	i18n: I18n;
 	aiService: AIService;
 	blogService: BlogService;
+	brunchService: BrunchService;
 	imageService: ImageService;
 	videoService: VideoService;
 	
@@ -72,6 +73,9 @@ export default class NaverBlogPlugin extends Plugin {
 
 		// Initialize Video service
 		this.videoService = new VideoService(this.app, this.settings);
+
+		// Initialize Brunch service
+		this.brunchService = new BrunchService(this.app, this.settings, this.createBrunchMarkdownFile.bind(this));
 
 		// Fetch models from APIs in background
 		void this.refreshModels().catch(() => {
@@ -146,18 +150,15 @@ export default class NaverBlogPlugin extends Plugin {
 			}
 		});
 
-		// Naver News import command
-		this.addCommand({
-			id: 'import-naver-news',
-			name: this.i18n.t('commands.import-naver-news'),
-			callback: () => {
-				new NaverNewsImportModal(this.app, this).open();
-			}
-		});
-
 		// Auto-sync subscribed blogs on startup
 		if (this.settings.subscribedBlogs.length > 0) {
 			setTimeout(() => void this.blogService.syncSubscribedBlogs(), UI_DELAYS.autoSync);
+		}
+
+		// Auto-sync subscribed Brunch authors on startup
+		const brunchSubscriptions = this.settings.brunchSettings?.subscribedBrunchAuthors || [];
+		if (brunchSubscriptions.length > 0) {
+			setTimeout(() => void this.brunchService.syncSubscribedAuthors(), UI_DELAYS.autoSync + 5000);
 		}
 
 		// Add settings tab
@@ -199,6 +200,7 @@ export default class NaverBlogPlugin extends Plugin {
 		// Update services when settings change
 		this.aiService = new AIService(this.settings);
 		this.blogService.updateSettings(this.settings);
+		this.brunchService.updateSettings(this.settings);
 		this.imageService.updateSettings(this.settings);
 		this.videoService.updateSettings(this.settings);
 	}
@@ -379,9 +381,14 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 	async createMarkdownFile(post: ProcessedBlogPost): Promise<TFile | null> {
 		try {
-			// Generate AI tags and excerpt if enabled
+			// Generate AI tags and append to original tags (avoid duplicates)
 			if (this.settings.enableAiTags) {
-				post.tags = await this.generateAITags(post.title, post.content);
+				const aiTags = await this.generateAITags(post.title, post.content);
+				if (aiTags && aiTags.length > 0) {
+					const existingTags = new Set(post.tags.map(t => t.toLowerCase()));
+					const newTags = aiTags.filter(t => !existingTags.has(t.toLowerCase()));
+					post.tags = [...post.tags, ...newTags];
+				}
 			}
 
 			if (this.settings.enableAiExcerpt) {

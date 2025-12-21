@@ -51,6 +51,18 @@ export class NaverBlogFetcher {
         try {
             const parsed = await this.fetchPostContent(logNo);
 
+            // Fetch tags from API (more reliable than HTML parsing)
+            let tags = parsed.tags;
+            try {
+                const tagMap = await this.fetchTagsFromAPI(logNo);
+                const apiTags = tagMap.get(logNo);
+                if (apiTags && apiTags.length > 0) {
+                    tags = apiTags;
+                }
+            } catch {
+                // Tag API failed, use HTML-parsed tags as fallback
+            }
+
             return {
                 title: parsed.title,
                 date: parsed.date,
@@ -60,7 +72,7 @@ export class NaverBlogFetcher {
                 content: parsed.content,
                 contentHtml: parsed.contentHtml,
                 blogId: this.blogId,
-                originalTags: parsed.tags
+                originalTags: tags
             };
         } catch (error) {
             throw new Error(`Failed to fetch single post ${logNo}: ${error.message}`);
@@ -146,7 +158,25 @@ export class NaverBlogFetcher {
                     await this.delay(500);
                 }
             }
-            
+
+            // Batch fetch tags from API for all posts
+            if (postsWithContent.length > 0) {
+                try {
+                    const logNos = postsWithContent.map(p => p.logNo);
+                    const tagMap = await this.fetchTagsFromAPI(logNos);
+
+                    // Update posts with API-fetched tags
+                    for (const post of postsWithContent) {
+                        const apiTags = tagMap.get(post.logNo);
+                        if (apiTags && apiTags.length > 0) {
+                            post.originalTags = apiTags;
+                        }
+                    }
+                } catch {
+                    // Tag API failed, keep HTML-parsed tags as fallback
+                }
+            }
+
             return postsWithContent;
         } catch (error) {
             throw new Error(`Failed to fetch posts from blog: ${this.blogId}`);
@@ -1821,6 +1851,53 @@ export class NaverBlogFetcher {
             .replace('https://blogpfthumb-phinf.pstatic.net/', 'https://blogfiles.pstatic.net/');
         
         return enhancedUrl;
+    }
+
+    /**
+     * Fetch tags from Naver Blog Tag API
+     * API: https://blog.naver.com/BlogTagListInfo.naver?blogId={blogId}&logNoList={logNo}&logType=mylog
+     * Response: { taglist: [{ logno, tagName (URL encoded, comma separated), encTagName }] }
+     */
+    async fetchTagsFromAPI(logNoList: string | string[]): Promise<Map<string, string[]>> {
+        const tagMap = new Map<string, string[]>();
+
+        try {
+            // Convert array to comma-separated string if needed
+            const logNos = Array.isArray(logNoList) ? logNoList.join(',') : logNoList;
+
+            const apiUrl = `https://blog.naver.com/BlogTagListInfo.naver?blogId=${this.blogId}&logNoList=${logNos}&logType=mylog`;
+
+            const response = await requestUrl({
+                url: apiUrl,
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json, text/plain, */*',
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8'
+                }
+            });
+
+            if (response.status === 200 && response.text) {
+                const data = JSON.parse(response.text);
+
+                if (data.taglist && Array.isArray(data.taglist)) {
+                    for (const tagInfo of data.taglist) {
+                        const logNo = tagInfo.logno;
+                        const encodedTags = tagInfo.tagName || '';
+
+                        if (logNo && encodedTags) {
+                            // Decode URL-encoded tags and split by comma
+                            const decodedTags = decodeURIComponent(encodedTags);
+                            const tags = decodedTags.split(',').map((tag: string) => tag.trim()).filter((tag: string) => tag.length > 0);
+                            tagMap.set(logNo, tags);
+                        }
+                    }
+                }
+            }
+        } catch {
+            // Tag API failed, return empty map (will fallback to HTML parsing)
+        }
+
+        return tagMap;
     }
 
     private delay(ms: number): Promise<void> {

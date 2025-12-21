@@ -1,5 +1,154 @@
 /* Naver Blog Importer Plugin Styles */
 
+/* ============================================================================
+   Import Modal Styles (Social Archiver inspired)
+   ============================================================================ */
+
+.naver-import-modal {
+    width: 90%;
+    max-width: 550px;
+}
+
+.naver-import-modal .modal-content {
+    padding: 0;
+}
+
+.naver-import-modal-title {
+    margin-bottom: 20px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.naver-import-url-container {
+    margin-bottom: 16px;
+}
+
+.naver-import-url-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-family: var(--font-monospace);
+    font-size: 13px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--input-radius);
+    background: var(--background-primary);
+    color: var(--text-normal);
+    transition: border-color 0.15s ease;
+    box-sizing: border-box;
+}
+
+.naver-import-url-input:focus {
+    outline: none;
+    border-color: var(--interactive-accent);
+}
+
+.naver-import-url-input::placeholder {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.naver-import-platform-badge {
+    margin-bottom: 12px;
+    padding: 6px 0;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.naver-import-platform-badge--valid {
+    color: var(--text-accent);
+}
+
+.naver-import-platform-badge--error {
+    color: var(--text-error);
+}
+
+.naver-import-options-container {
+    margin-bottom: 16px;
+}
+
+.naver-import-options-container .setting-item {
+    border-top: none;
+    padding: 8px 0;
+}
+
+.naver-import-options-container .setting-item:first-child {
+    padding-top: 0;
+}
+
+.naver-import-options-container .setting-item:last-child {
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.naver-import-options-container .setting-item-name {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.naver-import-options-container .setting-item-description {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.naver-import-button-container {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.naver-import-button-container button {
+    min-width: 80px;
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: var(--button-radius);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.naver-import-button-container button.mod-cta {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+}
+
+.naver-import-button-container button.mod-cta:hover {
+    background: var(--interactive-accent-hover);
+}
+
+.naver-import-button-container button.mod-cta:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Mobile responsive */
+@media (max-width: 480px) {
+    .naver-import-modal {
+        width: 100%;
+        max-width: none;
+    }
+
+    .naver-import-button-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .naver-import-button-container button {
+        width: 100%;
+        min-height: 44px;
+    }
+}
+
+/* ============================================================================
+   Legacy Modal Styles
+   ============================================================================ */
+
 .naver-blog-modal {
     min-width: 400px;
 }
@@ -105,6 +254,175 @@
 }
 
 /* Blog Item Styles */
+.naver-subscription-wrapper {
+    margin-bottom: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.naver-subscription-wrapper .naver-blog-item {
+    border: none;
+    border-radius: 0;
+    margin-bottom: 0;
+}
+
+.naver-subscription-meta {
+    padding: 6px 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--background-secondary);
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Brunch Subscription Card Styles */
+.brunch-subscription-card {
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    background: var(--background-primary);
+}
+
+.brunch-subscription-header {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.brunch-profile-image {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--background-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.brunch-profile-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.brunch-profile-placeholder {
+    font-size: 20px;
+}
+
+.brunch-author-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.brunch-author-name-row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.brunch-author-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.brunch-author-username {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.brunch-author-title {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.brunch-author-description {
+    font-size: 11px;
+    color: var(--text-accent);
+}
+
+.brunch-subscriber-count {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.brunch-subscription-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.brunch-post-count {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.brunch-count-label {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.brunch-count-input {
+    width: 50px;
+    padding: 3px 6px;
+    font-size: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+}
+
+.brunch-subscription-buttons {
+    display: flex;
+    gap: 6px;
+}
+
+.brunch-sync-button,
+.brunch-remove-button {
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.brunch-sync-button {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border: none;
+}
+
+.brunch-sync-button:hover {
+    background: var(--interactive-accent-hover);
+}
+
+.brunch-remove-button {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--background-modifier-border);
+}
+
+.brunch-remove-button:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.brunch-subscription-meta {
+    margin-top: 8px;
+    padding-top: 6px;
+    font-size: 10px;
+    color: var(--text-faint);
+    border-top: 1px solid var(--background-modifier-border);
+}
+
 .naver-blog-item {
     display: grid;
     grid-template-columns: 1fr auto auto auto;

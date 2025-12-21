@@ -124,7 +124,11 @@ export interface BrunchSubscription {
 	platform: 'brunch';
 	authorUsername: string;        // "@eveningdriver"
 	authorUserId?: string;         // "@@eHom" - extracted from RSS URL
-	authorName?: string;           // Display name
+	authorName?: string;           // Display name (e.g., "꽃보다 예쁜 여자")
+	authorTitle?: string;          // Author title (e.g., "아티스트")
+	authorDescription?: string;    // Author description (e.g., "인문 · 교양 분야 크리에이터")
+	profileImageUrl?: string;      // Profile image URL
+	subscriberCount?: number;      // Number of subscribers
 	rssUrl?: string;               // "https://brunch.co.kr/rss/@@eHom"
 	lastCheckedAt?: string;
 	lastPostId?: string;           // Last imported post ID

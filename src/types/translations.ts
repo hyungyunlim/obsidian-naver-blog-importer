@@ -35,9 +35,15 @@ export interface Translations {
 		enable_image_download_desc: string;
 		post_import_limit: string;
 		post_import_limit_desc: string;
-		subscribed_blogs: string;
+		naver_blog_subscriptions: string;
 		add_blog_id: string;
 		add_blog_id_desc: string;
+		// Brunch subscriptions
+		brunch_subscriptions: string;
+		add_brunch_author: string;
+		add_brunch_author_desc: string;
+		brunch_author_placeholder: string;
+		no_subscribed_brunch: string;
 		add_button: string;
 		remove_button: string;
 		sync_button: string;

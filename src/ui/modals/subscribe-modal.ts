@@ -65,11 +65,13 @@ export class NaverBlogSubscribeModal extends Modal {
 		}
 		
 		this.plugin.settings.subscribedBlogs.push(this.blogId);
-		
-		// Initialize blog subscription with default count
+
+		// Initialize blog subscription with metadata
 		this.plugin.settings.blogSubscriptions.push({
+			id: `naver-${this.blogId}-${Date.now()}`,
 			blogId: this.blogId,
-			postCount: DEFAULT_BLOG_POST_COUNT
+			postCount: DEFAULT_BLOG_POST_COUNT,
+			createdAt: new Date().toISOString()
 		});
 		
 		await this.plugin.saveSettings();

@@ -134,14 +134,14 @@ export class BlogService {
 	async importSinglePost(blogId: string, logNo: string): Promise<void> {
 		try {
 			new Notice(`Importing post ${logNo} from ${blogId}...`, 3000);
-			
+
 			const fetcher = new NaverBlogFetcher(blogId);
 			const post = await fetcher.fetchSinglePost(logNo);
-			
+
 			if (!post) {
 				throw new Error('Post not found or could not be fetched');
 			}
-			
+
 			// Convert to ProcessedBlogPost - use original tags from blog
 			const processedPost: ProcessedBlogPost = {
 				...post,
@@ -149,7 +149,7 @@ export class BlogService {
 				tags: post.originalTags || [],
 				excerpt: ''
 			};
-			
+
 			await this.createMarkdownFile(processedPost);
 			new Notice(`✅ Post imported successfully: ${processedPost.title}`, 4000);
 			

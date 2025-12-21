@@ -1,4 +1,4 @@
-import { App, Modal, Notice, TFile } from 'obsidian';
+import { App, Modal, Notice, TFile, Setting } from 'obsidian';
 import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
 import { BrunchFetcher, BrunchKeywordFetcher, BrunchBookFetcher } from '../../../brunch-fetcher';
 import { NaverCafeFetcher } from '../../fetchers/naver-cafe-fetcher';
@@ -11,6 +11,7 @@ import type { ProcessedCafePost } from '../../types';
 export class NaverBlogImportModal extends Modal {
 	plugin: NaverBlogPlugin;
 	private postCountInput: HTMLInputElement | null = null;
+	private shouldSubscribe: boolean = false;
 
 	constructor(app: App, plugin: NaverBlogPlugin) {
 		super(app);
@@ -18,47 +19,57 @@ export class NaverBlogImportModal extends Modal {
 	}
 
 	onOpen() {
-		const { contentEl } = this;
+		const { contentEl, modalEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h2', { text: 'Import from Naver' });
+		// Add modal class for styling
+		modalEl.addClass('naver-import-modal');
 
-		const inputContainer = contentEl.createDiv({ cls: 'naver-blog-input-container' });
+		// Title
+		contentEl.createEl('h2', {
+			text: 'Import from Naver / Brunch',
+			cls: 'naver-import-modal-title'
+		});
+
+		// URL Input container
+		const inputContainer = contentEl.createDiv({ cls: 'naver-import-url-container' });
 
 		const input = inputContainer.createEl('input', {
 			type: 'text',
-			placeholder: 'Blog/Cafe/News/Brunch URL (blog.naver.com, cafe.naver.com, brunch.co.kr)',
-			cls: 'naver-blog-input'
+			placeholder: 'Paste URL (blog.naver.com, cafe.naver.com, brunch.co.kr)',
+			cls: 'naver-import-url-input'
 		});
 
-		const detectionDiv = inputContainer.createDiv({ cls: 'naver-blog-detection' });
+		// Platform detection badge
+		const detectionDiv = inputContainer.createDiv({ cls: 'naver-import-platform-badge' });
 
 		// Options container (shown for bulk imports like Brunch author/keyword)
-		const optionsContainer = contentEl.createDiv({ cls: 'naver-blog-options-container' });
+		const optionsContainer = contentEl.createDiv({ cls: 'naver-import-options-container' });
 		optionsContainer.style.display = 'none';
-		optionsContainer.style.marginTop = '10px';
 
-		const postCountWrapper = optionsContainer.createDiv({ cls: 'naver-blog-post-count-wrapper' });
-		postCountWrapper.style.display = 'flex';
-		postCountWrapper.style.alignItems = 'center';
-		postCountWrapper.style.gap = '8px';
-
-		const postCountLabel = postCountWrapper.createEl('label', { text: 'Max posts:' });
-		postCountLabel.style.fontSize = '0.9em';
-		postCountLabel.style.color = 'var(--text-muted)';
-
-		this.postCountInput = postCountWrapper.createEl('input', {
+		// Post count setting item
+		const postCountItem = optionsContainer.createDiv({ cls: 'setting-item' });
+		const postCountInfo = postCountItem.createDiv({ cls: 'setting-item-info' });
+		postCountInfo.createDiv({ cls: 'setting-item-name', text: 'Max posts' });
+		postCountInfo.createDiv({ cls: 'setting-item-description', text: 'Leave empty to import all posts' });
+		const postCountControl = postCountItem.createDiv({ cls: 'setting-item-control' });
+		this.postCountInput = postCountControl.createEl('input', {
 			type: 'number',
-			placeholder: 'All',
-			cls: 'naver-blog-post-count-input'
+			placeholder: 'All'
 		});
 		this.postCountInput.style.width = '80px';
 		this.postCountInput.min = '1';
 		this.postCountInput.max = '1000';
 
-		const postCountHint = postCountWrapper.createEl('span', { text: '(leave empty for all)' });
-		postCountHint.style.fontSize = '0.85em';
-		postCountHint.style.color = 'var(--text-faint)';
+		// Subscribe toggle using Obsidian's Setting API
+		new Setting(optionsContainer)
+			.setName('Add to subscriptions')
+			.setDesc('Auto-sync new posts in the future')
+			.addToggle(toggle => toggle
+				.setValue(this.shouldSubscribe)
+				.onChange(value => {
+					this.shouldSubscribe = value;
+				}));
 
 		// Update detection status on input
 		const updateDetection = () => {
@@ -78,9 +89,12 @@ export class NaverBlogImportModal extends Modal {
 						 detection.type === 'news' ? '📰' :
 						 detection.type === 'brunch' ? '🥐' : '⚠️';
 			detectionDiv.setText(`${icon} ${detection.message}`);
-			detectionDiv.removeClass('naver-blog-detection--error');
+			detectionDiv.removeClass('naver-import-platform-badge--error');
+			detectionDiv.removeClass('naver-import-platform-badge--valid');
 			if (detection.type === 'invalid') {
-				detectionDiv.addClass('naver-blog-detection--error');
+				detectionDiv.addClass('naver-import-platform-badge--error');
+			} else {
+				detectionDiv.addClass('naver-import-platform-badge--valid');
 			}
 
 			// Show options for bulk brunch imports (author or keyword pages)
@@ -91,7 +105,7 @@ export class NaverBlogImportModal extends Modal {
 
 		input.addEventListener('input', updateDetection);
 
-		const buttonContainer = contentEl.createDiv({ cls: 'naver-blog-button-container' });
+		const buttonContainer = contentEl.createDiv({ cls: 'naver-import-button-container' });
 
 		const cancelButton = buttonContainer.createEl('button', {
 			text: this.plugin.i18n.t('modals.import_single_post.cancel_button')
@@ -317,6 +331,7 @@ export class NaverBlogImportModal extends Modal {
 		// Get max posts value before closing modal
 		const maxPostsValue = this.postCountInput?.value;
 		const maxPosts = maxPostsValue ? parseInt(maxPostsValue, 10) : undefined;
+		const shouldSubscribe = this.shouldSubscribe;
 
 		// Normalize URL to handle mobile-specific encoding issues
 		inputValue = this.normalizeUrl(inputValue);
@@ -357,7 +372,7 @@ export class NaverBlogImportModal extends Modal {
 				// Author page - import all posts
 				const authorMatch = inputValue.match(/@([^/]+)/);
 				if (authorMatch) {
-					await this.importBrunchAuthor(authorMatch[1], maxPosts);
+					await this.importBrunchAuthor(authorMatch[1], maxPosts, shouldSubscribe);
 				} else {
 					new Notice('Invalid Brunch URL format');
 				}
@@ -643,7 +658,7 @@ export class NaverBlogImportModal extends Modal {
 		}
 	}
 
-	async importBrunchAuthor(username: string, maxPosts?: number) {
+	async importBrunchAuthor(username: string, maxPosts?: number, shouldSubscribe?: boolean) {
 		let importCancelled = false;
 		const cancelNotice = new Notice("Click here to cancel import", 0);
 		// @ts-ignore - accessing private messageEl property
@@ -709,6 +724,49 @@ export class NaverBlogImportModal extends Modal {
 			else if (errorCount > 0) summary += ' ⚠️';
 
 			new Notice(summary, 8000);
+
+			// Add to subscriptions if requested
+			if (shouldSubscribe && !importCancelled && successCount > 0) {
+				const existing = this.plugin.settings.brunchSettings?.subscribedBrunchAuthors?.find(
+					sub => sub.authorUsername === username
+				);
+				if (!existing) {
+					if (!this.plugin.settings.brunchSettings) {
+						this.plugin.settings.brunchSettings = {
+							brunchImportFolder: 'Brunch Posts',
+							downloadBrunchImages: true,
+							downloadBrunchVideos: true,
+							downloadBrunchComments: true,
+							subscribedBrunchAuthors: [],
+							enableBrunchDuplicateCheck: true
+						};
+					}
+					if (!this.plugin.settings.brunchSettings.subscribedBrunchAuthors) {
+						this.plugin.settings.brunchSettings.subscribedBrunchAuthors = [];
+					}
+
+					// Fetch author profile for rich metadata
+					new Notice(`Fetching author profile...`, 2000);
+					const profile = await BrunchFetcher.fetchAuthorProfile(username);
+
+					const newSubscription = {
+						id: `brunch-${username}-${Date.now()}`,
+						platform: 'brunch' as const,
+						authorUsername: username,
+						authorName: profile.authorName,
+						authorTitle: profile.authorTitle,
+						authorDescription: profile.authorDescription,
+						profileImageUrl: profile.profileImageUrl,
+						subscriberCount: profile.subscriberCount,
+						postCount: maxPosts || 10,
+						createdAt: new Date().toISOString()
+					};
+
+					this.plugin.settings.brunchSettings.subscribedBrunchAuthors.push(newSubscription);
+					await this.plugin.saveSettings();
+					new Notice(`Added @${username} (${profile.authorName}) to subscriptions`, 3000);
+				}
+			}
 
 			if (lastCreatedFile && !importCancelled) {
 				await this.openFile(lastCreatedFile);

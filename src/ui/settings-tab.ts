@@ -1,12 +1,13 @@
 import { App, PluginSettingTab, Setting, Notice, normalizePath } from 'obsidian';
 
-import { 
-	DEFAULT_BLOG_POST_COUNT, 
-	MAX_POST_IMPORT_LIMIT, 
+import {
+	DEFAULT_BLOG_POST_COUNT,
+	MAX_POST_IMPORT_LIMIT,
 	MAX_SUBSCRIPTION_POST_COUNT,
-	PLACEHOLDERS 
+	PLACEHOLDERS
 } from '../constants';
 import { AIProviderUtils } from '../utils/ai-provider-utils';
+import { BrunchFetcher } from '../../brunch-fetcher';
 import type NaverBlogPlugin from '../../main';
 
 export class NaverBlogSettingTab extends PluginSettingTab {
@@ -221,39 +222,9 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-		if (this.plugin.settings.enableImageDownload) {
-			new Setting(containerEl)
-				.setName(this.plugin.i18n.t('settings.image_folder'))
-				.setDesc(this.plugin.i18n.t('settings.image_folder_desc'))
-				.addText(text => {
-					const input = text
-						.setPlaceholder(PLACEHOLDERS.folder.image)
-						.setValue(this.plugin.settings.imageFolder)
-						.onChange(async (value) => {
-							this.plugin.settings.imageFolder = value ? normalizePath(value) : '';
-							await this.plugin.saveSettings();
-						});
-					
-					// Add folder dropdown functionality
-					this.setupFolderDropdown(input.inputEl, (folder) => {
-						const normalizedFolder = normalizePath(folder);
-						this.plugin.settings.imageFolder = normalizedFolder;
-						void this.plugin.saveSettings();
-						input.setValue(normalizedFolder);
-					}, () => {
-						this.plugin.settings.imageFolder = '';
-						void this.plugin.saveSettings();
-						input.setValue('');
-					});
-					
-					return input;
-				});
-		}
-
-
-		// Subscribed blogs section
+		// Naver Blog Subscriptions section
 		new Setting(containerEl)
-			.setName(this.plugin.i18n.t('settings.subscribed_blogs'))
+			.setName(this.plugin.i18n.t('settings.naver_blog_subscriptions'))
 			.setHeading();
 		
 		const subscriptionDiv = containerEl.createDiv();
@@ -273,17 +244,89 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					const blogId = input.value.trim();
 					if (blogId && !this.plugin.settings.subscribedBlogs.includes(blogId)) {
 						this.plugin.settings.subscribedBlogs.push(blogId);
-						
-						// Initialize blog subscription with default count
+
+						// Initialize blog subscription with metadata
 						this.plugin.settings.blogSubscriptions.push({
+							id: `naver-${blogId}-${Date.now()}`,
 							blogId: blogId,
-							postCount: DEFAULT_BLOG_POST_COUNT
+							postCount: DEFAULT_BLOG_POST_COUNT,
+							createdAt: new Date().toISOString()
 						});
 						
 						await this.plugin.saveSettings();
 						input.value = '';
 						this.displaySubscriptions(subscriptionDiv);
 					}
+				}));
+
+		// Brunch Subscriptions section
+		new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.brunch_subscriptions'))
+			.setHeading();
+
+		const brunchSubscriptionDiv = containerEl.createDiv();
+		this.displayBrunchSubscriptions(brunchSubscriptionDiv);
+
+		new Setting(containerEl)
+			.setName(this.plugin.i18n.t('settings.add_brunch_author'))
+			.setDesc(this.plugin.i18n.t('settings.add_brunch_author_desc'))
+			.addText(text => {
+				text.setPlaceholder(this.plugin.i18n.t('settings.brunch_author_placeholder'));
+				return text;
+			})
+			.addButton(button => button
+				.setButtonText(this.plugin.i18n.t('settings.add_button'))
+				.onClick(async () => {
+					const input = button.buttonEl.previousElementSibling as HTMLInputElement;
+					const authorUsername = input.value.trim().replace(/^@/, '');
+					if (!authorUsername) return;
+
+					// Check if already subscribed
+					const existing = this.plugin.settings.brunchSettings?.subscribedBrunchAuthors?.find(
+						sub => sub.authorUsername === authorUsername
+					);
+					if (existing) {
+						new Notice(`Already subscribed to @${authorUsername}`);
+						return;
+					}
+
+					// Add subscription
+					if (!this.plugin.settings.brunchSettings) {
+						this.plugin.settings.brunchSettings = {
+							brunchImportFolder: 'Brunch Posts',
+							downloadBrunchImages: true,
+							downloadBrunchVideos: true,
+							downloadBrunchComments: true,
+							subscribedBrunchAuthors: [],
+							enableBrunchDuplicateCheck: true
+						};
+					}
+					if (!this.plugin.settings.brunchSettings.subscribedBrunchAuthors) {
+						this.plugin.settings.brunchSettings.subscribedBrunchAuthors = [];
+					}
+
+					// Fetch author profile for rich metadata
+					new Notice(`Fetching author profile...`, 2000);
+					const profile = await BrunchFetcher.fetchAuthorProfile(authorUsername);
+
+					const newSubscription = {
+						id: `brunch-${authorUsername}-${Date.now()}`,
+						platform: 'brunch' as const,
+						authorUsername: authorUsername,
+						authorName: profile.authorName,
+						authorTitle: profile.authorTitle,
+						authorDescription: profile.authorDescription,
+						profileImageUrl: profile.profileImageUrl,
+						subscriberCount: profile.subscriberCount,
+						postCount: DEFAULT_BLOG_POST_COUNT,
+						createdAt: new Date().toISOString()
+					};
+
+					this.plugin.settings.brunchSettings.subscribedBrunchAuthors.push(newSubscription);
+					await this.plugin.saveSettings();
+					input.value = '';
+					this.displayBrunchSubscriptions(brunchSubscriptionDiv);
+					new Notice(`Subscribed to @${authorUsername} (${profile.authorName})`);
 				}));
 
 		// Naver cafe section
@@ -350,33 +393,6 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.setName(this.plugin.i18n.t('settings.news_settings'))
 			.setHeading();
 
-		// News folder
-		new Setting(containerEl)
-			.setName(this.plugin.i18n.t('settings.news_folder'))
-			.setDesc(this.plugin.i18n.t('settings.news_folder_desc'))
-			.addText(text => {
-				text.setPlaceholder('NaverNews')
-					.setValue(this.plugin.settings.newsSettings?.newsFolder || 'NaverNews')
-					.onChange(async (value) => {
-						const newsSettings = this.ensureNewsSettings();
-						newsSettings.newsFolder = normalizePath(value || 'NaverNews');
-						await this.plugin.saveSettings();
-					});
-
-				// Setup folder dropdown
-				this.setupFolderDropdown(
-					text.inputEl,
-					(folder: string) => {
-						text.setValue(folder);
-						void (async () => {
-							const newsSettings = this.ensureNewsSettings();
-							newsSettings.newsFolder = folder;
-							await this.plugin.saveSettings();
-						})();
-					}
-				);
-			});
-
 		// Organize by press toggle
 		new Setting(containerEl)
 			.setName(this.plugin.i18n.t('settings.news_organize_by_press'))
@@ -416,29 +432,30 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 	displaySubscriptions(containerEl: HTMLElement) {
 		containerEl.empty();
-		
+
 		if (this.plugin.settings.subscribedBlogs.length === 0) {
 			containerEl.createEl('p', { text: this.plugin.i18n.t('settings.no_subscribed_blogs') });
 			return;
 		}
 
 		this.plugin.settings.subscribedBlogs.forEach((blogId: string, index: number) => {
-			const blogDiv = containerEl.createDiv({ cls: 'naver-blog-item' });
-			
+			const wrapper = containerEl.createDiv({ cls: 'naver-subscription-wrapper' });
+			const blogDiv = wrapper.createDiv({ cls: 'naver-blog-item' });
+
 			// Blog ID
 			blogDiv.createEl('span', { text: blogId });
-			
+
 			// Post count setting
 			const countDiv = blogDiv.createDiv({ cls: 'naver-blog-count-container' });
-			
+
 			countDiv.createEl('span', {
 				text: this.plugin.i18n.t('settings.posts_label') + ':',
 				cls: 'naver-blog-count-label'
 			});
-			
+
 			const blogSubscription = this.plugin.settings.blogSubscriptions.find(sub => sub.blogId === blogId);
 			const currentCount = blogSubscription?.postCount || DEFAULT_BLOG_POST_COUNT;
-			
+
 			const countInput = countDiv.createEl('input', {
 				type: 'number',
 				value: currentCount.toString(),
@@ -446,26 +463,28 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			});
 			countInput.min = '1';
 			countInput.max = MAX_SUBSCRIPTION_POST_COUNT.toString();
-			
+
 			countInput.onchange = async () => {
 				const newCount = parseInt(countInput.value) || DEFAULT_BLOG_POST_COUNT;
-				
+
 				// Update or create blog subscription
 				const existingIndex = this.plugin.settings.blogSubscriptions.findIndex(sub => sub.blogId === blogId);
 				if (existingIndex >= 0) {
 					this.plugin.settings.blogSubscriptions[existingIndex].postCount = newCount;
 				} else {
 					this.plugin.settings.blogSubscriptions.push({
+						id: `naver-${blogId}-${Date.now()}`,
 						blogId: blogId,
-						postCount: newCount
+						postCount: newCount,
+						createdAt: new Date().toISOString()
 					});
 				}
-				
+
 				await this.plugin.saveSettings();
 			};
-			
+
 			// Sync button
-			const syncButton = blogDiv.createEl('button', { 
+			const syncButton = blogDiv.createEl('button', {
 				text: this.plugin.i18n.t('settings.sync_button'),
 				cls: 'naver-blog-sync-button'
 			});
@@ -473,41 +492,200 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 				try {
 					new Notice(`Syncing ${blogId}...`);
 					const posts = await this.plugin.fetchNaverBlogPosts(blogId, currentCount);
-					
+
 					let successCount = 0;
 					for (const post of posts) {
 						try {
 							await this.plugin.createMarkdownFile(post);
 							successCount++;
 						} catch {
-									// Skip failed post
-							}
+							// Skip failed post
+						}
 					}
-					
+
+					// Update lastSyncedAt
+					const subIndex = this.plugin.settings.blogSubscriptions.findIndex(sub => sub.blogId === blogId);
+					if (subIndex >= 0) {
+						this.plugin.settings.blogSubscriptions[subIndex].lastSyncedAt = new Date().toISOString();
+						await this.plugin.saveSettings();
+					}
+
+					// Refresh display to show updated metadata
+					this.displaySubscriptions(containerEl);
+
 					new Notice(`Synced ${successCount} posts from ${blogId}`);
 				} catch (error) {
 					new Notice(`Failed to sync ${blogId}: ${error.message}`);
 				}
 			};
-			
+
 			// Remove button
-			const removeButton = blogDiv.createEl('button', { 
+			const removeButton = blogDiv.createEl('button', {
 				text: this.plugin.i18n.t('settings.remove_button'),
 				cls: 'naver-blog-remove-button'
 			});
 			removeButton.onclick = async () => {
 				// Remove from subscribed blogs
 				this.plugin.settings.subscribedBlogs.splice(index, 1);
-				
+
 				// Remove from blog subscriptions
 				const subIndex = this.plugin.settings.blogSubscriptions.findIndex(sub => sub.blogId === blogId);
 				if (subIndex >= 0) {
 					this.plugin.settings.blogSubscriptions.splice(subIndex, 1);
 				}
-				
+
 				await this.plugin.saveSettings();
 				this.displaySubscriptions(containerEl);
 			};
+
+			// Metadata row
+			const metaDiv = wrapper.createDiv({ cls: 'naver-subscription-meta' });
+			const metaParts: string[] = [];
+
+			if (blogSubscription?.createdAt) {
+				const createdDate = new Date(blogSubscription.createdAt).toLocaleDateString();
+				metaParts.push(`Added: ${createdDate}`);
+			}
+			if (blogSubscription?.lastSyncedAt) {
+				const lastSyncDate = new Date(blogSubscription.lastSyncedAt).toLocaleDateString();
+				metaParts.push(`Last sync: ${lastSyncDate}`);
+			}
+			if (blogSubscription?.lastLogNo) {
+				metaParts.push(`Last post: #${blogSubscription.lastLogNo}`);
+			}
+
+			if (metaParts.length > 0) {
+				metaDiv.setText(metaParts.join(' · '));
+			}
+		});
+	}
+
+	displayBrunchSubscriptions(containerEl: HTMLElement) {
+		containerEl.empty();
+
+		const subscriptions = this.plugin.settings.brunchSettings?.subscribedBrunchAuthors || [];
+
+		if (subscriptions.length === 0) {
+			containerEl.createEl('p', { text: this.plugin.i18n.t('settings.no_subscribed_brunch') });
+			return;
+		}
+
+		subscriptions.forEach((subscription, index) => {
+			const card = containerEl.createDiv({ cls: 'brunch-subscription-card' });
+
+			// Header with profile image, info, and controls
+			const header = card.createDiv({ cls: 'brunch-subscription-header' });
+
+			// Profile image
+			if (subscription.profileImageUrl) {
+				const imgWrapper = header.createDiv({ cls: 'brunch-profile-image' });
+				const img = imgWrapper.createEl('img', {
+					attr: { src: subscription.profileImageUrl, alt: subscription.authorName || subscription.authorUsername }
+				});
+				img.onerror = () => {
+					imgWrapper.empty();
+					imgWrapper.createEl('span', { text: '🥐', cls: 'brunch-profile-placeholder' });
+				};
+			} else {
+				const imgWrapper = header.createDiv({ cls: 'brunch-profile-image' });
+				imgWrapper.createEl('span', { text: '🥐', cls: 'brunch-profile-placeholder' });
+			}
+
+			// Author info
+			const infoDiv = header.createDiv({ cls: 'brunch-author-info' });
+
+			// Author name and username
+			const nameRow = infoDiv.createDiv({ cls: 'brunch-author-name-row' });
+			nameRow.createEl('span', {
+				text: subscription.authorName || subscription.authorUsername,
+				cls: 'brunch-author-name'
+			});
+			nameRow.createEl('span', {
+				text: `@${subscription.authorUsername}`,
+				cls: 'brunch-author-username'
+			});
+
+			// Second row: title, description, subscriber count (inline)
+			const detailParts: string[] = [];
+			if (subscription.authorTitle) {
+				detailParts.push(subscription.authorTitle);
+			}
+			if (subscription.authorDescription) {
+				detailParts.push(subscription.authorDescription);
+			}
+			if (subscription.subscriberCount) {
+				detailParts.push(`구독자 ${subscription.subscriberCount.toLocaleString()}명`);
+			}
+			if (detailParts.length > 0) {
+				infoDiv.createEl('div', {
+					text: detailParts.join(' · '),
+					cls: 'brunch-author-title'
+				});
+			}
+
+			// Controls (right side of header)
+			const controlsDiv = header.createDiv({ cls: 'brunch-subscription-controls' });
+
+			// Post count
+			const countDiv = controlsDiv.createDiv({ cls: 'brunch-post-count' });
+			const countInput = countDiv.createEl('input', {
+				type: 'number',
+				value: subscription.postCount.toString(),
+				cls: 'brunch-count-input'
+			});
+			countInput.min = '1';
+			countInput.max = MAX_SUBSCRIPTION_POST_COUNT.toString();
+			countInput.onchange = async () => {
+				const newCount = parseInt(countInput.value) || DEFAULT_BLOG_POST_COUNT;
+				subscription.postCount = newCount;
+				await this.plugin.saveSettings();
+			};
+
+			// Buttons
+			const buttonsDiv = controlsDiv.createDiv({ cls: 'brunch-subscription-buttons' });
+
+			const syncButton = buttonsDiv.createEl('button', {
+				text: this.plugin.i18n.t('settings.sync_button'),
+				cls: 'brunch-sync-button'
+			});
+			syncButton.onclick = async () => {
+				try {
+					new Notice(`Syncing @${subscription.authorUsername}...`);
+					await this.plugin.brunchService.syncSingleAuthor(subscription);
+					subscription.lastCheckedAt = new Date().toISOString();
+					await this.plugin.saveSettings();
+					this.displayBrunchSubscriptions(containerEl);
+					new Notice(`Synced posts from @${subscription.authorUsername}`);
+				} catch (error) {
+					new Notice(`Failed to sync: ${error.message}`);
+				}
+			};
+
+			const removeButton = buttonsDiv.createEl('button', {
+				text: this.plugin.i18n.t('settings.remove_button'),
+				cls: 'brunch-remove-button'
+			});
+			removeButton.onclick = async () => {
+				subscriptions.splice(index, 1);
+				await this.plugin.saveSettings();
+				this.displayBrunchSubscriptions(containerEl);
+				new Notice(`Unsubscribed from @${subscription.authorUsername}`);
+			};
+
+			// Metadata footer
+			const metaParts: string[] = [];
+			if (subscription.createdAt) {
+				metaParts.push(`Added: ${new Date(subscription.createdAt).toLocaleDateString()}`);
+			}
+			if (subscription.lastCheckedAt) {
+				metaParts.push(`Last sync: ${new Date(subscription.lastCheckedAt).toLocaleDateString()}`);
+			}
+			if (metaParts.length > 0) {
+				card.createEl('div', {
+					text: metaParts.join(' · '),
+					cls: 'brunch-subscription-meta'
+				});
+			}
 		});
 	}
 

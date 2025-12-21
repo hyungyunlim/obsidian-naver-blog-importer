@@ -110,6 +110,37 @@ export class BrunchService {
 	}
 
 	/**
+	 * Sync a single Brunch author subscription
+	 */
+	async syncSingleAuthor(subscription: BrunchSubscription): Promise<void> {
+		try {
+			const posts = await this.fetchBrunchPosts(subscription.authorUsername, subscription.postCount);
+
+			for (let j = 0; j < posts.length; j++) {
+				const post = posts[j];
+				const postProgress = `(${j + 1}/${posts.length})`;
+
+				try {
+					new Notice(`Creating ${postProgress}: ${post.title}`, 3000);
+					await this.createMarkdownFile(post);
+				} catch {
+					// Continue on error
+				}
+				await new Promise(resolve => setTimeout(resolve, 500));
+			}
+
+			// Update last checked time
+			subscription.lastCheckedAt = new Date().toISOString();
+			if (posts.length > 0) {
+				subscription.lastPostId = posts[0].postId;
+			}
+		} catch (error) {
+			new Notice(`Failed to sync @${subscription.authorUsername}: ${error.message}`, 5000);
+			throw error;
+		}
+	}
+
+	/**
 	 * Sync all subscribed Brunch authors
 	 */
 	async syncSubscribedAuthors(): Promise<void> {

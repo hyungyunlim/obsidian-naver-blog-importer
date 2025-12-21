@@ -5,8 +5,14 @@ import type { BrunchSettings } from './brunch';
 import { DEFAULT_BRUNCH_SETTINGS } from './brunch';
 
 export interface BlogSubscription {
+	id: string;                    // Unique identifier
 	blogId: string;
+	blogName?: string;             // Display name (fetched from API)
+	profileImageUrl?: string;      // Blog profile image URL
 	postCount: number;
+	createdAt: string;             // ISO date string
+	lastSyncedAt?: string;         // Last sync time
+	lastLogNo?: string;            // Last imported post logNo for incremental sync
 }
 
 export interface CafeSettings {

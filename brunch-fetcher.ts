@@ -38,6 +38,15 @@ interface BrunchRssItem {
 	description: string;
 }
 
+export interface BrunchAuthorProfile {
+	username: string;
+	authorName: string;
+	authorTitle?: string;
+	authorDescription?: string;
+	profileImageUrl?: string;
+	subscriberCount?: number;
+}
+
 // Common headers to avoid bot detection and skip auto-login redirect
 const BRUNCH_REQUEST_HEADERS = {
 	'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -1361,6 +1370,176 @@ export class BrunchFetcher {
 		}
 
 		return lines.join('\n');
+	}
+
+	/**
+	 * Parse Korean number format (e.g., "1.2만", "5천") to number
+	 */
+	private static parseKoreanNumber(text: string): number | undefined {
+		if (!text) return undefined;
+
+		// Remove commas and whitespace
+		text = text.replace(/[,\s]/g, '');
+
+		// Match Korean number format: 1.2만, 5천, etc.
+		const match = text.match(/([\d.]+)(만|천)?/);
+		if (!match) return undefined;
+
+		let num = parseFloat(match[1]);
+		if (isNaN(num)) return undefined;
+
+		const unit = match[2];
+		if (unit === '만') {
+			num *= 10000;
+		} else if (unit === '천') {
+			num *= 1000;
+		}
+
+		return Math.round(num);
+	}
+
+	/**
+	 * Fetch author profile information using Brunch API
+	 * API endpoint: https://api.brunch.co.kr/v1/profile/@{profileId}
+	 * Returns complete profile data including followerCount
+	 */
+	static async fetchAuthorProfile(username: string): Promise<BrunchAuthorProfile> {
+		// Remove @ prefix if present
+		const cleanUsername = username.replace(/^@/, '');
+		const apiUrl = `https://api.brunch.co.kr/v1/profile/@${cleanUsername}`;
+
+		try {
+			console.log('[Brunch] Fetching author profile from API:', apiUrl);
+
+			const response = await requestUrl({
+				url: apiUrl,
+				method: 'GET',
+				headers: {
+					'Accept': 'application/json',
+					'User-Agent': BRUNCH_REQUEST_HEADERS['User-Agent'],
+				},
+				throw: false
+			});
+
+			if (response.status === 200) {
+				const data = JSON.parse(response.text);
+
+				if (data.code === 200 && data.data) {
+					const profile = data.data;
+
+					// Extract job/title from profileCategoryList
+					let authorTitle: string | undefined;
+					if (profile.profileCategoryList) {
+						const jobCategory = profile.profileCategoryList.find(
+							(cat: { category: string }) => cat.category === 'job'
+						);
+						if (jobCategory?.keywordList?.[0]?.keyword) {
+							authorTitle = jobCategory.keywordList[0].keyword;
+						}
+					}
+
+					// Extract creator description from topCreator
+					const authorDescription = profile.topCreator?.displayName || undefined;
+
+					// Build profile image URL
+					let profileImageUrl = profile.userImage || profile.profileImage;
+					if (profileImageUrl && !profileImageUrl.startsWith('http')) {
+						profileImageUrl = 'https:' + profileImageUrl;
+					}
+
+					console.log(`[Brunch] API profile result: name="${profile.userName}", title="${authorTitle || 'none'}", desc="${authorDescription || 'none'}", subscribers=${profile.followerCount || 0}`);
+
+					return {
+						username: cleanUsername,
+						authorName: profile.userName || cleanUsername,
+						authorTitle,
+						authorDescription,
+						profileImageUrl,
+						subscriberCount: profile.followerCount
+					};
+				}
+			}
+
+			// Fallback to HTML parsing if API fails
+			console.log('[Brunch] API failed, falling back to HTML parsing');
+			return this.fetchAuthorProfileFromHtml(cleanUsername);
+
+		} catch (error) {
+			console.error('[Brunch] Failed to fetch author profile from API:', error);
+			return this.fetchAuthorProfileFromHtml(cleanUsername);
+		}
+	}
+
+	/**
+	 * Fallback: Fetch author profile from HTML page
+	 */
+	private static async fetchAuthorProfileFromHtml(username: string): Promise<BrunchAuthorProfile> {
+		const url = BRUNCH_AUTHOR_URL(username);
+
+		try {
+			console.log('[Brunch] Fetching author profile from HTML:', url);
+
+			const response = await requestUrl({
+				url: url,
+				method: 'GET',
+				headers: BRUNCH_REQUEST_HEADERS,
+				throw: false
+			});
+
+			if (response.status !== 200) {
+				return { username, authorName: username };
+			}
+
+			const html = response.text;
+			const $ = cheerio.load(html);
+
+			// Author name: .tit_blogger or og:title
+			let authorName: string = $('.tit_blogger').first().text().trim() || username;
+			if (authorName === username) {
+				const ogTitle = $('meta[property="og:title"]').attr('content') || '';
+				if (ogTitle) {
+					authorName = ogTitle
+						.replace(/의\s*브런치스토리.*$/i, '')
+						.replace(/\s*-\s*brunch.*$/i, '')
+						.trim() || username;
+				}
+			}
+
+			// Author title: .txt_info
+			const authorTitle = $('.blog_cpeg .txt_info').first().text().trim() ||
+				$('.txt_info').first().text().trim() || undefined;
+
+			// Author description: .display_name
+			const authorDescription = $('.top_creator_link .display_name').first().text().trim() ||
+				$('.display_name').first().text().trim() || undefined;
+
+			// Profile image
+			let profileImageUrl = $('.profileUserImage').attr('src') ||
+				$('img[alt="프로필"]').attr('src') ||
+				$('meta[property="og:image"]').attr('content') || undefined;
+
+			if (profileImageUrl) {
+				if (profileImageUrl.startsWith('//')) {
+					profileImageUrl = 'https:' + profileImageUrl;
+				} else if (!profileImageUrl.startsWith('http')) {
+					profileImageUrl = 'https:' + profileImageUrl;
+				}
+			}
+
+			console.log(`[Brunch] HTML profile result: name="${authorName}", title="${authorTitle || 'none'}", desc="${authorDescription || 'none'}"`);
+
+			return {
+				username,
+				authorName,
+				authorTitle,
+				authorDescription,
+				profileImageUrl,
+				subscriberCount: undefined // Not available in HTML
+			};
+		} catch (error) {
+			console.error('[Brunch] Failed to fetch author profile from HTML:', error);
+			return { username, authorName: username };
+		}
 	}
 }
 
