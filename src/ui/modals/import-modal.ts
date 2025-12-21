@@ -624,8 +624,8 @@ export class NaverBlogImportModal extends Modal {
 
 			new Notice(summary, 8000);
 
-			// Add to subscriptions if requested
-			if (shouldSubscribe && !importCancelled && successCount > 0) {
+			// Add to subscriptions if requested (even if no new posts due to duplicates)
+			if (shouldSubscribe && !importCancelled) {
 				const existing = this.plugin.settings.subscribedBlogs.includes(blogId);
 				if (!existing) {
 					// Fetch profile info for rich metadata
@@ -749,8 +749,8 @@ export class NaverBlogImportModal extends Modal {
 
 			new Notice(summary, 8000);
 
-			// Add to subscriptions if requested
-			if (shouldSubscribe && !importCancelled && successCount > 0) {
+			// Add to subscriptions if requested (even if no new posts due to duplicates)
+			if (shouldSubscribe && !importCancelled) {
 				const existing = this.plugin.settings.brunchSettings?.subscribedBrunchAuthors?.find(
 					sub => sub.authorUsername === username
 				);
