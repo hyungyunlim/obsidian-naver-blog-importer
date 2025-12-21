@@ -150,15 +150,13 @@ export default class NaverBlogPlugin extends Plugin {
 			}
 		});
 
-		// Auto-sync subscribed blogs on startup
-		if (this.settings.subscribedBlogs.length > 0) {
-			setTimeout(() => void this.blogService.syncSubscribedBlogs(), UI_DELAYS.autoSync);
-		}
-
-		// Auto-sync subscribed Brunch authors on startup
+		// Auto-sync all subscriptions on startup (consolidated)
+		const hasBlogSubscriptions = this.settings.subscribedBlogs.length > 0;
 		const brunchSubscriptions = this.settings.brunchSettings?.subscribedBrunchAuthors || [];
-		if (brunchSubscriptions.length > 0) {
-			setTimeout(() => void this.brunchService.syncSubscribedAuthors(), UI_DELAYS.autoSync + 5000);
+		const hasBrunchSubscriptions = brunchSubscriptions.length > 0;
+
+		if (hasBlogSubscriptions || hasBrunchSubscriptions) {
+			setTimeout(() => void this.autoSyncAllSubscriptions(), UI_DELAYS.autoSync);
 		}
 
 		// Add settings tab
@@ -167,6 +165,63 @@ export default class NaverBlogPlugin extends Plugin {
 
 	onunload() {
 		// Cleanup if needed
+	}
+
+	/**
+	 * Auto-sync all subscriptions with consolidated notifications
+	 */
+	private async autoSyncAllSubscriptions(): Promise<void> {
+		const blogCount = this.settings.subscribedBlogs.length;
+		const brunchAuthors = this.settings.brunchSettings?.subscribedBrunchAuthors || [];
+		const brunchCount = brunchAuthors.length;
+
+		// Build summary of what we're syncing
+		const syncTargets: string[] = [];
+		if (blogCount > 0) syncTargets.push(`${blogCount} blog${blogCount > 1 ? 's' : ''}`);
+		if (brunchCount > 0) syncTargets.push(`${brunchCount} Brunch author${brunchCount > 1 ? 's' : ''}`);
+
+		if (syncTargets.length === 0) return;
+
+		// Show single starting notice
+		const syncNotice = new Notice(`Syncing subscriptions: ${syncTargets.join(', ')}...`, 0);
+
+		let totalBlogPosts = 0;
+		let totalBrunchPosts = 0;
+		let totalErrors = 0;
+
+		try {
+			// Sync blogs silently
+			if (blogCount > 0) {
+				const blogResult = await this.blogService.syncSubscribedBlogs({ silent: true });
+				totalBlogPosts = blogResult.newPosts;
+				totalErrors += blogResult.errors;
+			}
+
+			// Sync Brunch silently
+			if (brunchCount > 0) {
+				const brunchResult = await this.brunchService.syncSubscribedAuthors({ silent: true });
+				totalBrunchPosts = brunchResult.newPosts;
+				totalErrors += brunchResult.errors;
+			}
+		} finally {
+			syncNotice.hide();
+
+			// Show consolidated summary
+			const totalPosts = totalBlogPosts + totalBrunchPosts;
+			if (totalPosts > 0 || totalErrors > 0) {
+				const parts: string[] = [];
+				if (totalBlogPosts > 0) parts.push(`${totalBlogPosts} from blogs`);
+				if (totalBrunchPosts > 0) parts.push(`${totalBrunchPosts} from Brunch`);
+
+				let summary = `Sync completed: ${parts.join(', ')}`;
+				if (parts.length === 0) summary = 'Sync completed: no new posts';
+				if (totalErrors > 0) summary += ` (${totalErrors} error${totalErrors > 1 ? 's' : ''})`;
+
+				new Notice(summary, 6000);
+			} else {
+				new Notice('Sync completed: no new posts found', 4000);
+			}
+		}
 	}
 
 	async loadSettings() {

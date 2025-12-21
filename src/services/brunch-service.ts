@@ -2,6 +2,15 @@ import { App, Notice } from 'obsidian';
 import { BrunchFetcher } from '../../brunch-fetcher';
 import { NaverBlogSettings, ProcessedBrunchPost, BrunchSubscription } from '../types';
 
+export interface SyncOptions {
+	silent?: boolean;  // Suppress intermediate notices (for auto-sync)
+}
+
+export interface SyncResult {
+	newPosts: number;
+	errors: number;
+}
+
 export class BrunchService {
 	constructor(
 		private app: App,
@@ -12,10 +21,14 @@ export class BrunchService {
 	/**
 	 * Fetch posts from a Brunch author
 	 */
-	async fetchBrunchPosts(username: string, maxPosts?: number): Promise<ProcessedBrunchPost[]> {
+	async fetchBrunchPosts(username: string, maxPosts?: number, options?: SyncOptions): Promise<ProcessedBrunchPost[]> {
+		const silent = options?.silent ?? false;
 		let fetchNotice: Notice | null = null;
+
 		try {
-			fetchNotice = new Notice('Fetching Brunch posts...', 0);
+			if (!silent) {
+				fetchNotice = new Notice('Fetching Brunch posts...', 0);
+			}
 
 			const fetcher = new BrunchFetcher(username);
 			const posts = await fetcher.fetchPosts(maxPosts);
@@ -30,12 +43,16 @@ export class BrunchService {
 			if (this.settings.brunchSettings?.enableBrunchDuplicateCheck) {
 				const existingPostIds = this.getExistingBrunchPostIds();
 				filteredPosts = posts.filter(post => !existingPostIds.has(post.postId));
-				new Notice(`Found ${posts.length} posts, ${filteredPosts.length} new posts after duplicate check`, 4000);
-			} else {
+				if (!silent) {
+					new Notice(`Found ${posts.length} posts, ${filteredPosts.length} new posts after duplicate check`, 4000);
+				}
+			} else if (!silent) {
 				new Notice(`Found ${posts.length} posts`, 4000);
 			}
 
-			new Notice(`Processing ${filteredPosts.length} posts...`, 3000);
+			if (!silent) {
+				new Notice(`Processing ${filteredPosts.length} posts...`, 3000);
+			}
 
 			return filteredPosts;
 
@@ -45,7 +62,9 @@ export class BrunchService {
 				fetchNotice = null;
 			}
 
-			new Notice(`Failed to fetch posts from @${username}: ${error.message}`, 5000);
+			if (!silent) {
+				new Notice(`Failed to fetch posts from @${username}: ${error.message}`, 5000);
+			}
 			throw error;
 		}
 	}
@@ -112,19 +131,25 @@ export class BrunchService {
 	/**
 	 * Sync a single Brunch author subscription
 	 */
-	async syncSingleAuthor(subscription: BrunchSubscription): Promise<void> {
+	async syncSingleAuthor(subscription: BrunchSubscription, options?: SyncOptions): Promise<SyncResult> {
+		const silent = options?.silent ?? false;
+		const result: SyncResult = { newPosts: 0, errors: 0 };
+
 		try {
-			const posts = await this.fetchBrunchPosts(subscription.authorUsername, subscription.postCount);
+			const posts = await this.fetchBrunchPosts(subscription.authorUsername, subscription.postCount, { silent });
 
 			for (let j = 0; j < posts.length; j++) {
 				const post = posts[j];
-				const postProgress = `(${j + 1}/${posts.length})`;
 
 				try {
-					new Notice(`Creating ${postProgress}: ${post.title}`, 3000);
+					if (!silent) {
+						const postProgress = `(${j + 1}/${posts.length})`;
+						new Notice(`Creating ${postProgress}: ${post.title}`, 3000);
+					}
 					await this.createMarkdownFile(post);
+					result.newPosts++;
 				} catch {
-					// Continue on error
+					result.errors++;
 				}
 				await new Promise(resolve => setTimeout(resolve, 500));
 			}
@@ -135,42 +160,56 @@ export class BrunchService {
 				subscription.lastPostId = posts[0].postId;
 			}
 		} catch (error) {
-			new Notice(`Failed to sync @${subscription.authorUsername}: ${error.message}`, 5000);
+			if (!silent) {
+				new Notice(`Failed to sync @${subscription.authorUsername}: ${error.message}`, 5000);
+			}
 			throw error;
 		}
+
+		return result;
 	}
 
 	/**
 	 * Sync all subscribed Brunch authors
 	 */
-	async syncSubscribedAuthors(): Promise<void> {
-		const subscriptions = this.settings.brunchSettings?.subscribedBrunchAuthors || [];
-		if (subscriptions.length === 0) return;
+	async syncSubscribedAuthors(options?: SyncOptions): Promise<SyncResult> {
+		const silent = options?.silent ?? false;
+		const result: SyncResult = { newPosts: 0, errors: 0 };
 
-		const syncNotice = new Notice('Syncing subscribed Brunch authors...', 0);
-		let totalNewPosts = 0;
-		let totalErrors = 0;
+		const subscriptions = this.settings.brunchSettings?.subscribedBrunchAuthors || [];
+		if (subscriptions.length === 0) return result;
+
+		let syncNotice: Notice | null = null;
+		if (!silent) {
+			syncNotice = new Notice('Syncing subscribed Brunch authors...', 0);
+		}
+
 		const totalAuthors = subscriptions.length;
 
 		try {
 			for (let i = 0; i < subscriptions.length; i++) {
 				const subscription = subscriptions[i];
-				const authorProgress = `(${i + 1}/${totalAuthors})`;
 
 				try {
-					new Notice(`Syncing Brunch ${authorProgress}: @${subscription.authorUsername} (${subscription.postCount} posts)`, 5000);
-					const posts = await this.fetchBrunchPosts(subscription.authorUsername, subscription.postCount);
+					if (!silent) {
+						const authorProgress = `(${i + 1}/${totalAuthors})`;
+						new Notice(`Syncing Brunch ${authorProgress}: @${subscription.authorUsername} (${subscription.postCount} posts)`, 5000);
+					}
+
+					const posts = await this.fetchBrunchPosts(subscription.authorUsername, subscription.postCount, { silent });
 
 					for (let j = 0; j < posts.length; j++) {
 						const post = posts[j];
-						const postProgress = `${authorProgress} post (${j + 1}/${posts.length})`;
 
 						try {
-							new Notice(`Creating ${postProgress}: ${post.title}`, 3000);
+							if (!silent) {
+								const postProgress = `(${i + 1}/${totalAuthors}) post (${j + 1}/${posts.length})`;
+								new Notice(`Creating ${postProgress}: ${post.title}`, 3000);
+							}
 							await this.createMarkdownFile(post);
-							totalNewPosts++;
+							result.newPosts++;
 						} catch {
-							totalErrors++;
+							result.errors++;
 						}
 						await new Promise(resolve => setTimeout(resolve, 500));
 					}
@@ -182,20 +221,26 @@ export class BrunchService {
 					}
 
 				} catch {
-					totalErrors++;
+					result.errors++;
 				}
 
 				// Add delay between authors
 				await new Promise(resolve => setTimeout(resolve, 1000));
 			}
 		} finally {
-			syncNotice.hide();
-			if (totalNewPosts > 0 || totalErrors > 0) {
-				new Notice(`Brunch sync completed: ${totalNewPosts} posts imported, ${totalErrors} errors`, 5000);
-			} else {
-				new Notice('Brunch sync completed: no new posts found', 5000);
+			if (syncNotice) {
+				syncNotice.hide();
+			}
+			if (!silent) {
+				if (result.newPosts > 0 || result.errors > 0) {
+					new Notice(`Brunch sync completed: ${result.newPosts} posts imported, ${result.errors} errors`, 5000);
+				} else {
+					new Notice('Brunch sync completed: no new posts found', 5000);
+				}
 			}
 		}
+
+		return result;
 	}
 
 	/**
