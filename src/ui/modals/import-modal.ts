@@ -100,9 +100,9 @@ export class NaverBlogImportModal extends Modal {
 				detectionDiv.addClass('naver-import-platform-badge--valid');
 			}
 
-			// Show options for bulk brunch imports (author or keyword pages)
-			const showOptions = detection.type === 'brunch' &&
-				(detection.message.includes('all posts') || detection.message.includes('(all posts)'));
+			// Show options for bulk imports (Naver blog bulk or Brunch author/keyword pages)
+			const showOptions = detection.type === 'bulk' ||
+				(detection.type === 'brunch' && (detection.message.includes('all posts') || detection.message.includes('(all posts)')));
 			optionsContainer.style.display = showOptions ? 'block' : 'none';
 		};
 
@@ -422,7 +422,7 @@ export class NaverBlogImportModal extends Modal {
 				// e.g., https://blog.naver.com/iluvssang/
 				const blogId = extractBlogIdFromUrl(inputValue);
 				if (blogId) {
-					await this.importAllPosts(blogId);
+					await this.importAllPosts(blogId, maxPosts, shouldSubscribe);
 				} else {
 					new Notice('Invalid Naver Blog URL format');
 				}
@@ -431,7 +431,7 @@ export class NaverBlogImportModal extends Modal {
 			// Bulk import - treat as blog ID
 			const blogId = inputValue.replace(/[^a-zA-Z0-9_-]/g, '');
 			if (blogId) {
-				await this.importAllPosts(blogId);
+				await this.importAllPosts(blogId, maxPosts, shouldSubscribe);
 			} else {
 				new Notice('Invalid blog ID');
 			}
@@ -552,7 +552,7 @@ export class NaverBlogImportModal extends Modal {
 		}
 	}
 
-	async importAllPosts(blogId: string) {
+	async importAllPosts(blogId: string, maxPosts?: number, shouldSubscribe?: boolean) {
 		let importCancelled = false;
 		const cancelNotice = new Notice("Click here to cancel import", 0);
 		// @ts-ignore - accessing private messageEl property
@@ -566,9 +566,10 @@ export class NaverBlogImportModal extends Modal {
 		}
 
 		try {
-			new Notice(`Fetching posts from ${blogId}...`);
+			const limitText = maxPosts ? ` (max ${maxPosts})` : '';
+			new Notice(`Fetching posts from ${blogId}${limitText}...`);
 
-			const posts = await this.plugin.fetchNaverBlogPosts(blogId);
+			const posts = await this.plugin.fetchNaverBlogPosts(blogId, maxPosts);
 
 			if (posts.length === 0) {
 				cancelNotice.hide();
@@ -625,6 +626,29 @@ export class NaverBlogImportModal extends Modal {
 			else if (errorCount > 0) summary += ' ⚠️';
 
 			new Notice(summary, 8000);
+
+			// Add to subscriptions if requested
+			if (shouldSubscribe && !importCancelled && successCount > 0) {
+				const existing = this.plugin.settings.subscribedBlogs.includes(blogId);
+				if (!existing) {
+					// Fetch profile info for rich metadata
+					new Notice(`Fetching blog profile...`, 2000);
+					const profile = await NaverBlogFetcher.fetchProfileInfoStatic(blogId);
+
+					this.plugin.settings.subscribedBlogs.push(blogId);
+					this.plugin.settings.blogSubscriptions.push({
+						id: `naver-${blogId}-${Date.now()}`,
+						blogId: blogId,
+						blogName: profile.nickname,
+						profileImageUrl: profile.profileImageUrl,
+						bio: profile.bio,
+						postCount: maxPosts || 10,
+						createdAt: new Date().toISOString()
+					});
+					await this.plugin.saveSettings();
+					new Notice(`Added ${profile.nickname} (${blogId}) to subscriptions`, 3000);
+				}
+			}
 
 			// Open the last created file after import completes
 			if (lastCreatedFile && !importCancelled) {
