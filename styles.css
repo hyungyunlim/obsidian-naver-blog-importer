@@ -275,6 +275,15 @@
     border-top: 1px solid var(--background-modifier-border);
 }
 
+/* Card layout meta section */
+.naver-subscription-card > .naver-subscription-meta {
+    margin-top: 10px;
+    padding: 6px 0;
+    font-size: 10px;
+    color: var(--text-faint);
+    background: none;
+}
+
 /* Brunch Subscription Card Styles */
 .brunch-subscription-card {
     margin-bottom: 12px;
@@ -465,7 +474,7 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
 }
 
 .naver-author-name-row {
@@ -489,7 +498,9 @@
 .naver-author-bio {
     font-size: 11px;
     color: var(--text-muted);
-    line-height: 1.4;
+    line-height: 1.5;
+    word-break: break-word;
+    padding-bottom: 2px;
 }
 
 .naver-subscription-controls {

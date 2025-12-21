@@ -644,10 +644,8 @@ export class NaverBlogImportModal extends Modal {
 			new Notice(summary, 8000);
 
 			// Add to subscriptions if requested (even if no new posts due to duplicates)
-			console.log('[Naver] shouldSubscribe:', shouldSubscribe, 'importCancelled:', importCancelled);
 			if (shouldSubscribe && !importCancelled) {
 				const existing = this.plugin.settings.subscribedBlogs.includes(blogId);
-				console.log('[Naver] existing:', existing, 'blogId:', blogId);
 				if (!existing) {
 					// Fetch profile info for rich metadata
 					new Notice(`Fetching blog profile...`, 2000);
