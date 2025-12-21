@@ -503,8 +503,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			if (subscription?.bio) {
 				infoDiv.createEl('div', {
 					text: subscription.bio,
-					cls: 'naver-author-bio',
-					attr: { title: subscription.bio }
+					cls: 'naver-author-bio'
 				});
 			}
 

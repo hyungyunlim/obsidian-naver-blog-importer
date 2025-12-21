@@ -332,7 +332,6 @@ export class NaverBlogImportModal extends Modal {
 		const maxPostsValue = this.postCountInput?.value;
 		const maxPosts = maxPostsValue ? parseInt(maxPostsValue, 10) : undefined;
 		const shouldSubscribe = this.shouldSubscribe;
-
 		// Normalize URL to handle mobile-specific encoding issues
 		inputValue = this.normalizeUrl(inputValue);
 
@@ -570,6 +569,26 @@ export class NaverBlogImportModal extends Modal {
 
 			if (posts.length === 0) {
 				cancelNotice.hide();
+				// Still allow subscription even if no posts
+				if (shouldSubscribe) {
+					const existing = this.plugin.settings.subscribedBlogs.includes(blogId);
+					if (!existing) {
+						new Notice(`Fetching blog profile...`, 2000);
+						const profile = await NaverBlogFetcher.fetchProfileInfoStatic(blogId);
+						this.plugin.settings.subscribedBlogs.push(blogId);
+						this.plugin.settings.blogSubscriptions.push({
+							id: `naver-${blogId}-${Date.now()}`,
+							blogId: blogId,
+							blogName: profile.nickname,
+							profileImageUrl: profile.profileImageUrl,
+							bio: profile.bio,
+							postCount: maxPosts || 10,
+							createdAt: new Date().toISOString()
+						});
+						await this.plugin.saveSettings();
+						new Notice(`Added ${profile.nickname} (${blogId}) to subscriptions`, 3000);
+					}
+				}
 				new Notice("No posts found or failed to fetch posts");
 				return;
 			}
@@ -625,8 +644,10 @@ export class NaverBlogImportModal extends Modal {
 			new Notice(summary, 8000);
 
 			// Add to subscriptions if requested (even if no new posts due to duplicates)
+			console.log('[Naver] shouldSubscribe:', shouldSubscribe, 'importCancelled:', importCancelled);
 			if (shouldSubscribe && !importCancelled) {
 				const existing = this.plugin.settings.subscribedBlogs.includes(blogId);
+				console.log('[Naver] existing:', existing, 'blogId:', blogId);
 				if (!existing) {
 					// Fetch profile info for rich metadata
 					new Notice(`Fetching blog profile...`, 2000);
