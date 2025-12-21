@@ -1972,7 +1972,17 @@ export class NaverBlogFetcher {
             let bio: string | undefined;
             const bioMatch = html.match(/<p[^>]*class="[^"]*caption[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*itemfont[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
             if (bioMatch) {
-                bio = bioMatch[1].replace(/<[^>]+>/g, '').trim();
+                bio = bioMatch[1]
+                    .replace(/<[^>]+>/g, '')      // Remove HTML tags
+                    .replace(/&nbsp;/g, ' ')      // Decode non-breaking spaces
+                    .replace(/&amp;/g, '&')       // Decode ampersands
+                    .replace(/&lt;/g, '<')        // Decode less than
+                    .replace(/&gt;/g, '>')        // Decode greater than
+                    .replace(/&quot;/g, '"')      // Decode quotes
+                    .replace(/&#39;/g, "'")       // Decode single quotes
+                    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))  // Decode numeric entities
+                    .replace(/\s+/g, ' ')         // Normalize multiple spaces to single space
+                    .trim();
                 if (bio.length === 0) bio = undefined;
             }
 
