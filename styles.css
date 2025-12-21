@@ -489,12 +489,18 @@
 .naver-author-bio {
     font-size: 11px;
     color: var(--text-muted);
-    line-height: 1.4;
+    line-height: 1.3;
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
+    cursor: help;
+}
+
+.naver-author-bio:hover {
+    -webkit-line-clamp: unset;
+    max-height: none;
 }
 
 .naver-subscription-controls {
