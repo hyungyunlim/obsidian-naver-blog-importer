@@ -77,7 +77,6 @@ export class BrunchFetcher {
 		const url = BRUNCH_POST_URL(this.username, postId);
 
 		try {
-			console.log('[Brunch] Fetching URL:', url);
 
 			// Use throw: false to handle redirects manually
 			const response = await requestUrl({
@@ -87,13 +86,10 @@ export class BrunchFetcher {
 				throw: false
 			});
 
-			console.log('[Brunch] Response status:', response.status);
-			console.log('[Brunch] Response headers:', response.headers);
 
 			// Handle redirect manually if needed
 			if (response.status >= 300 && response.status < 400) {
 				const redirectUrl = response.headers['location'];
-				console.log('[Brunch] Redirect to:', redirectUrl);
 				if (redirectUrl) {
 					const finalUrl = redirectUrl.startsWith('http') ? redirectUrl : `${BRUNCH_BASE_URL}${redirectUrl}`;
 					const redirectResponse = await requestUrl({
@@ -102,7 +98,6 @@ export class BrunchFetcher {
 						headers: BRUNCH_REQUEST_HEADERS,
 						throw: false
 					});
-					console.log('[Brunch] Redirect response status:', redirectResponse.status);
 					if (redirectResponse.status === 200) {
 						return this.parsePostContent(redirectResponse.text, finalUrl, postId);
 					}
@@ -114,12 +109,9 @@ export class BrunchFetcher {
 				throw new Error(`Failed to fetch post: HTTP ${response.status}`);
 			}
 
-			console.log('[Brunch] Content length:', response.text?.length);
 			// Debug: show first 500 chars of HTML
-			console.log('[Brunch] HTML preview:', response.text?.substring(0, 500));
 			return this.parsePostContent(response.text, url, postId);
 		} catch (error) {
-			console.error('[Brunch] Error:', error);
 			throw new Error(`Failed to fetch Brunch post ${postId}: ${error.message}`);
 		}
 	}
@@ -159,12 +151,10 @@ export class BrunchFetcher {
 		let lastTime: number | undefined = undefined;
 		let hasMore = true;
 
-		console.log(`[Brunch] Fetching post list for @${this.username} using API...`);
 
 		try {
 			while (hasMore) {
 				const apiUrl = BRUNCH_ARTICLE_LIST_API(this.username, lastTime);
-				console.log(`[Brunch] API request: ${apiUrl}`);
 
 				const response = await requestUrl({
 					url: apiUrl,
@@ -179,14 +169,12 @@ export class BrunchFetcher {
 
 				// Check if request was blocked or failed
 				if (response.status !== 200) {
-					console.log(`[Brunch] API request failed with status ${response.status}`);
 					throw new Error(`API request failed: ${response.status}`);
 				}
 
 				const data = JSON.parse(response.text);
 
 				if (data.code !== 200 || !data.data?.list) {
-					console.log('[Brunch] API returned non-200 or empty list');
 					break;
 				}
 
@@ -210,7 +198,6 @@ export class BrunchFetcher {
 					}
 				}
 
-				console.log(`[Brunch] Fetched ${articles.length} articles, total: ${postIds.length}`);
 
 				// Check if we've reached maxPosts limit
 				if (maxPosts && postIds.length >= maxPosts) {
@@ -225,14 +212,11 @@ export class BrunchFetcher {
 			}
 
 		} catch (error) {
-			console.error('[Brunch] Failed to get post list from API:', error);
 
 			// Fallback to HTML parsing if API fails
-			console.log('[Brunch] Falling back to HTML parsing...');
 			return this.getPostListFromHtml(maxPosts);
 		}
 
-		console.log(`[Brunch] Total posts found: ${postIds.length}`);
 
 		// Sort by ID (descending - newest first)
 		postIds.sort((a, b) => parseInt(b) - parseInt(a));
@@ -282,7 +266,6 @@ export class BrunchFetcher {
 			}
 
 		} catch (error) {
-			console.error('[Brunch] Failed to get post list from HTML:', error);
 		}
 
 		// Sort by ID (descending - newest first)
@@ -339,31 +322,25 @@ export class BrunchFetcher {
 		const hasAstroIsland = html.includes('astro-island');
 		const hasWrapBody = html.includes('wrap_body');
 		const hasOgTitle = html.includes('og:title');
-		console.log(`[Brunch] Page check - astro-island: ${hasAstroIsland}, wrap_body: ${hasWrapBody}, og:title: ${hasOgTitle}`);
 
 		if (html.includes('서비스 접속이 원활하지 않습니다') || html.includes('wrap_exception')) {
-			console.error('[Brunch] Error page detected for:', url);
 			throw new Error('Brunch service temporarily unavailable');
 		}
 
 		// Check if page is empty CSR shell without content
 		if (!hasAstroIsland && !hasWrapBody && html.length < 30000) {
-			console.error('[Brunch] Empty CSR shell detected, HTML length:', html.length);
-			console.log('[Brunch] HTML sample (1000-1500):', html.substring(1000, 1500));
 			throw new Error('Empty page received - server may be blocking requests');
 		}
 
 		// Check for login redirect page (only if it's actually a login page, not just contains login link)
 		if (html.includes('accounts.kakao.com/login') ||
 			(html.includes('로그인이 필요합니다') && !hasAstroIsland)) {
-			console.error('[Brunch] Login redirect detected for:', url);
 			throw new Error('Login required - check cookie settings');
 		}
 
 		// Use legacy parsing when wrap_body exists (proven to work with images)
 		// Only fall back to Astro parsing when wrap_body is not available
 		const title = this.extractOgMeta($, 'og:title') || 'Untitled';
-		console.log(`[Brunch] Parsed title: "${title}" for ${url}`);
 		const description = this.extractOgMeta($, 'og:description') || '';
 		const thumbnail = this.extractOgMeta($, 'og:image');
 		const regDate = this.extractOgMeta($, 'og:regDate');
@@ -387,7 +364,6 @@ export class BrunchFetcher {
 		// Extract internal userId for API calls (e.g., for fetching comments)
 		const userId = this.extractUserId($);
 		if (userId) {
-			console.log(`[Brunch] Extracted userId: ${userId}`);
 		}
 
 		// Convert body to markdown (also extracts video IDs)
@@ -443,7 +419,6 @@ export class BrunchFetcher {
 			// Find the astro-island with article props
 			const propsMatch = html.match(/astro-island[^>]*props="([^"]+)"/);
 			if (!propsMatch) {
-				console.log('[Brunch] No astro-island props found');
 				return null;
 			}
 
@@ -458,7 +433,6 @@ export class BrunchFetcher {
 			// Props format: {"article":[0,{...}],"content":[0,"..."]}
 			const articleMatch = propsStr.match(/"article":\[0,(\{[^}]+(?:\{[^}]*\}[^}]*)*\})\]/);
 			if (!articleMatch) {
-				console.log('[Brunch] No article data in props');
 				return null;
 			}
 
@@ -476,7 +450,6 @@ export class BrunchFetcher {
 			// Find the content JSON string
 			const contentMatch = propsStr.match(/"content":\[0,"((?:[^"\\]|\\.)*)"\]/);
 			if (!contentMatch) {
-				console.log('[Brunch] No content in props');
 				return null;
 			}
 
@@ -492,7 +465,6 @@ export class BrunchFetcher {
 			try {
 				contentJson = JSON.parse(contentJsonStr);
 			} catch (e) {
-				console.error('[Brunch] Failed to parse content JSON:', e);
 				return null;
 			}
 
@@ -519,7 +491,6 @@ export class BrunchFetcher {
 				commentCount: commentCountMatch ? parseInt(commentCountMatch[1]) : undefined,
 			};
 		} catch (error) {
-			console.error('[Brunch] Error extracting Astro article data:', error);
 			return null;
 		}
 	}
@@ -697,7 +668,6 @@ export class BrunchFetcher {
 	private convertBodyToMarkdown($: CheerioAPI): { markdown: string; contentHtml: string; videoIds: string[] } {
 		const wrapBody = $(BRUNCH_SELECTORS.wrapBody);
 		const wrapItems = wrapBody.find(BRUNCH_SELECTORS.wrapItem);
-		console.log(`[Brunch] wrap_body found: ${wrapBody.length > 0}, wrap_item count: ${wrapItems.length}`);
 
 		const contentHtml = wrapBody.html() || '';
 		const lines: string[] = [];
@@ -1031,7 +1001,6 @@ export class BrunchFetcher {
 	async fetchComments(userId: string, articleNo: string): Promise<BrunchComment[]> {
 		try {
 			const apiUrl = BRUNCH_COMMENTS_API(userId, articleNo);
-			console.log(`[Brunch] Fetching comments from: ${apiUrl}`);
 
 			const response = await requestUrl({
 				url: apiUrl,
@@ -1045,23 +1014,19 @@ export class BrunchFetcher {
 			});
 
 			if (response.status !== 200) {
-				console.log(`[Brunch] Comments API failed: HTTP ${response.status}`);
 				return [];
 			}
 
 			const data = JSON.parse(response.text);
 
 			if (data.code !== 200 || !data.data?.list) {
-				console.log('[Brunch] Comments API returned non-200 or empty list');
 				return [];
 			}
 
 			const comments = this.parseComments(data.data.list);
-			console.log(`[Brunch] Fetched ${comments.length} comments (total count: ${data.data.totalCount})`);
 
 			return comments;
 		} catch (error) {
-			console.error('[Brunch] Failed to fetch comments:', error);
 			return [];
 		}
 	}
@@ -1133,7 +1098,6 @@ export class BrunchFetcher {
 	 */
 	async getKakaoVideoInfo(videoId: string, refererUrl: string): Promise<BrunchVideo | null> {
 		try {
-			console.log('[Brunch] Fetching Kakao video info for:', videoId);
 
 			// Step 1: Get auth token from readyNplay API
 			// Build URL without @ symbol which causes issues
@@ -1144,7 +1108,6 @@ export class BrunchFetcher {
 				`&fields=seekUrl,abrVideoLocationList&playerVersion=3.47.1&appVersion=143.0.0.0` +
 				`&startPosition=0&dteType=PC&continuousPlay=false&autoPlay=false&drmType=widevine`;
 
-			console.log('[Brunch] readyNplay URL:', readyPlayUrl);
 
 			const readyPlayResponse = await requestUrl({
 				url: readyPlayUrl,
@@ -1158,7 +1121,6 @@ export class BrunchFetcher {
 			});
 
 			if (readyPlayResponse.status !== 200) {
-				console.log('[Brunch] readyNplay API failed:', readyPlayResponse.status);
 				return null;
 			}
 
@@ -1166,7 +1128,6 @@ export class BrunchFetcher {
 			const token = readyPlayData?.kampLocation?.token;
 
 			if (!token) {
-				console.log('[Brunch] No auth token in readyNplay response');
 				return null;
 			}
 
@@ -1197,7 +1158,6 @@ export class BrunchFetcher {
 			});
 
 			if (kampResponse.status !== 200) {
-				console.log('[Brunch] kamp API failed:', kampResponse.status);
 				return null;
 			}
 
@@ -1205,7 +1165,6 @@ export class BrunchFetcher {
 
 			// Check if DRM protected
 			if (kampData.is_drm) {
-				console.log('[Brunch] Video is DRM protected, cannot download');
 				return {
 					url: `https://play-tv.kakao.com/embed/player/cliplink/${videoId}@my`,
 					type: 'kakaoTV',
@@ -1230,7 +1189,6 @@ export class BrunchFetcher {
 			const highProfile = profiles.find((p: { name: string }) => p.name === 'HIGH');
 			const duration = highProfile?.duration || kampData.duration;
 
-			console.log('[Brunch] Found MP4 stream:', mp4Stream?.name, mp4Stream?.profile);
 
 			return {
 				url: `https://play-tv.kakao.com/embed/player/cliplink/${videoId}@my`,
@@ -1243,7 +1201,6 @@ export class BrunchFetcher {
 			};
 
 		} catch (error) {
-			console.error('[Brunch] Failed to get Kakao video info:', error);
 			return null;
 		}
 	}
@@ -1409,7 +1366,6 @@ export class BrunchFetcher {
 		const apiUrl = `https://api.brunch.co.kr/v1/profile/@${cleanUsername}`;
 
 		try {
-			console.log('[Brunch] Fetching author profile from API:', apiUrl);
 
 			const response = await requestUrl({
 				url: apiUrl,
@@ -1447,7 +1403,6 @@ export class BrunchFetcher {
 						profileImageUrl = 'https:' + profileImageUrl;
 					}
 
-					console.log(`[Brunch] API profile result: name="${profile.userName}", title="${authorTitle || 'none'}", desc="${authorDescription || 'none'}", subscribers=${profile.followerCount || 0}`);
 
 					return {
 						username: cleanUsername,
@@ -1461,11 +1416,9 @@ export class BrunchFetcher {
 			}
 
 			// Fallback to HTML parsing if API fails
-			console.log('[Brunch] API failed, falling back to HTML parsing');
 			return this.fetchAuthorProfileFromHtml(cleanUsername);
 
 		} catch (error) {
-			console.error('[Brunch] Failed to fetch author profile from API:', error);
 			return this.fetchAuthorProfileFromHtml(cleanUsername);
 		}
 	}
@@ -1477,7 +1430,6 @@ export class BrunchFetcher {
 		const url = BRUNCH_AUTHOR_URL(username);
 
 		try {
-			console.log('[Brunch] Fetching author profile from HTML:', url);
 
 			const response = await requestUrl({
 				url: url,
@@ -1526,7 +1478,6 @@ export class BrunchFetcher {
 				}
 			}
 
-			console.log(`[Brunch] HTML profile result: name="${authorName}", title="${authorTitle || 'none'}", desc="${authorDescription || 'none'}"`);
 
 			return {
 				username,
@@ -1537,7 +1488,6 @@ export class BrunchFetcher {
 				subscriberCount: undefined // Not available in HTML
 			};
 		} catch (error) {
-			console.error('[Brunch] Failed to fetch author profile from HTML:', error);
 			return { username, authorName: username };
 		}
 	}
@@ -1553,9 +1503,7 @@ export class BrunchKeywordFetcher {
 
 	constructor(keyword: string) {
 		// Decode if URL-encoded, replace underscores with spaces
-		console.log(`[Brunch Keyword] Constructor input: "${keyword}"`);
 		this.keyword = decodeURIComponent(keyword).replace(/_/g, ' ');
-		console.log(`[Brunch Keyword] Decoded keyword: "${this.keyword}"`);
 	}
 
 	/**
@@ -1568,8 +1516,6 @@ export class BrunchKeywordFetcher {
 
 		const keywordForUrl = this.keyword.replace(/ /g, '_');
 		const url = BRUNCH_KEYWORD_URL(keywordForUrl);
-		console.log(`[Brunch Keyword] Keyword: "${this.keyword}" -> "${keywordForUrl}"`);
-		console.log(`[Brunch Keyword] Fetching keyword page: ${url}`);
 
 		try {
 			const response = await requestUrl({
@@ -1585,7 +1531,6 @@ export class BrunchKeywordFetcher {
 			const inputMatch = html.match(/id=["']keywordParam["'][^>]*value=["'](\d+)["']/);
 			if (inputMatch) {
 				this.groupId = inputMatch[1];
-				console.log(`[Brunch Keyword] Found groupId from input: ${this.groupId}`);
 				return this.groupId;
 			}
 
@@ -1593,7 +1538,6 @@ export class BrunchKeywordFetcher {
 			const inputMatch2 = html.match(/keywordParam["']\s+value=["'](\d+)["']/);
 			if (inputMatch2) {
 				this.groupId = inputMatch2[1];
-				console.log(`[Brunch Keyword] Found groupId from input (alt): ${this.groupId}`);
 				return this.groupId;
 			}
 
@@ -1602,13 +1546,11 @@ export class BrunchKeywordFetcher {
 			const paramMatch = html.match(/keywordParam['":\s]+['"](\d+)['"]/);
 			if (paramMatch) {
 				this.groupId = paramMatch[1];
-				console.log(`[Brunch Keyword] Found groupId from JS: ${this.groupId}`);
 				return this.groupId;
 			}
 
 			throw new Error('Could not find groupId in keyword page');
 		} catch (error) {
-			console.error('[Brunch Keyword] Failed to fetch groupId:', error);
 			throw error;
 		}
 	}
@@ -1624,12 +1566,10 @@ export class BrunchKeywordFetcher {
 		let pickContentId: string | undefined = undefined;
 		let hasMore = true;
 
-		console.log(`[Brunch Keyword] Fetching articles for keyword "${this.keyword}" (groupId: ${groupId})`);
 
 		try {
 			while (hasMore) {
 				const apiUrl = BRUNCH_KEYWORD_API(groupId, publishTime, pickContentId);
-				console.log(`[Brunch Keyword] API request: ${apiUrl}`);
 
 				const response = await requestUrl({
 					url: apiUrl,
@@ -1643,14 +1583,12 @@ export class BrunchKeywordFetcher {
 				});
 
 				if (response.status !== 200) {
-					console.log(`[Brunch Keyword] API request failed with status ${response.status}`);
 					break;
 				}
 
 				const data = JSON.parse(response.text);
 
 				if (data.code !== 200 || !data.data?.articleList) {
-					console.log('[Brunch Keyword] API returned non-200 or empty list');
 					break;
 				}
 
@@ -1678,7 +1616,6 @@ export class BrunchKeywordFetcher {
 					}
 				}
 
-				console.log(`[Brunch Keyword] Fetched ${articleList.length} articles, total: ${articles.length}`);
 
 				// Check if we've reached maxPosts limit
 				if (maxPosts && articles.length >= maxPosts) {
@@ -1697,10 +1634,8 @@ export class BrunchKeywordFetcher {
 				}
 			}
 		} catch (error) {
-			console.error('[Brunch Keyword] Failed to fetch article list:', error);
 		}
 
-		console.log(`[Brunch Keyword] Total articles found: ${articles.length}`);
 		return maxPosts ? articles.slice(0, maxPosts) : articles;
 	}
 
@@ -1712,7 +1647,6 @@ export class BrunchKeywordFetcher {
 		const posts: ProcessedBrunchPost[] = [];
 		const total = articles.length;
 
-		console.log(`[Brunch Keyword] Fetching ${total} posts...`);
 
 		for (let i = 0; i < articles.length; i++) {
 			const article = articles[i];
@@ -1732,7 +1666,6 @@ export class BrunchKeywordFetcher {
 					await this.delay(BRUNCH_RATE_LIMITS.requestDelay);
 				}
 			} catch (error) {
-				console.error(`[Brunch Keyword] Failed to fetch post @${article.userId}/${article.articleNo}:`, error);
 			}
 		}
 
@@ -1776,7 +1709,6 @@ export class BrunchBookFetcher {
 
 	constructor(bookId: string) {
 		this.bookId = bookId;
-		console.log(`[Brunch Book] Constructor: bookId="${bookId}"`);
 	}
 
 	/**
@@ -1790,7 +1722,6 @@ export class BrunchBookFetcher {
 		totalCount: number;
 	}> {
 		const url = BRUNCH_BOOK_URL(this.bookId);
-		console.log(`[Brunch Book] Fetching book page: ${url}`);
 
 		try {
 			const response = await requestUrl({
@@ -1805,7 +1736,6 @@ export class BrunchBookFetcher {
 			}
 
 			const html = response.text;
-			console.log('[Brunch Book] HTML length:', html.length);
 
 			const $ = cheerio.load(html);
 
@@ -1818,7 +1748,6 @@ export class BrunchBookFetcher {
 			// Extract magazineId from data-tiara-id attribute
 			const magazineIdMatch = html.match(/data-tiara-id="(\d+)"/);
 			const magazineId = magazineIdMatch?.[1];
-			console.log('[Brunch Book] MagazineId from data-tiara-id:', magazineId);
 
 			// Extract profileId from data-tiara-category_id attribute
 			// Format: data-tiara-category_id="@profileId"
@@ -1826,7 +1755,6 @@ export class BrunchBookFetcher {
 			const tiaraCategoryMatch = html.match(/data-tiara-category_id="@([^"]+)"/);
 			if (tiaraCategoryMatch) {
 				authorProfileId = tiaraCategoryMatch[1];
-				console.log('[Brunch Book] Found profileId from data-tiara-category_id:', authorProfileId);
 			}
 
 			// Fallback - look for /@profileId links in the page
@@ -1834,17 +1762,14 @@ export class BrunchBookFetcher {
 				const profileLinkMatch = html.match(/href="\/@([a-zA-Z0-9_]+)"/);
 				if (profileLinkMatch && profileLinkMatch[1] !== 'brunch') {
 					authorProfileId = profileLinkMatch[1];
-					console.log('[Brunch Book] Found profileId from link:', authorProfileId);
 				}
 			}
 
 			if (!authorProfileId) {
-				console.error('[Brunch Book] Could not find author profileId');
 				throw new Error('Could not find author profileId in book page');
 			}
 
 			if (!magazineId) {
-				console.error('[Brunch Book] Could not find magazineId');
 				throw new Error('Could not find magazineId in book page');
 			}
 
@@ -1853,7 +1778,6 @@ export class BrunchBookFetcher {
 			// Fetch article list from magazine API
 			const articles = await this.fetchArticlesFromApi(magazineId, authorProfileId);
 
-			console.log(`[Brunch Book] Found ${articles.length} articles in book "${bookTitle}" by @${authorProfileId}`);
 
 			return {
 				articles,
@@ -1862,7 +1786,6 @@ export class BrunchBookFetcher {
 				totalCount: articles.length,
 			};
 		} catch (error) {
-			console.error('[Brunch Book] Failed to fetch book page:', error);
 			throw error;
 		}
 	}
@@ -1875,7 +1798,6 @@ export class BrunchBookFetcher {
 		profileId: string
 	): Promise<Array<{ userId: string; articleNo: string; profileId: string; title: string }>> {
 		const apiUrl = BRUNCH_MAGAZINE_ARTICLES_API(magazineId);
-		console.log(`[Brunch Book] Fetching articles from API: ${apiUrl}`);
 
 		try {
 			const response = await requestUrl({
@@ -1906,10 +1828,8 @@ export class BrunchBookFetcher {
 				title: item.article.title || '',
 			}));
 
-			console.log(`[Brunch Book] API returned ${articles.length} articles`);
 			return articles;
 		} catch (error) {
-			console.error('[Brunch Book] Failed to fetch articles from API:', error);
 			throw error;
 		}
 	}
@@ -1930,7 +1850,6 @@ export class BrunchBookFetcher {
 		const posts: ProcessedBrunchPost[] = [];
 		const limit = maxPosts ? Math.min(maxPosts, articles.length) : articles.length;
 
-		console.log(`[Brunch Book] Fetching ${limit} posts from "${bookTitle}"...`);
 
 		for (let i = 0; i < limit; i++) {
 			const article = articles[i];
@@ -1959,7 +1878,6 @@ export class BrunchBookFetcher {
 					await this.delay(BRUNCH_RATE_LIMITS.requestDelay);
 				}
 			} catch (error) {
-				console.error(`[Brunch Book] Failed to fetch post @${article.profileId}/${article.articleNo}:`, error);
 			}
 		}
 

@@ -621,16 +621,13 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const shouldDownloadComments = this.settings.brunchSettings?.downloadBrunchComments ?? true;
 			if (shouldDownloadComments && post.userId && post.commentCount && post.commentCount > 0) {
 				try {
-					console.log(`[Brunch] Fetching comments for @${post.username}/${post.postId}...`);
 					const fetcher = new BrunchFetcher(post.username);
 					const comments = await fetcher.fetchComments(post.userId, post.postId);
 					if (comments.length > 0) {
 						const commentsMarkdown = convertBrunchCommentsToMarkdown(comments);
 						processedContent += commentsMarkdown;
-						console.log(`[Brunch] Added ${comments.length} comments to markdown`);
 					}
 				} catch (error) {
-					console.error('[Brunch] Failed to fetch comments:', error);
 					// Continue without comments
 				}
 			}
@@ -742,13 +739,11 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 		for (let i = 0; i < videos.length; i++) {
 			const video = videos[i];
 			if (!video.mp4Url || !video.videoId) {
-				console.log('[Brunch] No MP4 URL for video:', video.videoId);
 				continue;
 			}
 
 			try {
 				new Notice(`Downloading video ${i + 1}/${videos.length}...`, 3000);
-				console.log('[Brunch] Downloading video from:', video.mp4Url);
 
 				// Download the video file with proper headers
 				const response = await requestUrl({
@@ -786,11 +781,9 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 						`![Video](${localVideoPath})`
 					);
 
-					console.log('[Brunch] Downloaded video:', filename);
 					new Notice(`Downloaded video: ${filename}`, 2000);
 				}
 			} catch (error) {
-				console.error('[Brunch] Failed to download video:', error);
 				// Keep original video link on failure
 			}
 		}
