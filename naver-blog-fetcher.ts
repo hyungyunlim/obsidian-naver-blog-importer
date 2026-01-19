@@ -23,6 +23,7 @@ interface BlogComponent {
 		code?: string;
 		link?: string;
 		type?: string;
+		vid?: string;
 		[key: string]: unknown;
 	};
 }
@@ -115,8 +116,7 @@ export class NaverBlogFetcher {
 
             // Fetch content for each post
             const postsWithContent: NaverBlogPost[] = [];
-            const totalPosts = posts.length;
-            
+
             for (let i = 0; i < posts.length; i++) {
                 const post = posts[i];
 

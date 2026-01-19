@@ -233,7 +233,7 @@ export class VideoService {
 				const filename = `${articleId}_${videoCount}_${title}_${bestQuality.name}.${extension}`;
 
 				// Download video
-				const videoPath = await this.downloadVideo(
+				await this.downloadVideo(
 					bestQuality.source,
 					filename,
 					customVideoFolder

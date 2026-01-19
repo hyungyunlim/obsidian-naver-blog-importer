@@ -83,7 +83,7 @@ export default class NaverBlogPlugin extends Plugin {
 		});
 
 		// Add ribbon icon
-		this.addRibbonIcon('download', 'Import Naver Blog', (evt: MouseEvent) => {
+		this.addRibbonIcon('download', 'Import Naver blog', (evt: MouseEvent) => {
 			new NaverBlogImportModal(this.app, this).open();
 		});
 

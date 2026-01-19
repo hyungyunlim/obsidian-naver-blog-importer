@@ -69,6 +69,14 @@
     margin-bottom: 16px;
 }
 
+.naver-import-options-container.is-hidden {
+    display: none;
+}
+
+.naver-import-post-count-input {
+    width: 80px;
+}
+
 .naver-import-options-container .setting-item {
     border-top: none;
     padding: 8px 0;

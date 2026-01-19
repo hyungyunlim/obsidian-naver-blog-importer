@@ -3,7 +3,7 @@ import { NaverBlogFetcher } from '../../../naver-blog-fetcher';
 import { BrunchFetcher, BrunchKeywordFetcher, BrunchBookFetcher } from '../../../brunch-fetcher';
 import { NaverCafeFetcher } from '../../fetchers/naver-cafe-fetcher';
 import { NaverNewsFetcher } from '../../fetchers/naver-news-fetcher';
-import { UI_DEFAULTS, NOTICE_TIMEOUTS, parseCafeUrl, BRUNCH_URL_PATTERNS } from '../../constants';
+import { UI_DEFAULTS, NOTICE_TIMEOUTS, parseCafeUrl } from '../../constants';
 import { isNaverBlogUrl, parseNaverBlogUrl, extractBlogIdFromUrl } from '../../utils/url-utils';
 import type NaverBlogPlugin from '../../../main';
 import type { ProcessedCafePost } from '../../types';
@@ -44,8 +44,7 @@ export class NaverBlogImportModal extends Modal {
 		const detectionDiv = inputContainer.createDiv({ cls: 'naver-import-platform-badge' });
 
 		// Options container (shown for bulk imports like Brunch author/keyword)
-		const optionsContainer = contentEl.createDiv({ cls: 'naver-import-options-container' });
-		optionsContainer.style.display = 'none';
+		const optionsContainer = contentEl.createDiv({ cls: 'naver-import-options-container is-hidden' });
 
 		// Post count setting item
 		const postCountItem = optionsContainer.createDiv({ cls: 'setting-item' });
@@ -55,9 +54,9 @@ export class NaverBlogImportModal extends Modal {
 		const postCountControl = postCountItem.createDiv({ cls: 'setting-item-control' });
 		this.postCountInput = postCountControl.createEl('input', {
 			type: 'number',
-			placeholder: 'All'
+			placeholder: 'All',
+			cls: 'naver-import-post-count-input'
 		});
-		this.postCountInput.style.width = '80px';
 		this.postCountInput.min = '1';
 		this.postCountInput.max = '1000';
 
@@ -76,7 +75,7 @@ export class NaverBlogImportModal extends Modal {
 			const value = input.value.trim();
 			if (!value) {
 				detectionDiv.empty();
-				optionsContainer.style.display = 'none';
+				optionsContainer.addClass('is-hidden');
 				return;
 			}
 
@@ -100,7 +99,11 @@ export class NaverBlogImportModal extends Modal {
 			// Show options for bulk imports (Naver blog bulk or Brunch author/keyword pages)
 			const showOptions = detection.type === 'bulk' ||
 				(detection.type === 'brunch' && (detection.message.includes('all posts') || detection.message.includes('(all posts)')));
-			optionsContainer.style.display = showOptions ? 'block' : 'none';
+			if (showOptions) {
+				optionsContainer.removeClass('is-hidden');
+			} else {
+				optionsContainer.addClass('is-hidden');
+			}
 		};
 
 		input.addEventListener('input', updateDetection);

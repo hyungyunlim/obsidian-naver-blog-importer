@@ -20,9 +20,6 @@ import {
 } from './src/constants/brunch-endpoints';
 
 // Kakao TV API endpoints
-// Note: Using %40 instead of @ to avoid URL parsing issues in Obsidian's requestUrl
-const KAKAO_TV_READY_PLAY_URL = (videoId: string) =>
-	`https://play-tv.kakao.com/katz/v4/ft/cliplink/${videoId}%40my/readyNplay`;
 const KAKAO_KAMP_VOD_URL = (videoId: string) =>
 	`https://kamp.kakao.com/vod/v1/src/${videoId}`;
 
@@ -265,7 +262,8 @@ export class BrunchFetcher {
 				}
 			}
 
-		} catch (error) {
+		} catch {
+			// RSS parsing failed, continue with already collected post IDs
 		}
 
 		// Sort by ID (descending - newest first)
@@ -321,7 +319,6 @@ export class BrunchFetcher {
 		// Check for error page or empty shell (CSR page without content)
 		const hasAstroIsland = html.includes('astro-island');
 		const hasWrapBody = html.includes('wrap_body');
-		const hasOgTitle = html.includes('og:title');
 
 		if (html.includes('서비스 접속이 원활하지 않습니다') || html.includes('wrap_exception')) {
 			throw new Error('Brunch service temporarily unavailable');
@@ -341,7 +338,6 @@ export class BrunchFetcher {
 		// Use legacy parsing when wrap_body exists (proven to work with images)
 		// Only fall back to Astro parsing when wrap_body is not available
 		const title = this.extractOgMeta($, 'og:title') || 'Untitled';
-		const description = this.extractOgMeta($, 'og:description') || '';
 		const thumbnail = this.extractOgMeta($, 'og:image');
 		const regDate = this.extractOgMeta($, 'og:regDate');
 		const authorName = this.extractOgMeta($, 'og:article:author') || this.username;
@@ -363,8 +359,6 @@ export class BrunchFetcher {
 
 		// Extract internal userId for API calls (e.g., for fetching comments)
 		const userId = this.extractUserId($);
-		if (userId) {
-		}
 
 		// Convert body to markdown (also extracts video IDs)
 		const { markdown, contentHtml, videoIds } = this.convertBodyToMarkdown($);
@@ -667,7 +661,6 @@ export class BrunchFetcher {
 	 */
 	private convertBodyToMarkdown($: CheerioAPI): { markdown: string; contentHtml: string; videoIds: string[] } {
 		const wrapBody = $(BRUNCH_SELECTORS.wrapBody);
-		const wrapItems = wrapBody.find(BRUNCH_SELECTORS.wrapItem);
 
 		const contentHtml = wrapBody.html() || '';
 		const lines: string[] = [];
@@ -882,7 +875,6 @@ export class BrunchFetcher {
 		// Extract original URL from daumcdn thumbnail if needed
 		const fnameMatch = url.match(BRUNCH_IMAGE_PATTERNS.fnameParam);
 		if (fnameMatch) {
-			const originalUrl = decodeURIComponent(fnameMatch[1]);
 			// Use high-res version instead of original
 			return url.replace(BRUNCH_IMAGE_PATTERNS.thumbSize, BRUNCH_IMAGE_PATTERNS.highResFormat);
 		}
@@ -1517,42 +1509,38 @@ export class BrunchKeywordFetcher {
 		const keywordForUrl = this.keyword.replace(/ /g, '_');
 		const url = BRUNCH_KEYWORD_URL(keywordForUrl);
 
-		try {
-			const response = await requestUrl({
-				url: url,
-				method: 'GET',
-				headers: BRUNCH_REQUEST_HEADERS,
-			});
+		const response = await requestUrl({
+			url: url,
+			method: 'GET',
+			headers: BRUNCH_REQUEST_HEADERS,
+		});
 
-			const html = response.text;
+		const html = response.text;
 
-			// Method 1: Look for hidden input with id="keywordParam"
-			// Pattern: <input ... id="keywordParam" value="38">
-			const inputMatch = html.match(/id=["']keywordParam["'][^>]*value=["'](\d+)["']/);
-			if (inputMatch) {
-				this.groupId = inputMatch[1];
-				return this.groupId;
-			}
-
-			// Method 2: Alternative input pattern (value before id)
-			const inputMatch2 = html.match(/keywordParam["']\s+value=["'](\d+)["']/);
-			if (inputMatch2) {
-				this.groupId = inputMatch2[1];
-				return this.groupId;
-			}
-
-			// Method 3: JavaScript variable pattern
-			// Pattern: keywordParam: "38" or keywordParam:"38"
-			const paramMatch = html.match(/keywordParam['":\s]+['"](\d+)['"]/);
-			if (paramMatch) {
-				this.groupId = paramMatch[1];
-				return this.groupId;
-			}
-
-			throw new Error('Could not find groupId in keyword page');
-		} catch (error) {
-			throw error;
+		// Method 1: Look for hidden input with id="keywordParam"
+		// Pattern: <input ... id="keywordParam" value="38">
+		const inputMatch = html.match(/id=["']keywordParam["'][^>]*value=["'](\d+)["']/);
+		if (inputMatch) {
+			this.groupId = inputMatch[1];
+			return this.groupId;
 		}
+
+		// Method 2: Alternative input pattern (value before id)
+		const inputMatch2 = html.match(/keywordParam["']\s+value=["'](\d+)["']/);
+		if (inputMatch2) {
+			this.groupId = inputMatch2[1];
+			return this.groupId;
+		}
+
+		// Method 3: JavaScript variable pattern
+		// Pattern: keywordParam: "38" or keywordParam:"38"
+		const paramMatch = html.match(/keywordParam['":\s]+['"](\d+)['"]/);
+		if (paramMatch) {
+			this.groupId = paramMatch[1];
+			return this.groupId;
+		}
+
+		throw new Error('Could not find groupId in keyword page');
 	}
 
 	/**
@@ -1633,7 +1621,8 @@ export class BrunchKeywordFetcher {
 					await this.delay(500);
 				}
 			}
-		} catch (error) {
+		} catch {
+			// API request failed, return collected articles so far
 		}
 
 		return maxPosts ? articles.slice(0, maxPosts) : articles;
@@ -1665,7 +1654,8 @@ export class BrunchKeywordFetcher {
 				if (i < articles.length - 1) {
 					await this.delay(BRUNCH_RATE_LIMITS.requestDelay);
 				}
-			} catch (error) {
+			} catch {
+				// Failed to fetch individual post, skip and continue
 			}
 		}
 
@@ -1723,71 +1713,66 @@ export class BrunchBookFetcher {
 	}> {
 		const url = BRUNCH_BOOK_URL(this.bookId);
 
-		try {
-			const response = await requestUrl({
-				url: url,
-				method: 'GET',
-				headers: BRUNCH_REQUEST_HEADERS,
-				throw: false
-			});
+		const response = await requestUrl({
+			url: url,
+			method: 'GET',
+			headers: BRUNCH_REQUEST_HEADERS,
+			throw: false
+		});
 
-			if (response.status !== 200) {
-				throw new Error(`Failed to fetch book page: HTTP ${response.status}`);
-			}
-
-			const html = response.text;
-
-			const $ = cheerio.load(html);
-
-			// Extract book title from og:title
-			let bookTitle = $('meta[property="og:title"]').attr('content') || this.bookId;
-			// Remove prefix like "[연재 브런치북] "
-			bookTitle = bookTitle.replace(/^\[.*?\]\s*/, '').trim();
-			this.bookTitle = bookTitle;
-
-			// Extract magazineId from data-tiara-id attribute
-			const magazineIdMatch = html.match(/data-tiara-id="(\d+)"/);
-			const magazineId = magazineIdMatch?.[1];
-
-			// Extract profileId from data-tiara-category_id attribute
-			// Format: data-tiara-category_id="@profileId"
-			let authorProfileId: string | null = null;
-			const tiaraCategoryMatch = html.match(/data-tiara-category_id="@([^"]+)"/);
-			if (tiaraCategoryMatch) {
-				authorProfileId = tiaraCategoryMatch[1];
-			}
-
-			// Fallback - look for /@profileId links in the page
-			if (!authorProfileId) {
-				const profileLinkMatch = html.match(/href="\/@([a-zA-Z0-9_]+)"/);
-				if (profileLinkMatch && profileLinkMatch[1] !== 'brunch') {
-					authorProfileId = profileLinkMatch[1];
-				}
-			}
-
-			if (!authorProfileId) {
-				throw new Error('Could not find author profileId in book page');
-			}
-
-			if (!magazineId) {
-				throw new Error('Could not find magazineId in book page');
-			}
-
-			this.authorProfileId = authorProfileId;
-
-			// Fetch article list from magazine API
-			const articles = await this.fetchArticlesFromApi(magazineId, authorProfileId);
-
-
-			return {
-				articles,
-				bookTitle,
-				authorProfileId,
-				totalCount: articles.length,
-			};
-		} catch (error) {
-			throw error;
+		if (response.status !== 200) {
+			throw new Error(`Failed to fetch book page: HTTP ${response.status}`);
 		}
+
+		const html = response.text;
+
+		const $ = cheerio.load(html);
+
+		// Extract book title from og:title
+		let bookTitle = $('meta[property="og:title"]').attr('content') || this.bookId;
+		// Remove prefix like "[연재 브런치북] "
+		bookTitle = bookTitle.replace(/^\[.*?\]\s*/, '').trim();
+		this.bookTitle = bookTitle;
+
+		// Extract magazineId from data-tiara-id attribute
+		const magazineIdMatch = html.match(/data-tiara-id="(\d+)"/);
+		const magazineId = magazineIdMatch?.[1];
+
+		// Extract profileId from data-tiara-category_id attribute
+		// Format: data-tiara-category_id="@profileId"
+		let authorProfileId: string | null = null;
+		const tiaraCategoryMatch = html.match(/data-tiara-category_id="@([^"]+)"/);
+		if (tiaraCategoryMatch) {
+			authorProfileId = tiaraCategoryMatch[1];
+		}
+
+		// Fallback - look for /@profileId links in the page
+		if (!authorProfileId) {
+			const profileLinkMatch = html.match(/href="\/@([a-zA-Z0-9_]+)"/);
+			if (profileLinkMatch && profileLinkMatch[1] !== 'brunch') {
+				authorProfileId = profileLinkMatch[1];
+			}
+		}
+
+		if (!authorProfileId) {
+			throw new Error('Could not find author profileId in book page');
+		}
+
+		if (!magazineId) {
+			throw new Error('Could not find magazineId in book page');
+		}
+
+		this.authorProfileId = authorProfileId;
+
+		// Fetch article list from magazine API
+		const articles = await this.fetchArticlesFromApi(magazineId, authorProfileId);
+
+		return {
+			articles,
+			bookTitle,
+			authorProfileId,
+			totalCount: articles.length,
+		};
 	}
 
 	/**
@@ -1799,39 +1784,35 @@ export class BrunchBookFetcher {
 	): Promise<Array<{ userId: string; articleNo: string; profileId: string; title: string }>> {
 		const apiUrl = BRUNCH_MAGAZINE_ARTICLES_API(magazineId);
 
-		try {
-			const response = await requestUrl({
-				url: apiUrl,
-				method: 'GET',
-				headers: {
-					'Accept': '*/*',
-					'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-					'Cookie': 'b_s_a_l=1'
-				},
-				throw: false
-			});
+		const response = await requestUrl({
+			url: apiUrl,
+			method: 'GET',
+			headers: {
+				'Accept': '*/*',
+				'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+				'Cookie': 'b_s_a_l=1'
+			},
+			throw: false
+		});
 
-			if (response.status !== 200) {
-				throw new Error(`Magazine API failed: HTTP ${response.status}`);
-			}
-
-			const data = JSON.parse(response.text);
-
-			if (data.code !== 200 || !data.data?.list) {
-				throw new Error('Invalid API response');
-			}
-
-			const articles = data.data.list.map((item: { article: { no: number; userId: string; title: string } }) => ({
-				userId: item.article.userId,
-				articleNo: item.article.no.toString(),
-				profileId: profileId,
-				title: item.article.title || '',
-			}));
-
-			return articles;
-		} catch (error) {
-			throw error;
+		if (response.status !== 200) {
+			throw new Error(`Magazine API failed: HTTP ${response.status}`);
 		}
+
+		const data = JSON.parse(response.text);
+
+		if (data.code !== 200 || !data.data?.list) {
+			throw new Error('Invalid API response');
+		}
+
+		const articles = data.data.list.map((item: { article: { no: number; userId: string; title: string } }) => ({
+			userId: item.article.userId,
+			articleNo: item.article.no.toString(),
+			profileId: profileId,
+			title: item.article.title || '',
+		}));
+
+		return articles;
 	}
 
 	/**
@@ -1877,7 +1858,8 @@ export class BrunchBookFetcher {
 				if (i < limit - 1) {
 					await this.delay(BRUNCH_RATE_LIMITS.requestDelay);
 				}
-			} catch (error) {
+			} catch {
+				// Failed to fetch individual post, skip and continue
 			}
 		}
 
