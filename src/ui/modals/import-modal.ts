@@ -27,7 +27,7 @@ export class NaverBlogImportModal extends Modal {
 
 		// Title
 		contentEl.createEl('h2', {
-			text: 'Import from Naver / Brunch',
+			text: 'Import from Naver/Brunch',
 			cls: 'naver-import-modal-title'
 		});
 
@@ -351,7 +351,7 @@ export class NaverBlogImportModal extends Modal {
 				if (bookId) {
 					await this.importBrunchBook(bookId, maxPosts);
 				} else {
-					new Notice('Invalid Brunch book URL format');
+					new Notice('Invalid Brunch book URL format.');
 				}
 				return;
 			}
@@ -362,7 +362,7 @@ export class NaverBlogImportModal extends Modal {
 				if (keyword) {
 					await this.importBrunchKeyword(keyword, maxPosts);
 				} else {
-					new Notice('Invalid Brunch keyword URL format');
+					new Notice('Invalid Brunch keyword URL format.');
 				}
 				return;
 			}
@@ -376,7 +376,7 @@ export class NaverBlogImportModal extends Modal {
 				if (authorMatch) {
 					await this.importBrunchAuthor(authorMatch[1], maxPosts, shouldSubscribe);
 				} else {
-					new Notice('Invalid Brunch URL format');
+					new Notice('Invalid Brunch URL format.');
 				}
 			}
 			return;
@@ -389,7 +389,7 @@ export class NaverBlogImportModal extends Modal {
 				const [, oid, aid] = newsMatch;
 				await this.importNewsArticle(inputValue, oid, aid);
 			} else {
-				new Notice('Invalid Naver News URL. Please include the article ID.');
+				new Notice('Invalid Naver news URL. Please include the article ID.');
 			}
 			return;
 		}
@@ -405,7 +405,7 @@ export class NaverBlogImportModal extends Modal {
 					new Notice('Could not extract cafe identifier from URL');
 				}
 			} else {
-				new Notice('Invalid Naver Cafe URL. Please include the article ID.');
+				new Notice('Invalid Naver cafe URL. Please include the article ID.');
 			}
 			return;
 		}
@@ -423,7 +423,7 @@ export class NaverBlogImportModal extends Modal {
 				if (blogId) {
 					await this.importAllPosts(blogId, maxPosts, shouldSubscribe);
 				} else {
-					new Notice('Invalid Naver Blog URL format');
+					new Notice('Invalid Naver blog URL format.');
 				}
 			}
 		} else {
@@ -491,7 +491,7 @@ export class NaverBlogImportModal extends Modal {
 
 	async importNewsArticle(url: string, oid: string, aid: string) {
 		try {
-			new Notice(`📰 Importing news article...`, NOTICE_TIMEOUTS.short);
+			new Notice('Importing news article...', NOTICE_TIMEOUTS.short);
 
 			const newsSettings = this.plugin.settings.newsSettings;
 			if (!newsSettings) {
@@ -688,7 +688,7 @@ export class NaverBlogImportModal extends Modal {
 			const post = await fetcher.fetchSinglePost(postId);
 
 			if (!post) {
-				new Notice('Failed to fetch Brunch post', NOTICE_TIMEOUTS.medium);
+				new Notice('Failed to fetch Brunch post.', NOTICE_TIMEOUTS.medium);
 				return;
 			}
 

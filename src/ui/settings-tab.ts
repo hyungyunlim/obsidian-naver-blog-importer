@@ -82,7 +82,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					.setName(this.plugin.i18n.t('settings.openai_api_key'))
 					.setDesc(this.plugin.i18n.t('settings.openai_api_key_desc'))
 					.addText(text => text
-						.setPlaceholder('sk-...')
+						.setPlaceholder('Enter API key')
 						.setValue(this.plugin.settings.openaiApiKey)
 						.onChange(async (value) => {
 							this.plugin.settings.openaiApiKey = value;
@@ -96,7 +96,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					.setName(this.plugin.i18n.t('settings.anthropic_api_key'))
 					.setDesc(this.plugin.i18n.t('settings.anthropic_api_key_desc'))
 					.addText(text => text
-						.setPlaceholder('sk-ant-...')
+						.setPlaceholder('Enter API key')
 						.setValue(this.plugin.settings.anthropicApiKey)
 						.onChange(async (value) => {
 							this.plugin.settings.anthropicApiKey = value;
@@ -110,7 +110,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					.setName(this.plugin.i18n.t('settings.google_api_key'))
 					.setDesc(this.plugin.i18n.t('settings.google_api_key_desc'))
 					.addText(text => text
-						.setPlaceholder('AIza...')
+						.setPlaceholder('Enter API key')
 						.setValue(this.plugin.settings.googleApiKey)
 						.onChange(async (value) => {
 							this.plugin.settings.googleApiKey = value;
@@ -124,7 +124,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					.setName(this.plugin.i18n.t('settings.ollama_endpoint'))
 					.setDesc(this.plugin.i18n.t('settings.ollama_endpoint_desc'))
 					.addText(text => text
-						.setPlaceholder('http://localhost:11434')
+						.setPlaceholder('Enter endpoint URL')
 						.setValue(this.plugin.settings.ollamaEndpoint)
 						.onChange(async (value) => {
 							this.plugin.settings.ollamaEndpoint = value;
@@ -368,9 +368,9 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		// NID_AUT input
 		new Setting(containerEl)
 			.setName('NID_AUT')
-			.setDesc('Copy the NID_AUT cookie value')
+			.setDesc('Copy the NID_AUT cookie value.')
 			.addText(text => text
-				.setPlaceholder('Paste NID_AUT value')
+				.setPlaceholder('Paste cookie value')
 				.setValue(this.plugin.settings.cafeSettings?.nidAut || '')
 				.onChange(async (value) => {
 					const cafeSettings = this.ensureCafeSettings();
@@ -384,9 +384,9 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		// NID_SES input
 		new Setting(containerEl)
 			.setName('NID_SES')
-			.setDesc('Copy the NID_SES cookie value')
+			.setDesc('Copy the NID_SES cookie value.')
 			.addText(text => text
-				.setPlaceholder('Paste NID_SES value')
+				.setPlaceholder('Paste cookie value')
 				.setValue(this.plugin.settings.cafeSettings?.nidSes || '')
 				.onChange(async (value) => {
 					const cafeSettings = this.ensureCafeSettings();
