@@ -152,10 +152,8 @@ export class AIProviderUtils {
 				return 'https://generativelanguage.googleapis.com/v1beta';
 			case 'ollama':
 				return ollamaEndpoint || 'http://localhost:11434';
-			default: {
-				const unsupportedProvider: string = provider;
-				throw new Error(`Unsupported AI provider: ${unsupportedProvider}`);
-			}
+			default:
+				throw new Error(`Unsupported AI provider: ${String(provider)}`)
 		}
 	}
 }
