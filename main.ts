@@ -83,7 +83,7 @@ export default class NaverBlogPlugin extends Plugin {
 		});
 
 		// Add ribbon icon
-		this.addRibbonIcon('download', 'Import from Naver', (evt: MouseEvent) => {
+		this.addRibbonIcon('download', 'Import blog posts', (evt: MouseEvent) => {
 			new NaverBlogImportModal(this.app, this).open();
 		});
 
@@ -917,11 +917,11 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			
 			// Provide specific error messages
 			if (error.message.includes('401')) {
-				new Notice('Invalid OpenAI API key.', 8000);
+				new Notice('Invalid API key', 8000);
 				new Notice('Please check your API key in plugin settings', NOTICE_TIMEOUTS.medium);
 			} else if (error.message.includes('quota')) {
-				new Notice('OpenAI API quota exceeded.', 8000);
-				new Notice('Please check your OpenAI billing settings.', NOTICE_TIMEOUTS.medium);
+				new Notice('API quota exceeded', 8000);
+				new Notice('Please check your billing settings', NOTICE_TIMEOUTS.medium);
 			} else if (error.message.includes('network')) {
 				new Notice('Network error - please check your connection', NOTICE_TIMEOUTS.medium);
 			} else {

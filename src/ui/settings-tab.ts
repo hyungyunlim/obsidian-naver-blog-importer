@@ -368,7 +368,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		// NID_AUT input
 		new Setting(containerEl)
 			.setName('NID_AUT')
-			.setDesc('Copy the NID_AUT cookie value.')
+			.setDesc('Paste the cookie value from your browser')
 			.addText(text => text
 				.setPlaceholder('Paste cookie value')
 				.setValue(this.plugin.settings.cafeSettings?.nidAut || '')
@@ -384,7 +384,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		// NID_SES input
 		new Setting(containerEl)
 			.setName('NID_SES')
-			.setDesc('Copy the NID_SES cookie value.')
+			.setDesc('Paste the cookie value from your browser')
 			.addText(text => text
 				.setPlaceholder('Paste cookie value')
 				.setValue(this.plugin.settings.cafeSettings?.nidSes || '')

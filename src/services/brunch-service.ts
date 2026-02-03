@@ -27,7 +27,7 @@ export class BrunchService {
 
 		try {
 			if (!silent) {
-				fetchNotice = new Notice('Fetching Brunch posts', 0);
+				fetchNotice = new Notice('Fetching brunch posts', 0);
 			}
 
 			const fetcher = new BrunchFetcher(username);
@@ -181,7 +181,7 @@ export class BrunchService {
 
 		let syncNotice: Notice | null = null;
 		if (!silent) {
-			syncNotice = new Notice('Syncing subscribed Brunch authors', 0);
+			syncNotice = new Notice('Syncing subscribed brunch authors', 0);
 		}
 
 		const totalAuthors = subscriptions.length;
