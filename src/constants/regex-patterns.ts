@@ -13,7 +13,7 @@ export const IMAGE_PATTERNS = {
 
 // URL parsing patterns
 export const URL_PATTERNS = {
-	naverBlogPost: /https?:\/\/(?:m\.)?blog\.naver\.com\/([^/]+)\/(\d+)/,
+	naverBlogPost: new RegExp('https?://(?:m\\.)?blog\\.naver\\.com/([^/]+)/(\\d+)'),
 	naverMobileBlog: /m\.blog\.naver\.com/,
 	naverDesktopBlog: /blog\.naver\.com/
 } as const;

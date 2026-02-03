@@ -122,7 +122,7 @@ export default class NaverBlogPlugin extends Plugin {
 					try {
 						// This will validate API key internally
 						this.aiService.getModelName();
-					} catch (error) {
+					} catch {
 						new Notice(this.i18n.t('notices.api_key_required', { provider: this.settings.aiProvider.toUpperCase() }), 8000);
 						new Notice(this.i18n.t('notices.set_api_key'), NOTICE_TIMEOUTS.medium);
 						return;
@@ -511,7 +511,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			new Notice(`Created: ${filename}`);
 			return createdFile;
-		} catch (error) {
+		} catch {
 			new Notice(`Failed to create file for: ${post.title}`);
 			return null;
 		}
@@ -597,7 +597,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			new Notice(`Created: ${filename}`);
 			return createdFile;
-		} catch (error) {
+		} catch {
 			new Notice(`Failed to create file for: ${post.title}`);
 			return null;
 		}
@@ -682,7 +682,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 						const commentsMarkdown = convertBrunchCommentsToMarkdown(comments);
 						processedContent += commentsMarkdown;
 					}
-				} catch (error) {
+				} catch {
 					// Continue without comments
 				}
 			}
@@ -718,7 +718,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			new Notice(`Created: ${filename}`);
 			return createdFile;
-		} catch (error) {
+		} catch {
 			new Notice(`Failed to create file for: ${post.title}`);
 			return null;
 		}
@@ -838,7 +838,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 					new Notice(`Downloaded video: ${filename}`, 2000);
 				}
-			} catch (error) {
+			} catch {
 				// Keep original video link on failure
 			}
 		}

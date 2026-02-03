@@ -108,15 +108,15 @@ export class ImageService {
 						
 						// Save image
 						const imagePath = normalizePath(`${attachmentsFolder}/${filename}`);
-							await this.app.vault.createBinary(imagePath, response.arrayBuffer);
-							
-							// Verify file was saved
-							const fileExists = this.app.vault.getAbstractFileByPath(imagePath);
-							// File saved successfully
-							
-							if (!fileExists) {
-								throw new Error('File was not saved properly');
-							}
+						await this.app.vault.createBinary(imagePath, response.arrayBuffer);
+						
+						// Verify file was saved
+						const fileExists = this.app.vault.getAbstractFileByPath(imagePath);
+						// File saved successfully
+						
+						if (!fileExists) {
+							throw new Error('File was not saved properly');
+						}
 						
 						// Update content with local path (relative to notes folder)
 						const relativePath = this.calculateRelativePath(customNotesFolder, customImageFolder);

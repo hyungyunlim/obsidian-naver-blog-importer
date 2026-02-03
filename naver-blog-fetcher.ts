@@ -1796,14 +1796,13 @@ export class NaverBlogFetcher {
         const parentComponent = $el.closest('.se-component');
         if (parentComponent.length > 0) {
             // Look for data attributes in parent component
-            const dataAttrs = (parentComponent[0] as unknown as { attribs?: Record<string, unknown> })?.attribs;
-            if (dataAttrs) {
-                for (let i = 0; i < dataAttrs.length; i++) {
-                    const attr = dataAttrs[i] as { name: string; value: string };
-                    if (attr.name.includes('data-') && attr.value.includes('https://postfiles.pstatic.net')) {
+            const allAttrs = parentComponent.attr();
+            if (allAttrs) {
+                for (const [attrName, attrValue] of Object.entries(allAttrs)) {
+                    if (attrName.includes('data-') && typeof attrValue === 'string' && attrValue.includes('https://postfiles.pstatic.net')) {
                         try {
                             // Try to extract URL from JSON-like data attributes
-                            const matches = attr.value.match(/https:\/\/postfiles\.pstatic\.net[^"'\s}]+/g);
+                            const matches = attrValue.match(/https:\/\/postfiles\.pstatic\.net[^"'\s}]+/g);
                             if (matches && matches.length > 0) {
                                 // Find the largest/original image URL (usually without size params or with longer path)
                                 const originalUrl = matches.reduce((best: string, current: string) => {
