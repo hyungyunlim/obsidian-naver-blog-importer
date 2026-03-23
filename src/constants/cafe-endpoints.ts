@@ -110,3 +110,21 @@ export const parseCafeUrl = (url: string): { cafeUrl?: string; cafeId?: string; 
 
 	return null;
 };
+
+/** Base URL for cafe article API */
+export const CAFE_ARTICLE_API_BASE =
+	'https://apis.naver.com/cafe-web/cafe-articleapi/v2.1/cafes';
+
+/**
+ * Builds the cafe article API URL with optional art token for member-only articles.
+ */
+export const buildCafeArticleApiUrl = (
+	cafeId: string,
+	articleId: string,
+	artToken?: string
+): string => {
+	const base = `${CAFE_ARTICLE_API_BASE}/${cafeId}/articles/${articleId}`;
+	return artToken
+		? `${base}?art=${encodeURIComponent(artToken)}`
+		: base;
+};

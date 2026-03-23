@@ -5,6 +5,7 @@ import { NaverCafeFetcher } from '../../fetchers/naver-cafe-fetcher';
 import { NaverNewsFetcher } from '../../fetchers/naver-news-fetcher';
 import { UI_DEFAULTS, NOTICE_TIMEOUTS, parseCafeUrl } from '../../constants';
 import { isNaverBlogUrl, parseNaverBlogUrl, extractBlogIdFromUrl } from '../../utils/url-utils';
+import { isNaverShortUrl, expandNaverShortUrl, extractArtToken } from '../../utils/url-expander';
 import type NaverBlogPlugin from '../../../main';
 import type { ProcessedCafePost } from '../../types';
 
@@ -70,6 +71,9 @@ export class NaverBlogImportModal extends Modal {
 					this.shouldSubscribe = value;
 				}));
 
+		// Cache for resolved short URLs to avoid redundant network calls
+		let shortUrlCache: { original: string; resolved: string } | null = null;
+
 		// Update detection status on input
 		const updateDetection = () => {
 			const value = input.value.trim();
@@ -79,31 +83,33 @@ export class NaverBlogImportModal extends Modal {
 				return;
 			}
 
-			const detection = this.detectInputType(value);
-			detectionDiv.empty();
-
-			const icon = detection.type === 'single' ? '📄' :
-						 detection.type === 'bulk' ? '📚' :
-						 detection.type === 'cafe' ? '☕' :
-						 detection.type === 'news' ? '📰' :
-						 detection.type === 'brunch' ? '🥐' : '⚠️';
-			detectionDiv.setText(`${icon} ${detection.message}`);
-			detectionDiv.removeClass('naver-import-platform-badge--error');
-			detectionDiv.removeClass('naver-import-platform-badge--valid');
-			if (detection.type === 'invalid') {
-				detectionDiv.addClass('naver-import-platform-badge--error');
-			} else {
+			// If it's a short URL, expand asynchronously then re-detect
+			if (isNaverShortUrl(value)) {
+				// Check cache first
+				if (shortUrlCache && shortUrlCache.original === value) {
+					const detection = this.detectInputType(shortUrlCache.resolved);
+					this.applyDetectionBadge(detectionDiv, detection, optionsContainer);
+					return;
+				}
+				detectionDiv.empty();
+				detectionDiv.setText('🔗 Resolving short URL...');
+				detectionDiv.removeClass('naver-import-platform-badge--error');
 				detectionDiv.addClass('naver-import-platform-badge--valid');
+				optionsContainer.addClass('is-hidden');
+
+				void expandNaverShortUrl(value).then((resolved) => {
+					// Only update if input hasn't changed
+					if (input.value.trim() === value) {
+						shortUrlCache = { original: value, resolved };
+						const detection = this.detectInputType(resolved);
+						this.applyDetectionBadge(detectionDiv, detection, optionsContainer);
+					}
+				});
+				return;
 			}
 
-			// Show options for bulk imports (Naver blog bulk or Brunch author/keyword pages)
-			const showOptions = detection.type === 'bulk' ||
-				(detection.type === 'brunch' && (detection.message.includes('all posts') || detection.message.includes('(all posts)')));
-			if (showOptions) {
-				optionsContainer.removeClass('is-hidden');
-			} else {
-				optionsContainer.addClass('is-hidden');
-			}
+			const detection = this.detectInputType(value);
+			this.applyDetectionBadge(detectionDiv, detection, optionsContainer);
 		};
 
 		input.addEventListener('input', updateDetection);
@@ -136,7 +142,7 @@ export class NaverBlogImportModal extends Modal {
 			input.focus();
 
 			navigator.clipboard.readText().then((clipboardText) => {
-				if (clipboardText && (isNaverBlogUrl(clipboardText) || this.isNaverCafeUrl(clipboardText) || this.isNaverNewsUrl(clipboardText) || this.isBrunchUrl(clipboardText))) {
+				if (clipboardText && (isNaverBlogUrl(clipboardText) || this.isNaverCafeUrl(clipboardText) || this.isNaverNewsUrl(clipboardText) || this.isBrunchUrl(clipboardText) || isNaverShortUrl(clipboardText))) {
 					input.value = clipboardText.trim();
 					input.select();
 					updateDetection();
@@ -222,11 +228,47 @@ export class NaverBlogImportModal extends Modal {
 		return normalized;
 	}
 
+	private applyDetectionBadge(
+		detectionDiv: HTMLDivElement,
+		detection: { type: string; message: string },
+		optionsContainer: HTMLDivElement
+	) {
+		detectionDiv.empty();
+
+		const icon = detection.type === 'single' ? '📄' :
+					 detection.type === 'bulk' ? '📚' :
+					 detection.type === 'cafe' ? '☕' :
+					 detection.type === 'news' ? '📰' :
+					 detection.type === 'brunch' ? '🥐' : '⚠️';
+		detectionDiv.setText(`${icon} ${detection.message}`);
+		detectionDiv.removeClass('naver-import-platform-badge--error');
+		detectionDiv.removeClass('naver-import-platform-badge--valid');
+		if (detection.type === 'invalid') {
+			detectionDiv.addClass('naver-import-platform-badge--error');
+		} else {
+			detectionDiv.addClass('naver-import-platform-badge--valid');
+		}
+
+		// Show options for bulk imports (Naver blog bulk or Brunch author/keyword pages)
+		const showOptions = detection.type === 'bulk' ||
+			(detection.type === 'brunch' && (detection.message.includes('all posts') || detection.message.includes('(all posts)')));
+		if (showOptions) {
+			optionsContainer.removeClass('is-hidden');
+		} else {
+			optionsContainer.addClass('is-hidden');
+		}
+	}
+
 	detectInputType(value: string): { type: 'single' | 'bulk' | 'cafe' | 'news' | 'brunch' | 'invalid'; message: string } {
 		// Normalize URL to handle mobile-specific encoding issues
 		value = this.normalizeUrl(value);
 		// Fix Brunch URL if @ is missing (mobile may strip @)
 		value = this.fixBrunchUrl(value);
+
+		// Short URLs that haven't been resolved yet should not fall through to blog ID detection
+		if (isNaverShortUrl(value)) {
+			return { type: 'invalid', message: 'Resolving short URL...' };
+		}
 
 		// Check for Brunch URL first
 		if (this.isBrunchUrl(value)) {
@@ -341,6 +383,20 @@ export class NaverBlogImportModal extends Modal {
 		// Fix Brunch URL if @ is missing (mobile may strip @)
 		inputValue = this.fixBrunchUrl(inputValue);
 
+		// Expand short URLs (naver.me, me2.do, han.gl)
+		if (isNaverShortUrl(inputValue)) {
+			const expanded = await expandNaverShortUrl(inputValue);
+			if (expanded === inputValue) {
+				// Expansion failed — notify user
+				new Notice('Could not resolve shortened URL. Please paste the full URL.', NOTICE_TIMEOUTS.medium);
+				return;
+			}
+			inputValue = expanded;
+		}
+
+		// Extract art token from resolved URL (for member-only cafe articles)
+		const artToken = extractArtToken(inputValue);
+
 		this.close();
 
 		// Check for Brunch URL first
@@ -400,7 +456,7 @@ export class NaverBlogImportModal extends Modal {
 			if (parsed && parsed.articleId) {
 				const cafeIdentifier = parsed.cafeUrl || parsed.cafeId;
 				if (cafeIdentifier) {
-					await this.importCafeArticle(cafeIdentifier, parsed.articleId);
+					await this.importCafeArticle(cafeIdentifier, parsed.articleId, artToken);
 				} else {
 					new Notice('Could not extract cafe identifier from URL');
 				}
@@ -437,19 +493,19 @@ export class NaverBlogImportModal extends Modal {
 		}
 	}
 
-	async importCafeArticle(cafeIdOrUrl: string, articleId: string) {
+	async importCafeArticle(cafeIdOrUrl: string, articleId: string, artToken?: string) {
 		try {
 			const cookie = this.plugin.settings.cafeSettings?.naverCookie || '';
 
-			// Warn if no cookie is set
-			if (!cookie) {
+			// Warn if no cookie is set (art token can bypass this for shared links)
+			if (!cookie && !artToken) {
 				new Notice('⚠️ 네이버 쿠키가 설정되지 않았습니다. 비공개 카페의 경우 가져오기가 실패할 수 있습니다.', NOTICE_TIMEOUTS.medium);
 			}
 
 			new Notice(`Importing cafe article...`, NOTICE_TIMEOUTS.short);
 
 			const fetcher = new NaverCafeFetcher(cafeIdOrUrl, cookie);
-			const article = await fetcher.fetchSingleArticle(articleId);
+			const article = await fetcher.fetchSingleArticle(articleId, true, artToken);
 
 			if (!article) {
 				new Notice('Failed to fetch cafe article', NOTICE_TIMEOUTS.medium);

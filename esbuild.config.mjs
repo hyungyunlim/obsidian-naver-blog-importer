@@ -1,6 +1,8 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { copyFileSync, existsSync, mkdirSync } from "fs";
+import { join } from "path";
 
 const banner =
 `/*
@@ -45,8 +47,28 @@ const context = await esbuild.context({
 	tsconfig: './tsconfig.json'
 });
 
+// Deploy built files to test vault
+const TEST_VAULT_PLUGIN_DIR = join(
+	process.env.HOME || "",
+	"vaults/test/.obsidian/plugins/naver-blog-importer"
+);
+
+function deployToTestVault() {
+	if (!existsSync(TEST_VAULT_PLUGIN_DIR)) {
+		mkdirSync(TEST_VAULT_PLUGIN_DIR, { recursive: true });
+	}
+	const files = ["main.js", "manifest.json", "styles.css"];
+	for (const file of files) {
+		if (existsSync(file)) {
+			copyFileSync(file, join(TEST_VAULT_PLUGIN_DIR, file));
+		}
+	}
+	console.log(`\x1b[32m✓ Deployed to ${TEST_VAULT_PLUGIN_DIR}\x1b[0m`);
+}
+
 if (prod) {
 	await context.rebuild();
+	deployToTestVault();
 	process.exit(0);
 } else {
 	await context.watch();

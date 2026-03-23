@@ -9,12 +9,11 @@ import {
 	buildCafeArticleDirectUrl,
 	buildCafeMobileArticleUrl,
 	buildCafeCommentListUrl,
+	buildCafeArticleApiUrl,
+	CAFE_ARTICLE_API_BASE,
 	parseCafeUrl,
 	CAFE_BASE_URL,
 } from '../constants';
-
-// Naver Cafe Article API endpoint
-const CAFE_ARTICLE_API = 'https://apis.naver.com/cafe-web/cafe-articleapi/v2.1/cafes';
 
 export class NaverCafeFetcher {
 	private cafeId: string;
@@ -104,14 +103,14 @@ export class NaverCafeFetcher {
 	/**
 	 * Fetch a single article by articleId
 	 */
-	async fetchSingleArticle(articleId: string, includeComments = true): Promise<CafeArticleDetail> {
+	async fetchSingleArticle(articleId: string, includeComments = true, artToken?: string): Promise<CafeArticleDetail> {
 		try {
 			// First, resolve the cafeId
 			const cafeId = await this.resolveCafeId();
 
 			// Try the article API first with native https (best method for cookie support)
 			try {
-				const apiUrl = `${CAFE_ARTICLE_API}/${cafeId}/articles/${articleId}`;
+				const apiUrl = buildCafeArticleApiUrl(cafeId, articleId, artToken);
 				const response = await this.makeRequest(apiUrl, this.cookie || undefined);
 
 				// Check for authentication errors
