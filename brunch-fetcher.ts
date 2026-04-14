@@ -208,7 +208,7 @@ export class BrunchFetcher {
 				}
 			}
 
-		} catch (error) {
+		} catch {
 
 			// Fallback to HTML parsing if API fails
 			return this.getPostListFromHtml(maxPosts);
@@ -458,7 +458,7 @@ export class BrunchFetcher {
 			let contentJson;
 			try {
 				contentJson = JSON.parse(contentJsonStr);
-			} catch (e) {
+			} catch {
 				return null;
 			}
 
@@ -484,7 +484,7 @@ export class BrunchFetcher {
 				likeCount: likeCountMatch ? parseInt(likeCountMatch[1]) : undefined,
 				commentCount: commentCountMatch ? parseInt(commentCountMatch[1]) : undefined,
 			};
-		} catch (error) {
+		} catch {
 			return null;
 		}
 	}
@@ -1018,7 +1018,7 @@ export class BrunchFetcher {
 			const comments = this.parseComments(data.data.list);
 
 			return comments;
-		} catch (error) {
+		} catch {
 			return [];
 		}
 	}
@@ -1192,7 +1192,7 @@ export class BrunchFetcher {
 				profile: mp4Stream?.profile || 'HIGH',
 			};
 
-		} catch (error) {
+		} catch {
 			return null;
 		}
 	}
@@ -1410,7 +1410,7 @@ export class BrunchFetcher {
 			// Fallback to HTML parsing if API fails
 			return this.fetchAuthorProfileFromHtml(cleanUsername);
 
-		} catch (error) {
+		} catch {
 			return this.fetchAuthorProfileFromHtml(cleanUsername);
 		}
 	}
@@ -1479,7 +1479,7 @@ export class BrunchFetcher {
 				profileImageUrl,
 				subscriberCount: undefined // Not available in HTML
 			};
-		} catch (error) {
+		} catch {
 			return { username, authorName: username };
 		}
 	}

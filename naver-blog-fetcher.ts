@@ -178,7 +178,7 @@ export class NaverBlogFetcher {
             }
 
             return postsWithContent;
-        } catch (error) {
+        } catch {
             throw new Error(`Failed to fetch posts from blog: ${this.blogId}`);
         }
     }
@@ -445,14 +445,14 @@ export class NaverBlogFetcher {
                             return parsed;
                         }
                     }
-                } catch (error) {
+                } catch {
                     continue;
                 }
             }
 
             throw new Error(`All URL formats failed for logNo: ${logNo}`);
-        } catch (error) {
-            throw new Error(`Failed to fetch content: ${error.message}`);
+        } catch (error: unknown) {
+            throw new Error(`Failed to fetch content: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -1186,15 +1186,15 @@ export class NaverBlogFetcher {
                             const data = JSON.parse(jsonMatch[0]);
                             return this.extractContentFromComponents(data.components || []);
                         }
-                    } catch (error) {
+                    } catch {
                         // Continue to next script
                         continue;
                     }
                 }
             }
-            
+
             return '';
-        } catch (error) {
+        } catch {
             return '';
         }
     }
@@ -1527,7 +1527,7 @@ export class NaverBlogFetcher {
             }
 
             return '';
-        } catch (error) {
+        } catch {
             return '';
         }
     }
@@ -1544,7 +1544,7 @@ export class NaverBlogFetcher {
             }
             
             return date.toISOString().split('T')[0];
-        } catch (error) {
+        } catch {
             return new Date().toISOString().split('T')[0];
         }
     }
@@ -1599,7 +1599,7 @@ export class NaverBlogFetcher {
             }
             
             return existingContent;
-        } catch (error) {
+        } catch {
             return existingContent;
         }
     }

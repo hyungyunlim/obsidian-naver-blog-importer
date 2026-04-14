@@ -10,7 +10,6 @@ import {
 	buildCafeMobileArticleUrl,
 	buildCafeCommentListUrl,
 	buildCafeArticleApiUrl,
-	CAFE_ARTICLE_API_BASE,
 	parseCafeUrl,
 	CAFE_BASE_URL,
 } from '../constants';

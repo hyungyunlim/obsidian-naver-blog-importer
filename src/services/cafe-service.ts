@@ -179,13 +179,13 @@ export class CafeService {
 							try {
 								await this.createMarkdownFile(post);
 								totalNewPosts++;
-							} catch (error) {
+							} catch {
 								totalErrors++;
 							}
 							await new Promise(resolve => setTimeout(resolve, 500));
 						}
 					}
-				} catch (error) {
+				} catch {
 					totalErrors++;
 				}
 

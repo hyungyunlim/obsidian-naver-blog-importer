@@ -38,7 +38,7 @@ export class AIService {
 	async fetchModelsFromAPI(provider: 'openai' | 'anthropic' | 'google'): Promise<string[]> {
 		try {
 			return await APIClientFactory.fetchModels(this.settings, provider);
-		} catch (error) {
+		} catch {
 			return [];
 		}
 	}

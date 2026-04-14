@@ -1,4 +1,4 @@
-import { requestUrl, Platform } from 'obsidian';
+import { requestUrl } from 'obsidian';
 
 /** Known Naver shortener domains */
 export const NAVER_SHORT_DOMAINS = ['naver.me', 'me2.do', 'han.gl'] as const;
@@ -25,51 +25,6 @@ export function isNaverShortUrl(url: string): boolean {
 	} catch {
 		return false;
 	}
-}
-
-/**
- * Resolve a short URL by making a HEAD/GET request without following redirects,
- * using Node.js https module (available in Obsidian desktop via Electron).
- * Returns the Location header value or null.
- */
-function resolveRedirectWithNode(url: string): Promise<string | null> {
-	return new Promise((resolve) => {
-		try {
-			// eslint-disable-next-line @typescript-eslint/no-var-requires
-			const https = require('https') as typeof import('https');
-			const parsed = new URL(url);
-
-			const req = https.request(
-				{
-					hostname: parsed.hostname,
-					path: parsed.pathname + parsed.search,
-					method: 'HEAD',
-					headers: {
-						'User-Agent':
-							'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-					},
-				},
-				(res) => {
-					const location = res.headers['location'];
-					if (location) {
-						resolve(location);
-					} else {
-						resolve(null);
-					}
-					res.resume(); // Drain the response
-				}
-			);
-
-			req.on('error', () => resolve(null));
-			req.setTimeout(EXPANSION_TIMEOUT, () => {
-				req.destroy();
-				resolve(null);
-			});
-			req.end();
-		} catch {
-			resolve(null);
-		}
-	});
 }
 
 /** Patterns to extract the final URL from the response HTML after redirect */
@@ -131,9 +86,8 @@ async function resolveRedirectWithRequestUrl(url: string): Promise<string | null
  * Expands known Naver URL shortener domains to their final destination.
  * Returns the original URL unchanged if expansion fails or times out.
  *
- * On desktop (Electron): uses Node.js https to make a HEAD request without
- * following redirects, reading the Location header directly.
- * On mobile: falls back to requestUrl + HTML parsing.
+ * Uses Obsidian's requestUrl to follow the redirect and extract the final
+ * destination from the response URL, Location header, or HTML canonical/og:url.
  */
 export async function expandNaverShortUrl(url: string): Promise<string> {
 	if (!isNaverShortUrl(url)) return url;
@@ -145,9 +99,7 @@ export async function expandNaverShortUrl(url: string): Promise<string> {
 
 	try {
 		const result = await Promise.race([
-			Platform.isDesktop
-				? resolveRedirectWithNode(withProtocol)
-				: resolveRedirectWithRequestUrl(withProtocol),
+			resolveRedirectWithRequestUrl(withProtocol),
 			new Promise<null>((resolve) =>
 				setTimeout(() => resolve(null), EXPANSION_TIMEOUT)
 			),

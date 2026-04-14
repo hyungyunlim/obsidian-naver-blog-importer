@@ -92,7 +92,7 @@ export class NaverBlogImportModal extends Modal {
 					return;
 				}
 				detectionDiv.empty();
-				detectionDiv.setText('🔗 Resolving short URL...');
+				detectionDiv.setText('Resolving short URL...');
 				detectionDiv.removeClass('naver-import-platform-badge--error');
 				detectionDiv.addClass('naver-import-platform-badge--valid');
 				optionsContainer.addClass('is-hidden');
