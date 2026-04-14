@@ -452,7 +452,7 @@ export class NaverBlogFetcher {
 
             throw new Error(`All URL formats failed for logNo: ${logNo}`);
         } catch (error: unknown) {
-            throw new Error(`Failed to fetch content: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(`Failed to fetch content: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
     }
 
