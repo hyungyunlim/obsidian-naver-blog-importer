@@ -83,7 +83,7 @@ export default class NaverBlogPlugin extends Plugin {
 		});
 
 		// Add ribbon icon
-		this.addRibbonIcon('download', 'Import blog posts', (evt: MouseEvent) => {
+		this.addRibbonIcon('download', 'Import blog posts', (_evt: MouseEvent) => {
 			new NaverBlogImportModal(this.app, this).open();
 		});
 
@@ -156,7 +156,7 @@ export default class NaverBlogPlugin extends Plugin {
 		const hasBrunchSubscriptions = brunchSubscriptions.length > 0;
 
 		if (hasBlogSubscriptions || hasBrunchSubscriptions) {
-			setTimeout(() => void this.autoSyncAllSubscriptions(), UI_DELAYS.autoSync);
+			activeWindow.setTimeout((): void => void this.autoSyncAllSubscriptions(), UI_DELAYS.autoSync);
 		}
 
 		// Add settings tab

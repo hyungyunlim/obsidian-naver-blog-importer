@@ -138,7 +138,7 @@ export class NaverBlogImportModal extends Modal {
 		});
 
 		// Focus and auto-fill from clipboard
-		setTimeout(() => {
+		activeWindow.setTimeout(() => {
 			input.focus();
 
 			navigator.clipboard.readText().then((clipboardText) => {
@@ -545,7 +545,7 @@ export class NaverBlogImportModal extends Modal {
 		}
 	}
 
-	async importNewsArticle(url: string, oid: string, aid: string) {
+	async importNewsArticle(url: string, _oid: string, _aid: string) {
 		try {
 			new Notice('Importing news article...', NOTICE_TIMEOUTS.short);
 

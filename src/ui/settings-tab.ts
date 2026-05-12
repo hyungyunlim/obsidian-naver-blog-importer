@@ -356,7 +356,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			.setHeading();
 
 		// Cookie description
-		const cookieDesc = document.createDocumentFragment();
+		const cookieDesc = createFragment();
 		cookieDesc.appendText('For private/member-only cafes. ');
 		cookieDesc.createEl('br');
 		cookieDesc.appendText('Get from Chrome: F12 → Application → Cookies → naver.com');
@@ -815,17 +815,14 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 		let clearButton: HTMLElement | null = null;
 
 		// Create wrapper container for input with icons
-		const wrapper = document.createElement('div');
-		wrapper.className = 'naver-blog-search-wrapper';
+		const wrapper = createDiv({ cls: 'naver-blog-search-wrapper' });
 
 		// Insert wrapper before input and move input into it
 		inputEl.parentNode?.insertBefore(wrapper, inputEl);
 		wrapper.appendChild(inputEl);
 
 		// Create search icon
-		searchIcon = document.createElement('div');
-		searchIcon.textContent = '🔍';
-		searchIcon.className = 'naver-blog-search-icon';
+		searchIcon = createDiv({ cls: 'naver-blog-search-icon', text: '🔍' });
 		wrapper.appendChild(searchIcon);
 
 		// Add padding to input for search icon
@@ -839,9 +836,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 			}
 
 			if (inputEl.value.trim() && onClear) {
-				clearButton = document.createElement('div');
-				clearButton.textContent = '×';
-				clearButton.className = 'naver-blog-search-clear';
+				clearButton = createDiv({ cls: 'naver-blog-search-clear', text: '×' });
 
 				clearButton.addEventListener('click', (e) => {
 					e.preventDefault();
@@ -869,14 +864,11 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 			if (filteredFolders.length === 0) return;
 
-			dropdownEl = document.createElement('div');
-			dropdownEl.className = 'naver-blog-dropdown';
+			dropdownEl = createDiv({ cls: 'naver-blog-dropdown' });
 			dropdownEl.style.width = `${inputEl.offsetWidth}px`;
 
-			filteredFolders.forEach((folder, index) => {
-				const itemEl = document.createElement('div');
-				itemEl.className = 'naver-blog-dropdown-item';
-				itemEl.textContent = folder || '(Root)';
+			filteredFolders.forEach((folder) => {
+				const itemEl = createDiv({ cls: 'naver-blog-dropdown-item', text: folder || '(Root)' });
 
 				itemEl.addEventListener('click', () => {
 					onSelect(folder);
@@ -923,7 +915,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 		// Hide dropdown on blur (with delay to allow clicks)
 		inputEl.addEventListener('blur', () => {
-			setTimeout(() => {
+			activeWindow.setTimeout(() => {
 				hideDropdown();
 			}, 150);
 		});

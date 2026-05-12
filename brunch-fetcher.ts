@@ -677,10 +677,10 @@ export class BrunchFetcher {
 
 		wrapBody.find(BRUNCH_SELECTORS.wrapItem).each((_, item) => {
 			const $item = $(item);
-			const classList = [...(item as Element).attribs?.class?.split(' ') || []];
+			const classList = [...item.attribs?.class?.split(' ') || []];
 
 			if (classList.includes('item_type_text')) {
-				const tagName = (item as Element).tagName?.toLowerCase();
+				const tagName = item.tagName?.toLowerCase();
 
 				// Replace <br> tags with newlines before extracting text
 				$item.find('br').replaceWith('\n');

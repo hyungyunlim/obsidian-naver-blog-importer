@@ -733,7 +733,7 @@ export class NaverBlogFetcher {
      * Parse oembed component (YouTube, etc.) and extract link
      * Uses Obsidian's native embed syntax: ![title](url) for YouTube
      */
-    private parseOembedComponent($component: Cheerio<AnyNode>, $: CheerioAPI): string {
+    private parseOembedComponent($component: Cheerio<AnyNode>, _$: CheerioAPI): string {
         // Try to get data from script tag with data-module or data-module-v2
         const scriptEl = $component.find('script.__se_module_data, script[data-module]');
 
@@ -786,7 +786,7 @@ export class NaverBlogFetcher {
         return '[임베드 콘텐츠]\n';
     }
 
-    private extractTextFromElement(element: Cheerio<unknown>, $: CheerioAPI): string {
+    private extractTextFromElement(_element: Cheerio<unknown>, $: CheerioAPI): string {
         let content = '';
         
         // Use Python library approach: find .se-main-container first, then .se-component
@@ -1755,7 +1755,7 @@ export class NaverBlogFetcher {
         return true;
     }
 
-    private extractOriginalImageUrl($el: Cheerio<Element>, imgElement: Cheerio<Element>): string | null {
+    private extractOriginalImageUrl($el: Cheerio<Element>, _imgElement: Cheerio<Element>): string | null {
         // Try to extract original image URL from Naver blog's data-linkdata attribute
         const imageLink = $el.find('a.__se_image_link, a.se-module-image-link');
         

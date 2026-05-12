@@ -34,7 +34,7 @@ export class I18n {
 		
 		// Replace variables in the format {{variable}}
 		if (variables) {
-			return value.replace(/\{\{(\w+)\}\}/g, (match, varName) => {
+			return value.replace(/\{\{(\w+)\}\}/g, (match: string, varName: string) => {
 				return variables[varName] || match;
 			});
 		}

@@ -1091,7 +1091,7 @@ export class NaverCafeFetcher {
 						// Process all direct children in DOM order to maintain text flow
 						textModule.children().each((_, child) => {
 							const $child = $(child);
-							const tagName = (child as Element).tagName?.toLowerCase();
+							const tagName = child.tagName?.toLowerCase();
 
 							if (tagName === 'p') {
 								const paragraphText = $child.text().trim();
@@ -1379,7 +1379,7 @@ export class NaverCafeFetcher {
 			// Find all block-level elements and process them in order
 			$('body').find('p, img, div[style*="margin:30px"], .se-component-content, hr').each((_, el) => {
 				const $el = $(el);
-				const tagName = (el as Element).tagName?.toLowerCase();
+				const tagName = el.tagName?.toLowerCase();
 
 				// Skip if this element is inside another element we already processed
 				if ($el.parents('.se-component-content').length > 0 && tagName !== 'p' && tagName !== 'img') {
@@ -1430,8 +1430,8 @@ export class NaverCafeFetcher {
 	 */
 	private extractOriginalImageUrlFromElement(
 		$el: Cheerio<AnyNode>,
-		imgElement: Cheerio<AnyNode>,
-		$: CheerioAPI
+		_imgElement: Cheerio<AnyNode>,
+		_$: CheerioAPI
 	): string | null {
 		// Try to extract original image URL from Naver's data-linkdata attribute
 		const imageLink = $el.find('a.__se_image_link, a.se-module-image-link');
@@ -1470,7 +1470,7 @@ export class NaverCafeFetcher {
 	 * Parse oembed component (YouTube, etc.) and extract link
 	 * Uses Obsidian's native embed syntax: ![title](url) for YouTube
 	 */
-	private parseOembedComponent($component: Cheerio<AnyNode>, $: CheerioAPI): string {
+	private parseOembedComponent($component: Cheerio<AnyNode>, _$: CheerioAPI): string {
 		// Try to get data from script tag with data-module or data-module-v2
 		const scriptEl = $component.find('script.__se_module_data, script[data-module]');
 

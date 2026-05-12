@@ -46,7 +46,7 @@ export class NaverBlogSubscribeModal extends Modal {
 					void this.handleSubscribe();
 				}));
 
-		setTimeout(() => {
+		activeWindow.setTimeout(() => {
 			if (inputElement) {
 				inputElement.focus();
 			}
