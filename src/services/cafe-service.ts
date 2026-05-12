@@ -34,7 +34,8 @@ export class CafeService {
 			new Notice(`Cafe article imported: ${processedPost.title}`, 4000);
 			return processedPost;
 		} catch (error) {
-			new Notice(`Failed to import cafe article: ${error.message}`, 5000);
+			const msg = error instanceof Error ? error.message : String(error);
+			new Notice(`Failed to import cafe article: ${msg}`, 5000);
 			throw error;
 		}
 	}
@@ -125,7 +126,8 @@ export class CafeService {
 			if (fetchNotice) {
 				fetchNotice.hide();
 			}
-			new Notice(`Failed to fetch cafe articles: ${error.message}`, 5000);
+			const msg = error instanceof Error ? error.message : String(error);
+			new Notice(`Failed to fetch cafe articles: ${msg}`, 5000);
 			throw error;
 		}
 	}
@@ -214,11 +216,11 @@ export class CafeService {
 			for (const file of files) {
 				const cache = this.app.metadataCache.getFileCache(file);
 				if (cache?.frontmatter?.articleId) {
-					existingIds.add(cache.frontmatter.articleId);
+					existingIds.add(String(cache.frontmatter.articleId));
 				}
 				// Also check cafeArticleId for backwards compatibility
 				if (cache?.frontmatter?.cafeArticleId) {
-					existingIds.add(cache.frontmatter.cafeArticleId);
+					existingIds.add(String(cache.frontmatter.cafeArticleId));
 				}
 			}
 		} catch {

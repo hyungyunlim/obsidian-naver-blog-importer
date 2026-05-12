@@ -63,7 +63,8 @@ export class BrunchService {
 			}
 
 			if (!silent) {
-				new Notice(`Failed to fetch posts from @${username}: ${error.message}`, 5000);
+				const msg = error instanceof Error ? error.message : String(error);
+				new Notice(`Failed to fetch posts from @${username}: ${msg}`, 5000);
 			}
 			throw error;
 		}
@@ -103,7 +104,8 @@ export class BrunchService {
 			new Notice(`Brunch post imported: ${post.title}`, 4000);
 
 		} catch (error) {
-			new Notice(`Failed to import Brunch post: ${error.message}`, 5000);
+			const msg = error instanceof Error ? error.message : String(error);
+			new Notice(`Failed to import Brunch post: ${msg}`, 5000);
 			throw error;
 		}
 	}
@@ -119,7 +121,7 @@ export class BrunchService {
 				const cache = this.app.metadataCache.getFileCache(file);
 				// Check for Brunch-specific frontmatter
 				if (cache?.frontmatter?.platform === 'brunch' && cache?.frontmatter?.postId) {
-					existingPostIds.add(cache.frontmatter.postId);
+					existingPostIds.add(String(cache.frontmatter.postId));
 				}
 			}
 		} catch {
@@ -161,7 +163,8 @@ export class BrunchService {
 			}
 		} catch (error) {
 			if (!silent) {
-				new Notice(`Failed to sync @${subscription.authorUsername}: ${error.message}`, 5000);
+				const msg = error instanceof Error ? error.message : String(error);
+				new Notice(`Failed to sync @${subscription.authorUsername}: ${msg}`, 5000);
 			}
 			throw error;
 		}

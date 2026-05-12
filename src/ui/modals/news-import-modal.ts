@@ -175,7 +175,8 @@ export class NaverNewsImportModal extends Modal {
 						await this.app.vault.modify(file, content);
 					}
 				} catch (error) {
-					new Notice(`${this.plugin.i18n.t('modals.news_import.image_download_partial')}: ${error.message}`, NOTICE_TIMEOUTS.medium);
+					const message = error instanceof Error ? error.message : String(error);
+					new Notice(`${this.plugin.i18n.t('modals.news_import.image_download_partial')}: ${message}`, NOTICE_TIMEOUTS.medium);
 				}
 			}
 
@@ -187,7 +188,8 @@ export class NaverNewsImportModal extends Modal {
 				await this.openFile(file);
 			}
 		} catch (error) {
-			new Notice(`❌ ${this.plugin.i18n.t('modals.news_import.fetch_failed')}: ${error.message}`, NOTICE_TIMEOUTS.medium);
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(`❌ ${this.plugin.i18n.t('modals.news_import.fetch_failed')}: ${message}`, NOTICE_TIMEOUTS.medium);
 		}
 	}
 

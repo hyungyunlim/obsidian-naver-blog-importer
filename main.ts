@@ -66,7 +66,7 @@ export default class NaverBlogPlugin extends Plugin {
 		this.aiService = new AIService(this.settings);
 
 		// Initialize Blog service
-		this.blogService = new BlogService(this.app, this.settings, this.createMarkdownFile.bind(this));
+		this.blogService = new BlogService(this.app, this.settings, this.createMarkdownFile.bind(this) as (post: ProcessedBlogPost) => Promise<void>);
 
 		// Initialize Image service
 		this.imageService = new ImageService(this.app, this.settings);
@@ -75,7 +75,7 @@ export default class NaverBlogPlugin extends Plugin {
 		this.videoService = new VideoService(this.app, this.settings);
 
 		// Initialize Brunch service
-		this.brunchService = new BrunchService(this.app, this.settings, this.createBrunchMarkdownFile.bind(this));
+		this.brunchService = new BrunchService(this.app, this.settings, this.createBrunchMarkdownFile.bind(this) as (post: ProcessedBrunchPost) => Promise<void>);
 
 		// Fetch models from APIs in background
 		void this.refreshModels().catch(() => {
@@ -225,7 +225,7 @@ export default class NaverBlogPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		const loadedData = await this.loadData();
+		const loadedData = (await this.loadData()) as Partial<NaverBlogSettings> | null;
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
 		// Ensure cafeSettings exists with defaults
 		if (!this.settings.cafeSettings) {
@@ -377,8 +377,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 					cleanedText = cleanedText.replace(/```\n?/, '').replace(/\n?```$/, '');
 				}
 				
-				const tags = JSON.parse(cleanedText.trim());
-				return Array.isArray(tags) ? tags : [];
+				const tags: unknown = JSON.parse(cleanedText.trim());
+				return Array.isArray(tags) ? (tags as string[]) : [];
 			} catch {
 				// console.warn('Failed to parse tags as JSON:', content_text);
 				// Fallback parsing - extract array from text
@@ -387,8 +387,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 					try {
 						// Try to parse the matched content as JSON
 						const arrayContent = '[' + matches[1] + ']';
-						const tags = JSON.parse(arrayContent);
-						return Array.isArray(tags) ? tags : [];
+						const tags: unknown = JSON.parse(arrayContent);
+						return Array.isArray(tags) ? (tags as string[]) : [];
 					} catch {
 						// Manual parsing if JSON fails
 						return matches[1].split(',').map((tag: string) => tag.trim().replace(/["\n]/g, ''));
@@ -494,7 +494,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const filepath = normalizePath(`${folder}/${filename}`);
 
 			// Create frontmatter
-			const frontmatter = ContentUtils.createFrontmatter(post, this.imageService.sanitizeFilename.bind(this.imageService));
+			const frontmatter = ContentUtils.createFrontmatter(post, this.imageService.sanitizeFilename.bind(this.imageService) as (filename: string) => string);
 
 			// Create full content
 			const fullContent = `${frontmatter}\n${processedContent}`;
@@ -914,18 +914,19 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			new Notice('Layout and formatting fixed by AI', NOTICE_TIMEOUTS.medium);
 			
 		} catch (error) {
-			
+			const message = error instanceof Error ? error.message : String(error);
+
 			// Provide specific error messages
-			if (error.message.includes('401')) {
+			if (message.includes('401')) {
 				new Notice('Invalid API key', 8000);
 				new Notice('Please check your API key in plugin settings', NOTICE_TIMEOUTS.medium);
-			} else if (error.message.includes('quota')) {
+			} else if (message.includes('quota')) {
 				new Notice('API quota exceeded', 8000);
 				new Notice('Please check your billing settings', NOTICE_TIMEOUTS.medium);
-			} else if (error.message.includes('network')) {
+			} else if (message.includes('network')) {
 				new Notice('Network error - please check your connection', NOTICE_TIMEOUTS.medium);
 			} else {
-				new Notice(`AI formatting failed: ${error.message}`, 8000);
+				new Notice(`AI formatting failed: ${message}`, 8000);
 			}
 		}
 	}
@@ -1014,7 +1015,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			}
 
 		} catch (error) {
-			new Notice(this.i18n.t('notices.delete_failed', { error: error.message }), NOTICE_TIMEOUTS.medium);
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(this.i18n.t('notices.delete_failed', { error: message }), NOTICE_TIMEOUTS.medium);
 		}
 	}
 }

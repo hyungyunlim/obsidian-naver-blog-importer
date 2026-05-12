@@ -572,7 +572,8 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 					new Notice(`Synced ${successCount} posts from ${subscription?.blogName || blogId}`);
 				} catch (error) {
-					new Notice(`Failed to sync ${blogId}: ${error.message}`);
+					const message = error instanceof Error ? error.message : String(error);
+					new Notice(`Failed to sync ${blogId}: ${message}`);
 				}
 			};
 
@@ -709,7 +710,8 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					this.displayBrunchSubscriptions(containerEl);
 					new Notice(`Synced posts from @${subscription.authorUsername}`);
 				} catch (error) {
-					new Notice(`Failed to sync: ${error.message}`);
+					const message = error instanceof Error ? error.message : String(error);
+					new Notice(`Failed to sync: ${message}`);
 				}
 			};
 

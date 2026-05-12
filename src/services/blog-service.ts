@@ -74,7 +74,8 @@ export class BlogService {
 			}
 
 			if (!silent) {
-				new Notice(`❌ Failed to fetch posts from ${blogId}: ${error.message}`, 5000);
+				const msg = error instanceof Error ? error.message : String(error);
+				new Notice(`❌ Failed to fetch posts from ${blogId}: ${msg}`, 5000);
 			}
 			throw error;
 		}
@@ -87,7 +88,7 @@ export class BlogService {
 			for (const file of files) {
 				const cache = this.app.metadataCache.getFileCache(file);
 				if (cache?.frontmatter?.logNo) {
-					existingLogNos.add(cache.frontmatter.logNo);
+					existingLogNos.add(String(cache.frontmatter.logNo));
 				}
 			}
 		} catch {
@@ -187,7 +188,8 @@ export class BlogService {
 			new Notice(`✅ Post imported successfully: ${processedPost.title}`, 4000);
 			
 		} catch (error) {
-			new Notice(`❌ Failed to import post: ${error.message}`, 5000);
+			const msg = error instanceof Error ? error.message : String(error);
+			new Notice(`❌ Failed to import post: ${msg}`, 5000);
 			throw error;
 		}
 	}

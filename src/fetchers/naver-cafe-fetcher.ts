@@ -118,9 +118,9 @@ export class NaverCafeFetcher {
 				}
 
 				if (response.status === 200) {
-					let jsonData;
+					let jsonData: unknown;
 					try {
-						jsonData = JSON.parse(response.body);
+						jsonData = JSON.parse(response.body) as unknown;
 					} catch {
 						// Not valid JSON
 					}
@@ -147,7 +147,8 @@ export class NaverCafeFetcher {
 				}
 			} catch (error) {
 				// Re-throw cookie errors, otherwise fall through to other methods
-				if (error.message === 'COOKIE_REQUIRED') {
+				const msg = error instanceof Error ? error.message : String(error);
+				if (msg === 'COOKIE_REQUIRED') {
 					throw new Error('네이버 카페 글을 가져오려면 쿠키 설정이 필요합니다. 설정에서 네이버 쿠키를 입력해주세요.');
 				}
 				// Fall through to other methods
@@ -201,7 +202,7 @@ export class NaverCafeFetcher {
 
 			throw new Error(`Failed to fetch article ${articleId} from cafe ${this.cafeUrl}`);
 		} catch (error) {
-			throw new Error(`Failed to fetch article: ${error.message}`);
+			throw new Error(`Failed to fetch article: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
 
@@ -223,9 +224,9 @@ export class NaverCafeFetcher {
 					break;
 				}
 
-				let jsonData;
+				let jsonData: unknown;
 				try {
-					jsonData = JSON.parse(response.body);
+					jsonData = JSON.parse(response.body) as unknown;
 				} catch {
 					break;
 				}
@@ -585,7 +586,7 @@ export class NaverCafeFetcher {
 				// Create error article
 				articlesWithContent.push({
 					...article,
-					content: `[Error fetching content: ${error.message}]`,
+					content: `[Error fetching content: ${error instanceof Error ? error.message : String(error)}]`,
 					images: [],
 					attachments: [],
 					tags: [],
@@ -1293,10 +1294,10 @@ export class NaverCafeFetcher {
 						const linkData = $material.attr('data-linkdata');
 						if (linkData) {
 							try {
-								const data = JSON.parse(linkData);
-								const title = data.title || 'No Title';
-								const link = data.link || '#';
-								const type = data.type || 'Unknown';
+								const data = JSON.parse(linkData) as Record<string, unknown>;
+								const title = (data.title as string) || 'No Title';
+								const link = (data.link as string) || '#';
+								const type = (data.type as string) || 'Unknown';
 								content += `[${title}](${link}) (${type})\n\n`;
 							} catch {
 								content += '[자료]\n\n';
@@ -1312,10 +1313,12 @@ export class NaverCafeFetcher {
 						const moduleData = scriptEl.attr('data-module-v2');
 						if (moduleData) {
 							try {
-								const data = JSON.parse(moduleData);
-								if (data.type === 'v2_video' && data.data?.vid) {
+								const data = JSON.parse(moduleData) as Record<string, unknown>;
+								const dataField = data.data as Record<string, unknown> | undefined;
+								const vid = dataField?.vid as string | undefined;
+								if (data.type === 'v2_video' && vid) {
 									// Use placeholder with vid for later replacement
-									content += `\n\n<!--VIDEO:${data.data.vid}-->\n\n`;
+									content += `\n\n<!--VIDEO:${vid}-->\n\n`;
 								} else {
 									content += '[비디오]\n\n';
 								}
@@ -1440,8 +1443,8 @@ export class NaverCafeFetcher {
 			const linkData = imageLink.attr('data-linkdata');
 			if (linkData) {
 				try {
-					const data = JSON.parse(linkData);
-					if (data.src) return data.src;
+					const data = JSON.parse(linkData) as Record<string, unknown>;
+					if (data.src) return data.src as string;
 				} catch {
 					// Continue
 				}
@@ -1454,9 +1457,11 @@ export class NaverCafeFetcher {
 			const scriptContent = scriptElement.attr('data-module-v2') || scriptElement.html();
 			if (scriptContent) {
 				try {
-					const data = JSON.parse(scriptContent);
-					if (data.data?.src) return data.data.src;
-					if (data.data?.imageInfo?.src) return data.data.imageInfo.src;
+					const data = JSON.parse(scriptContent) as Record<string, unknown>;
+					const dataField = data.data as Record<string, unknown> | undefined;
+					if (dataField?.src) return dataField.src as string;
+					const imageInfo = dataField?.imageInfo as Record<string, unknown> | undefined;
+					if (imageInfo?.src) return imageInfo.src as string;
 				} catch {
 					// Continue
 				}
@@ -1478,12 +1483,12 @@ export class NaverCafeFetcher {
 			const moduleData = scriptEl.attr('data-module-v2') || scriptEl.attr('data-module');
 			if (moduleData) {
 				try {
-					const data = JSON.parse(moduleData);
-					const oembedData = data.data;
+					const data = JSON.parse(moduleData) as Record<string, unknown>;
+					const oembedData = data.data as Record<string, unknown> | undefined;
 
 					if (oembedData) {
-						const url = oembedData.inputUrl || oembedData.url || '';
-						const title = oembedData.title || '';
+						const url = ((oembedData.inputUrl as string) || (oembedData.url as string) || '');
+						const title = (oembedData.title as string) || '';
 
 						if (url) {
 							// YouTube: Use Obsidian native embed syntax

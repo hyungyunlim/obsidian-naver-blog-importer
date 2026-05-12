@@ -57,21 +57,33 @@ export class VideoService {
 					jsonStr = jsonStr.replace(/\\"/g, '"');
 				}
 
-				const data = JSON.parse(jsonStr);
+				interface VideoModuleData {
+					type: string;
+					id?: string;
+					data?: {
+						vid?: string;
+						inkey?: string;
+						thumbnail?: string;
+						mediaMeta?: { title?: string };
+					};
+				}
+				const data = JSON.parse(jsonStr) as VideoModuleData;
 
 				// Check if this is a video module
 				if (data.type !== 'v2_video') continue;
 
-				if (data.data?.vid && data.data?.inkey) {
+				const vid = data.data?.vid;
+				const inkey = data.data?.inkey;
+				if (vid && inkey) {
 					// Skip if we've already seen this vid
-					if (seenVids.has(data.data.vid)) continue;
-					seenVids.add(data.data.vid);
+					if (seenVids.has(vid)) continue;
+					seenVids.add(vid);
 
 					videos.push({
-						vid: data.data.vid,
-						inkey: data.data.inkey,
-						thumbnail: data.data.thumbnail || '',
-						title: data.data.mediaMeta?.title || '',
+						vid: vid,
+						inkey: inkey,
+						thumbnail: data.data?.thumbnail || '',
+						title: data.data?.mediaMeta?.title || '',
 						elementId: data.id || ''
 					});
 				}
@@ -104,7 +116,17 @@ export class VideoService {
 				throw new Error(`Video API returned status ${response.status}`);
 			}
 
-			const data = response.json;
+			interface VideoListItem {
+				id: string;
+				encodingOption?: { name?: string; width?: number; height?: number };
+				source: string;
+				bitrate?: { video?: number; audio?: number };
+				duration?: number;
+			}
+			interface VideoApiResponse {
+				videos?: { list?: VideoListItem[] };
+			}
+			const data = response.json as VideoApiResponse;
 			const qualities: VideoQuality[] = [];
 
 			// Extract video list from response
@@ -268,7 +290,8 @@ export class VideoService {
 
 			} catch (error) {
 				console.error(`Failed to download video ${video.vid}:`, error);
-				new Notice(`Failed to download video: ${error.message}`, 5000);
+				const msg = error instanceof Error ? error.message : String(error);
+				new Notice(`Failed to download video: ${msg}`, 5000);
 			}
 
 			// Small delay between downloads to avoid rate limiting

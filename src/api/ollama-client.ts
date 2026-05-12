@@ -27,7 +27,11 @@ export class OllamaClient {
 		});
 
 		if (response.status === 200) {
-			return response.json.message.content.trim();
+			interface OllamaResponse {
+				message: { content: string };
+			}
+			const body = response.json as OllamaResponse;
+			return body.message.content.trim();
 		} else {
 			throw new Error(`Ollama API error: ${response.status}`);
 		}

@@ -29,11 +29,15 @@ export class AnthropicClient {
 				interface ModelData {
 					id: string;
 				}
-				const models = response.json.data
+				interface ModelsResponse {
+					data: ModelData[];
+				}
+				const body = response.json as ModelsResponse;
+				const models = body.data
 					.map((model: ModelData) => model.id)
 					.filter((id: string) => id.startsWith('claude-'))
 					.sort();
-				
+
 				return models;
 			}
 		} catch {
@@ -69,7 +73,11 @@ export class AnthropicClient {
 		});
 
 		if (response.status === 200) {
-			return response.json.content[0].text.trim();
+			interface ChatResponse {
+				content: Array<{ type: string; text: string }>;
+			}
+			const body = response.json as ChatResponse;
+			return body.content[0].text.trim();
 		} else {
 			throw new Error(`Anthropic API error: ${response.status}`);
 		}

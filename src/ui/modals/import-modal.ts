@@ -541,7 +541,8 @@ export class NaverBlogImportModal extends Modal {
 				await this.openFile(createdFile);
 			}
 		} catch (error) {
-			new Notice(`❌ Import failed: ${error.message}`, NOTICE_TIMEOUTS.medium);
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(`❌ Import failed: ${message}`, NOTICE_TIMEOUTS.medium);
 		}
 	}
 
@@ -574,7 +575,8 @@ export class NaverBlogImportModal extends Modal {
 				}
 			}
 		} catch (error) {
-			new Notice(`❌ Import failed: ${error.message}`, NOTICE_TIMEOUTS.medium);
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(`❌ Import failed: ${message}`, NOTICE_TIMEOUTS.medium);
 		}
 	}
 
@@ -603,7 +605,8 @@ export class NaverBlogImportModal extends Modal {
 				await this.openFile(createdFile);
 			}
 		} catch (error) {
-			new Notice(`❌ Import failed: ${error.message}`, NOTICE_TIMEOUTS.medium);
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(`❌ Import failed: ${message}`, NOTICE_TIMEOUTS.medium);
 		}
 	}
 
@@ -756,7 +759,8 @@ export class NaverBlogImportModal extends Modal {
 				await this.openFile(createdFile);
 			}
 		} catch (error) {
-			new Notice(`❌ Brunch import failed: ${error.message}`, NOTICE_TIMEOUTS.medium);
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(`❌ Brunch import failed: ${message}`, NOTICE_TIMEOUTS.medium);
 		}
 	}
 
@@ -965,7 +969,8 @@ export class NaverBlogImportModal extends Modal {
 			}
 		} catch (error) {
 			cancelNotice.hide();
-			new Notice(`Brunch keyword import failed: ${error.message}`);
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(`Brunch keyword import failed: ${message}`);
 		}
 	}
 
@@ -1064,7 +1069,8 @@ export class NaverBlogImportModal extends Modal {
 			}
 		} catch (error) {
 			cancelNotice.hide();
-			new Notice(`Brunch book import failed: ${error.message}`);
+			const message = error instanceof Error ? error.message : String(error);
+			new Notice(`Brunch book import failed: ${message}`);
 		}
 	}
 

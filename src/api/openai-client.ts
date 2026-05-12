@@ -28,13 +28,17 @@ export class OpenAIClient {
 				interface ModelData {
 					id: string;
 				}
-				const models = response.json.data
+				interface ModelsResponse {
+					data: ModelData[];
+				}
+				const body = response.json as ModelsResponse;
+				const models = body.data
 					.map((model: ModelData) => model.id)
-					.filter((id: string) => 
+					.filter((id: string) =>
 						OPENAI_MODEL_PREFIXES.some(prefix => id.startsWith(prefix))
 					)
 					.sort();
-				
+
 				return models;
 			}
 		} catch {
@@ -65,7 +69,11 @@ export class OpenAIClient {
 		});
 
 		if (response.status === 200) {
-			return response.json.choices[0].message.content.trim();
+			interface ChatResponse {
+				choices: Array<{ message: { content: string } }>;
+			}
+			const body = response.json as ChatResponse;
+			return body.choices[0].message.content.trim();
 		} else {
 			throw new Error(`OpenAI API error: ${response.status}`);
 		}

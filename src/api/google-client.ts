@@ -29,7 +29,11 @@ export class GoogleClient {
 					name: string;
 					supportedGenerationMethods?: string[];
 				}
-				const models = response.json.models
+				interface ModelsResponse {
+					models: ModelInfo[];
+				}
+				const body = response.json as ModelsResponse;
+				const models = body.models
 					.filter((model: ModelInfo) => {
 						// Check if model supports generateContent
 						const supportedMethods = model.supportedGenerationMethods || [];
@@ -97,22 +101,29 @@ export class GoogleClient {
 				});
 
 				if (response.status === 200) {
-					const data = response.json;
-					
-					// Debug log the full response
-					
+					interface GeminiPart { text: string }
+					interface GeminiContent { parts: GeminiPart[] }
+					interface GeminiCandidate {
+						content: GeminiContent;
+						finishReason?: string;
+					}
+					interface GeminiResponse {
+						candidates: GeminiCandidate[];
+					}
+					const data = response.json as GeminiResponse;
+
 					// Check if response has candidates
 					if (!data.candidates || data.candidates.length === 0) {
 						throw new Error('Google API response missing candidates');
 					}
-					
+
 					const candidate = data.candidates[0];
-					
+
 					// Check if candidate has content
 					if (!candidate.content) {
 						throw new Error('Google API candidate missing content');
 					}
-					
+
 					// Handle MAX_TOKENS finish reason - response may be incomplete
 					if (candidate.finishReason === 'MAX_TOKENS') {
 						// console.warn('Google API response was truncated due to MAX_TOKENS');
@@ -120,16 +131,16 @@ export class GoogleClient {
 							throw new Error('Google API response completely truncated - try increasing maxTokens or reducing input size');
 						}
 					}
-					
+
 					if (!candidate.content.parts || candidate.content.parts.length === 0) {
 						throw new Error('Google API candidate content missing parts');
 					}
-					
+
 					const text = candidate.content.parts[0].text;
 					if (!text) {
 						throw new Error('Google API content missing text');
 					}
-					
+
 					return text.trim();
 				} else if (response.status === 503 && attempt < maxRetries) {
 					// 503 Service Unavailable - retry with exponential backoff

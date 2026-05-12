@@ -70,13 +70,13 @@ ${content}`
 			return fixedContent;
 			
 		} catch (error) {
-			
+			const msg = error instanceof Error ? error.message : String(error);
 			// Re-throw with more specific error types
-			if (error.message.includes('401') || error.message.includes('Invalid')) {
+			if (msg.includes('401') || msg.includes('Invalid')) {
 				throw new Error(`Invalid API key. Please check your ${this.settings.aiProvider.toUpperCase()} API key in settings.`);
-			} else if (error.message.includes('quota') || error.message.includes('billing')) {
+			} else if (msg.includes('quota') || msg.includes('billing')) {
 				throw new Error(`API quota exceeded. Please check your ${this.settings.aiProvider.toUpperCase()} billing.`);
-			} else if (error.message.includes('network') || error.message.includes('fetch')) {
+			} else if (msg.includes('network') || msg.includes('fetch')) {
 				throw new Error('Network error. Please check your internet connection.');
 			} else {
 				throw error;

@@ -93,7 +93,7 @@ export class NaverNewsFetcher {
 
 			return article;
 		} catch (error) {
-			throw new Error(`Failed to fetch article: ${error.message}`);
+			throw new Error(`Failed to fetch article: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
 
@@ -248,13 +248,13 @@ export class NaverNewsFetcher {
 
 		// Process all child nodes in DOM order
 		const processNode = (node: AnyNode) => {
-			if (node.type === 'text') {
+			if ((node.type as string) === 'text') {
 				const text = (node as unknown as { data: string }).data?.trim();
 				if (text) {
 					markdown += text + '\n\n';
 				}
-			} else if (node.type === 'tag') {
-				const element = node;
+			} else if ((node.type as string) === 'tag') {
+				const element = node as Element;
 				const $el = $(element);
 				const tagName = element.tagName.toLowerCase();
 
@@ -512,18 +512,19 @@ export class NaverNewsFetcher {
 				const jsonpMatch = response.text.match(/\((\{[\s\S]*\})\)/);
 				if (!jsonpMatch) break;
 
-				const data = JSON.parse(jsonpMatch[1]);
-				const result = data.result;
+				const data = JSON.parse(jsonpMatch[1]) as Record<string, unknown>;
+				const result = data.result as Record<string, unknown> | undefined;
 
 				if (!result || !result.commentList) break;
 
-				const comments = this.parseComments(result.commentList);
+				const comments = this.parseComments(result.commentList as unknown[]);
 				if (comments.length === 0) break;
 
 				allComments.push(...comments);
 
 				// Check for more pages
-				if (!result.pageModel || page >= result.pageModel.totalPages) {
+				const pageModel = result.pageModel as Record<string, unknown> | undefined;
+				if (!pageModel || page >= (pageModel.totalPages as number)) {
 					break;
 				}
 
@@ -745,7 +746,7 @@ export class NaverNewsFetcher {
 				}
 			} catch (error) {
 				// Skip failed images, keep original URL
-				new Notice(`Failed to download image: ${error.message}`);
+				new Notice(`Failed to download image: ${error instanceof Error ? error.message : String(error)}`);
 			}
 
 			// Small delay between downloads

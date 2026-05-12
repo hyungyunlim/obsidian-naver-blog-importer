@@ -76,7 +76,7 @@ export class NaverBlogFetcher {
                 originalTags: tags
             };
         } catch (error) {
-            throw new Error(`Failed to fetch single post ${logNo}: ${error.message}`);
+            throw new Error(`Failed to fetch single post ${logNo}: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -263,7 +263,7 @@ export class NaverBlogFetcher {
                 }
             }
         } catch (error) {
-            throw new Error(`Failed to fetch post list: ${error.message}`);
+            throw new Error(`Failed to fetch post list: ${error instanceof Error ? error.message : String(error)}`);
         }
 
         return posts;
@@ -725,7 +725,7 @@ export class NaverBlogFetcher {
                 tags: tags
             };
         } catch (error) {
-            throw new Error(`Failed to parse content: ${error.message}`);
+            throw new Error(`Failed to parse content: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
 
@@ -741,12 +741,12 @@ export class NaverBlogFetcher {
             const moduleData = scriptEl.attr('data-module-v2') || scriptEl.attr('data-module');
             if (moduleData) {
                 try {
-                    const data = JSON.parse(moduleData);
+                    const data = JSON.parse(moduleData) as { data?: { inputUrl?: string; url?: string; title?: string } };
                     const oembedData = data.data;
 
                     if (oembedData) {
-                        const url = oembedData.inputUrl || oembedData.url || '';
-                        const title = oembedData.title || '';
+                        const url = oembedData.inputUrl ?? oembedData.url ?? '';
+                        const title = oembedData.title ?? '';
 
                         if (url) {
                             // YouTube: Use Obsidian native embed syntax
@@ -1101,10 +1101,10 @@ export class NaverBlogFetcher {
                             const linkData = $material.attr('data-linkdata');
                             if (linkData) {
                                 try {
-                                    const data = JSON.parse(linkData);
-                                    const title = data.title || 'No Title';
-                                    const link = data.link || '#';
-                                    const type = data.type || 'Unknown';
+                                    const data = JSON.parse(linkData) as { title?: string; link?: string; type?: string };
+                                    const title = data.title ?? 'No Title';
+                                    const link = data.link ?? '#';
+                                    const type = data.type ?? 'Unknown';
                                     materialParts.push(`[${title}](${link}) (${type})`);
                                 } catch {
                                     // Failed to parse link data JSON, use fallback
@@ -1127,7 +1127,7 @@ export class NaverBlogFetcher {
                         const moduleData = scriptEl.attr('data-module-v2');
                         if (moduleData) {
                             try {
-                                const data = JSON.parse(moduleData);
+                                const data = JSON.parse(moduleData) as { type?: string; data?: { vid?: string } };
                                 if (data.type === 'v2_video' && data.data?.vid) {
                                     content += `\n\n<!--VIDEO:${data.data.vid}-->\n\n`;
                                 } else {
@@ -1183,8 +1183,8 @@ export class NaverBlogFetcher {
                         // Try to extract JSON data
                         const jsonMatch = scriptContent.match(/\{.*"components".*\}/s);
                         if (jsonMatch) {
-                            const data = JSON.parse(jsonMatch[0]);
-                            return this.extractContentFromComponents(data.components || []);
+                            const data = JSON.parse(jsonMatch[0]) as { components?: BlogComponent[] };
+                            return this.extractContentFromComponents(data.components ?? []);
                         }
                     } catch {
                         // Continue to next script
@@ -1763,7 +1763,7 @@ export class NaverBlogFetcher {
             const linkData = imageLink.attr('data-linkdata');
             if (linkData) {
                 try {
-                    const data = JSON.parse(linkData);
+                    const data = JSON.parse(linkData) as { src?: string };
                     if (data.src) {
                         return data.src;
                     }
@@ -1779,11 +1779,11 @@ export class NaverBlogFetcher {
             const scriptContent = scriptElement.attr('data-module-v2') || scriptElement.html();
             if (scriptContent) {
                 try {
-                    const data = JSON.parse(scriptContent);
-                    if (data.data && data.data.src) {
+                    const data = JSON.parse(scriptContent) as { data?: { src?: string; imageInfo?: { src?: string } } };
+                    if (data.data?.src) {
                         return data.data.src;
                     }
-                    if (data.data && data.data.imageInfo && data.data.imageInfo.src) {
+                    if (data.data?.imageInfo?.src) {
                         return data.data.imageInfo.src;
                     }
                 } catch {
@@ -1876,12 +1876,12 @@ export class NaverBlogFetcher {
             });
 
             if (response.status === 200 && response.text) {
-                const data = JSON.parse(response.text);
+                const data = JSON.parse(response.text) as { taglist?: Array<{ logno?: string; tagName?: string }> };
 
                 if (data.taglist && Array.isArray(data.taglist)) {
                     for (const tagInfo of data.taglist) {
                         const logNo = tagInfo.logno;
-                        const encodedTags = tagInfo.tagName || '';
+                        const encodedTags = tagInfo.tagName ?? '';
 
                         if (logNo && encodedTags) {
                             // Decode URL-encoded tags and split by comma
@@ -1979,7 +1979,7 @@ export class NaverBlogFetcher {
                     .replace(/&gt;/g, '>')        // Decode greater than
                     .replace(/&quot;/g, '"')      // Decode quotes
                     .replace(/&#39;/g, "'")       // Decode single quotes
-                    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))  // Decode numeric entities
+                    .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(parseInt(code, 10)))  // Decode numeric entities
                     .replace(/\s+/g, ' ')         // Normalize multiple spaces to single space
                     .trim();
                 if (bio.length === 0) bio = undefined;

@@ -1,7 +1,6 @@
 import { requestUrl } from 'obsidian';
 import * as cheerio from 'cheerio';
 import type { CheerioAPI } from 'cheerio';
-import type { Element } from 'domhandler';
 import type { ProcessedBrunchPost, BrunchSeries, BrunchVideo, BrunchComment, BrunchApiComment } from './src/types/brunch';
 import {
 	BRUNCH_BASE_URL,
@@ -109,7 +108,7 @@ export class BrunchFetcher {
 			// Debug: show first 500 chars of HTML
 			return this.parsePostContent(response.text, url, postId);
 		} catch (error) {
-			throw new Error(`Failed to fetch Brunch post ${postId}: ${error.message}`);
+			throw new Error(`Failed to fetch Brunch post ${postId}: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
 
@@ -169,7 +168,7 @@ export class BrunchFetcher {
 					throw new Error(`API request failed: ${response.status}`);
 				}
 
-				const data = JSON.parse(response.text);
+				const data = JSON.parse(response.text) as { code: number; data?: { list?: Array<{ no?: number | string; publishTimestamp?: number }> } };
 
 				if (data.code !== 200 || !data.data?.list) {
 					break;
@@ -455,9 +454,9 @@ export class BrunchFetcher {
 				.replace(/\\t/g, '\t');
 
 			// Parse the content JSON
-			let contentJson;
+			let contentJson: { body?: Array<{ type: string; data?: unknown[]; style?: Record<string, string> }>; cover?: { style?: Record<string, string> } };
 			try {
-				contentJson = JSON.parse(contentJsonStr);
+				contentJson = JSON.parse(contentJsonStr) as typeof contentJson;
 			} catch {
 				return null;
 			}
@@ -736,7 +735,7 @@ export class BrunchFetcher {
 				const dataApp = $item.attr('data-app');
 				if (dataApp) {
 					try {
-						const data = JSON.parse(dataApp);
+						const data = JSON.parse(dataApp) as { images?: Array<{ url?: string }> };
 						if (data.images && Array.isArray(data.images)) {
 							for (const image of data.images) {
 								if (image.url) {
@@ -799,7 +798,7 @@ export class BrunchFetcher {
 				const dataApp = $item.attr('data-app');
 				if (dataApp) {
 					try {
-						const data = JSON.parse(dataApp);
+						const data = JSON.parse(dataApp) as { url?: string; id?: string };
 						if (data.url) {
 							videoUrl = data.url;
 						}
@@ -1009,7 +1008,7 @@ export class BrunchFetcher {
 				return [];
 			}
 
-			const data = JSON.parse(response.text);
+			const data = JSON.parse(response.text) as { code: number; data?: { list?: BrunchApiComment[] } };
 
 			if (data.code !== 200 || !data.data?.list) {
 				return [];
@@ -1116,7 +1115,7 @@ export class BrunchFetcher {
 				return null;
 			}
 
-			const readyPlayData = JSON.parse(readyPlayResponse.text);
+			const readyPlayData = JSON.parse(readyPlayResponse.text) as { kampLocation?: { token?: string }; tid?: string };
 			const token = readyPlayData?.kampLocation?.token;
 
 			if (!token) {
@@ -1153,7 +1152,16 @@ export class BrunchFetcher {
 				return null;
 			}
 
-			const kampData = JSON.parse(kampResponse.text);
+			interface KampStream { protocol: string; profile: string; url?: string }
+			interface KampProfile { name: string; duration?: number }
+			interface KampData {
+				is_drm?: boolean;
+				thumbnail?: string;
+				duration?: number;
+				streams?: KampStream[];
+				profiles?: KampProfile[];
+			}
+			const kampData = JSON.parse(kampResponse.text) as KampData;
 
 			// Check if DRM protected
 			if (kampData.is_drm) {
@@ -1166,19 +1174,19 @@ export class BrunchFetcher {
 			}
 
 			// Find best MP4 stream (prefer HIGH quality)
-			const streams = kampData.streams || [];
-			let mp4Stream = streams.find((s: { protocol: string; profile: string }) =>
+			const streams: KampStream[] = kampData.streams || [];
+			let mp4Stream = streams.find((s) =>
 				s.protocol === 'mp4' && s.profile === 'HIGH'
 			);
 
 			// Fallback to any MP4
 			if (!mp4Stream) {
-				mp4Stream = streams.find((s: { protocol: string }) => s.protocol === 'mp4');
+				mp4Stream = streams.find((s) => s.protocol === 'mp4');
 			}
 
 			// Find profile info
-			const profiles = kampData.profiles || [];
-			const highProfile = profiles.find((p: { name: string }) => p.name === 'HIGH');
+			const profiles: KampProfile[] = kampData.profiles || [];
+			const highProfile = profiles.find((p) => p.name === 'HIGH');
 			const duration = highProfile?.duration || kampData.duration;
 
 
@@ -1370,7 +1378,18 @@ export class BrunchFetcher {
 			});
 
 			if (response.status === 200) {
-				const data = JSON.parse(response.text);
+				interface ProfileKeyword { keyword?: string }
+				interface ProfileCategory { category: string; keywordList?: ProfileKeyword[] }
+				interface BrunchProfile {
+					userName?: string;
+					userImage?: string;
+					profileImage?: string;
+					followerCount?: number;
+					topCreator?: { displayName?: string };
+					profileCategoryList?: ProfileCategory[];
+				}
+				interface BrunchProfileApiResponse { code: number; data?: BrunchProfile }
+				const data = JSON.parse(response.text) as BrunchProfileApiResponse;
 
 				if (data.code === 200 && data.data) {
 					const profile = data.data;
@@ -1379,7 +1398,7 @@ export class BrunchFetcher {
 					let authorTitle: string | undefined;
 					if (profile.profileCategoryList) {
 						const jobCategory = profile.profileCategoryList.find(
-							(cat: { category: string }) => cat.category === 'job'
+							(cat) => cat.category === 'job'
 						);
 						if (jobCategory?.keywordList?.[0]?.keyword) {
 							authorTitle = jobCategory.keywordList[0].keyword;
@@ -1574,7 +1593,16 @@ export class BrunchKeywordFetcher {
 					break;
 				}
 
-				const data = JSON.parse(response.text);
+				interface KeywordArticleItem {
+					article?: {
+						no?: number | string;
+						userId?: string;
+						profileId?: string;
+						title?: string;
+						publishTimestamp?: number;
+					};
+				}
+				const data = JSON.parse(response.text) as { code: number; data?: { articleList?: KeywordArticleItem[] } };
 
 				if (data.code !== 200 || !data.data?.articleList) {
 					break;
@@ -1799,13 +1827,14 @@ export class BrunchBookFetcher {
 			throw new Error(`Magazine API failed: HTTP ${response.status}`);
 		}
 
-		const data = JSON.parse(response.text);
+		interface MagazineArticleItem { article: { no: number; userId: string; title?: string } }
+		const data = JSON.parse(response.text) as { code: number; data?: { list?: MagazineArticleItem[] } };
 
 		if (data.code !== 200 || !data.data?.list) {
 			throw new Error('Invalid API response');
 		}
 
-		const articles = data.data.list.map((item: { article: { no: number; userId: string; title: string } }) => ({
+		const articles = data.data.list.map((item) => ({
 			userId: item.article.userId,
 			articleNo: item.article.no.toString(),
 			profileId: profileId,
