@@ -101,7 +101,7 @@ export async function expandNaverShortUrl(url: string): Promise<string> {
 		const result = await Promise.race([
 			resolveRedirectWithRequestUrl(withProtocol),
 			new Promise<null>((resolve) =>
-				setTimeout(() => resolve(null), EXPANSION_TIMEOUT)
+				window.setTimeout(() => resolve(null), EXPANSION_TIMEOUT)
 			),
 		]);
 

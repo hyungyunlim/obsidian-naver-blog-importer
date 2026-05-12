@@ -272,7 +272,7 @@ export class VideoService {
 			}
 
 			// Small delay between downloads to avoid rate limiting
-			await new Promise(resolve => setTimeout(resolve, 500));
+			await new Promise(resolve => window.setTimeout(resolve, 500));
 		}
 
 		if (videoCount > 0) {

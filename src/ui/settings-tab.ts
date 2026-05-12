@@ -915,7 +915,7 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 
 		// Hide dropdown on blur (with delay to allow clicks)
 		inputEl.addEventListener('blur', () => {
-			activeWindow.setTimeout(() => {
+			window.setTimeout(() => {
 				hideDropdown();
 			}, 150);
 		});

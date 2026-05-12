@@ -982,7 +982,7 @@ export class BrunchFetcher {
 	 * Delay helper for rate limiting
 	 */
 	private delay(ms: number): Promise<void> {
-		return new Promise(resolve => setTimeout(resolve, ms));
+		return new Promise(resolve => window.setTimeout(resolve, ms));
 	}
 
 	/**
@@ -1673,7 +1673,7 @@ export class BrunchKeywordFetcher {
 	 * Delay helper
 	 */
 	private delay(ms: number): Promise<void> {
-		return new Promise(resolve => setTimeout(resolve, ms));
+		return new Promise(resolve => window.setTimeout(resolve, ms));
 	}
 
 	/**
@@ -1887,7 +1887,7 @@ export class BrunchBookFetcher {
 	 * Delay helper
 	 */
 	private delay(ms: number): Promise<void> {
-		return new Promise(resolve => setTimeout(resolve, ms));
+		return new Promise(resolve => window.setTimeout(resolve, ms));
 	}
 
 	/**

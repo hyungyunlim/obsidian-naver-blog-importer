@@ -254,7 +254,7 @@ export class NaverNewsFetcher {
 					markdown += text + '\n\n';
 				}
 			} else if (node.type === 'tag') {
-				const element = node as Element;
+				const element = node;
 				const $el = $(element);
 				const tagName = element.tagName.toLowerCase();
 
@@ -835,7 +835,7 @@ export class NaverNewsFetcher {
 	 * Delay helper
 	 */
 	private delay(ms: number): Promise<void> {
-		return new Promise(resolve => setTimeout(resolve, ms));
+		return new Promise(resolve => window.setTimeout(resolve, ms));
 	}
 
 	/**

@@ -138,7 +138,7 @@ export class NaverBlogImportModal extends Modal {
 		});
 
 		// Focus and auto-fill from clipboard
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			input.focus();
 
 			navigator.clipboard.readText().then((clipboardText) => {
@@ -682,7 +682,7 @@ export class NaverBlogImportModal extends Modal {
 					// Failed to create markdown file for this post
 					errorCount++;
 				}
-				await new Promise(resolve => setTimeout(resolve, 500));
+				await new Promise(resolve => window.setTimeout(resolve, 500));
 			}
 
 			cancelNotice.hide();
@@ -808,7 +808,7 @@ export class NaverBlogImportModal extends Modal {
 				} catch {
 					errorCount++;
 				}
-				await new Promise(resolve => setTimeout(resolve, 500));
+				await new Promise(resolve => window.setTimeout(resolve, 500));
 			}
 
 			cancelNotice.hide();
@@ -940,7 +940,7 @@ export class NaverBlogImportModal extends Modal {
 
 				// Rate limiting
 				if (i < articles.length - 1) {
-					await new Promise(resolve => setTimeout(resolve, 1000));
+					await new Promise(resolve => window.setTimeout(resolve, 1000));
 				}
 			}
 
@@ -1039,7 +1039,7 @@ export class NaverBlogImportModal extends Modal {
 
 				// Rate limiting
 				if (i < articles.length - 1) {
-					await new Promise(resolve => setTimeout(resolve, 1000));
+					await new Promise(resolve => window.setTimeout(resolve, 1000));
 				}
 			}
 

@@ -138,7 +138,7 @@ export class BlogService {
 						} catch {
 							result.errors++;
 						}
-						await new Promise(resolve => setTimeout(resolve, 500));
+						await new Promise(resolve => window.setTimeout(resolve, 500));
 					}
 
 				} catch {
@@ -146,7 +146,7 @@ export class BlogService {
 				}
 
 				// Add delay between blogs
-				await new Promise(resolve => setTimeout(resolve, 1000));
+				await new Promise(resolve => window.setTimeout(resolve, 1000));
 			}
 		} finally {
 			if (syncNotice) {

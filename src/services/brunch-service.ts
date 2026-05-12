@@ -151,7 +151,7 @@ export class BrunchService {
 				} catch {
 					result.errors++;
 				}
-				await new Promise(resolve => setTimeout(resolve, 500));
+				await new Promise(resolve => window.setTimeout(resolve, 500));
 			}
 
 			// Update last checked time
@@ -211,7 +211,7 @@ export class BrunchService {
 						} catch {
 							result.errors++;
 						}
-						await new Promise(resolve => setTimeout(resolve, 500));
+						await new Promise(resolve => window.setTimeout(resolve, 500));
 					}
 
 					// Update last checked time
@@ -225,7 +225,7 @@ export class BrunchService {
 				}
 
 				// Add delay between authors
-				await new Promise(resolve => setTimeout(resolve, 1000));
+				await new Promise(resolve => window.setTimeout(resolve, 1000));
 			}
 		} finally {
 			if (syncNotice) {

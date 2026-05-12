@@ -53,7 +53,7 @@ export class FolderSuggestModal extends Modal {
 		renderFolders();
 
 		// Focus the input
-		activeWindow.setTimeout(() => inputEl.focus(), UI_DEFAULTS.modalTimeout);
+		window.setTimeout(() => inputEl.focus(), UI_DEFAULTS.modalTimeout);
 	}
 
 	onClose() {

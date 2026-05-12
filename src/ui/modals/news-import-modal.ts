@@ -77,7 +77,7 @@ export class NaverNewsImportModal extends Modal {
 		});
 
 		// Focus and auto-fill from clipboard
-		activeWindow.setTimeout(() => {
+		window.setTimeout(() => {
 			input.focus();
 
 			navigator.clipboard.readText().then((clipboardText) => {

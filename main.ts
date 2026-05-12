@@ -156,7 +156,7 @@ export default class NaverBlogPlugin extends Plugin {
 		const hasBrunchSubscriptions = brunchSubscriptions.length > 0;
 
 		if (hasBlogSubscriptions || hasBrunchSubscriptions) {
-			activeWindow.setTimeout((): void => void this.autoSyncAllSubscriptions(), UI_DELAYS.autoSync);
+			window.setTimeout((): void => void this.autoSyncAllSubscriptions(), UI_DELAYS.autoSync);
 		}
 
 		// Add settings tab
@@ -449,7 +449,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			if (this.settings.enableAiExcerpt) {
 				// Add small delay between AI calls to avoid rate limiting
 				if (this.settings.enableAiTags) {
-					await new Promise(resolve => setTimeout(resolve, API_DELAYS.betweenPosts));
+					await new Promise(resolve => window.setTimeout(resolve, API_DELAYS.betweenPosts));
 				}
 				post.excerpt = await this.generateAIExcerpt(post.title, post.content);
 			}
@@ -526,7 +526,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			if (this.settings.enableAiExcerpt) {
 				if (this.settings.enableAiTags) {
-					await new Promise(resolve => setTimeout(resolve, API_DELAYS.betweenPosts));
+					await new Promise(resolve => window.setTimeout(resolve, API_DELAYS.betweenPosts));
 				}
 				post.excerpt = await this.generateAIExcerpt(post.title, post.content);
 			}
