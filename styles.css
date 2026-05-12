@@ -658,12 +658,14 @@
     line-height: 1;
 }
 
-.naver-blog-search-input {
+.naver-blog-search-wrapper .naver-blog-search-input,
+input.naver-blog-search-input[type="text"],
+input.naver-blog-search-input {
     flex: 1;
-    padding: 8px 40px 8px 32px !important;
-    border: none !important;
-    background: transparent !important;
-    outline: none !important;
+    padding: 8px 40px 8px 32px;
+    border: none;
+    background: transparent;
+    outline: none;
     min-height: 32px;
     box-sizing: border-box;
 }
