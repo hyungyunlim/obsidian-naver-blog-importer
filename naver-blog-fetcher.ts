@@ -40,6 +40,11 @@ export interface NaverBlogPost {
     originalTags: string[];
 }
 
+export interface NaverBlogFetchPostsOptions {
+    excludeLogNos?: Set<string>;
+    onProgress?: (current: number, total: number, post: Omit<NaverBlogPost, 'content' | 'blogId' | 'originalTags'>) => void;
+}
+
 export class NaverBlogFetcher {
     private blogId: string;
 
@@ -80,7 +85,7 @@ export class NaverBlogFetcher {
         }
     }
 
-    async fetchPosts(maxPosts?: number): Promise<NaverBlogPost[]> {
+    async fetchPosts(maxPosts?: number, options: NaverBlogFetchPostsOptions = {}): Promise<NaverBlogPost[]> {
         try {
             // Get blog post list
             let posts = await this.getPostList(maxPosts);
@@ -114,6 +119,10 @@ export class NaverBlogFetcher {
                 posts = posts.slice(0, maxPosts);
             }
 
+            if (options.excludeLogNos && options.excludeLogNos.size > 0) {
+                posts = posts.filter(post => !options.excludeLogNos?.has(post.logNo));
+            }
+
             // Fetch content for each post
             const postsWithContent: NaverBlogPost[] = [];
 
@@ -121,6 +130,7 @@ export class NaverBlogFetcher {
                 const post = posts[i];
 
                 try {
+                    options.onProgress?.(i + 1, posts.length, post);
                     const parsed = await this.fetchPostContent(post.logNo);
                     postsWithContent.push({
                         title: parsed.title !== 'Untitled' ? parsed.title : post.title,
@@ -136,7 +146,7 @@ export class NaverBlogFetcher {
 
 
                     // Add delay to be respectful to the server
-                    await this.delay(1000);
+                    await this.delay(250);
                 } catch (error) {
 
                     // Create error post for failed fetch
@@ -155,7 +165,7 @@ export class NaverBlogFetcher {
                     
                     
                     // Add delay to be respectful to the server
-                    await this.delay(500);
+                    await this.delay(250);
                 }
             }
 
@@ -191,7 +201,8 @@ export class NaverBlogFetcher {
             // Try multiple pages to get more posts
             let currentPage = 1;
             let hasMore = true;
-            const maxPages = maxPosts ? Math.min(Math.ceil(maxPosts / 30), 10) : 20; // Limit pages based on maxPosts, default to 20 pages (600 posts max)
+            const postsPerPage = 10;
+            const maxPages = maxPosts ? Math.ceil(maxPosts / postsPerPage) : 100; // Default cap: 100 pages (1000 posts max)
             const postLimit = maxPosts || 1000; // Default to 1000 if no limit specified
             
             while (hasMore && currentPage <= maxPages && posts.length < postLimit) {
@@ -220,13 +231,15 @@ export class NaverBlogFetcher {
                             if (pagePosts.length > 0) {
                                 
                                 // Add only new posts (avoid duplicates)
+                                let newPostCount = 0;
                                 for (const post of pagePosts) {
                                     if (!posts.find(p => p.logNo === post.logNo)) {
                                         posts.push(post);
+                                        newPostCount++;
                                     }
                                 }
                                 
-                                foundPostsOnPage = true;
+                                foundPostsOnPage = newPostCount > 0;
                                 break; // Found posts with this URL pattern, no need to try others
                             }
                         }

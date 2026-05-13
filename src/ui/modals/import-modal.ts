@@ -598,12 +598,15 @@ export class NaverBlogImportModal extends Modal {
 				excerpt: post.content.substring(0, 150) + '...'
 			});
 
+			if (!createdFile) {
+				new Notice(`Already imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
+				return;
+			}
+
 			new Notice(`✅ Imported: "${post.title}"`, NOTICE_TIMEOUTS.medium);
 
 			// Open the created file
-			if (createdFile) {
-				await this.openFile(createdFile);
-			}
+			await this.openFile(createdFile);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
 			new Notice(`❌ Import failed: ${message}`, NOTICE_TIMEOUTS.medium);
@@ -658,6 +661,7 @@ export class NaverBlogImportModal extends Modal {
 			let successCount = 0;
 			let errorCount = 0;
 			let errorLogCount = 0;
+			let skippedCount = 0;
 			let lastCreatedFile: TFile | null = null;
 			const totalPosts = posts.length;
 
@@ -674,14 +678,16 @@ export class NaverBlogImportModal extends Modal {
 
 					if (createdFile) {
 						lastCreatedFile = createdFile;
-					}
-
-					if (isErrorPost) {
-						errorLogCount++;
+						if (isErrorPost) {
+							errorLogCount++;
+						} else {
+							successCount++;
+						}
 					} else {
-						successCount++;
+						skippedCount++;
 					}
-				} catch {
+				} catch (error) {
+					console.error(`Failed to create file for ${post.logNo}:`, error);
 					// Failed to create markdown file for this post
 					errorCount++;
 				}
@@ -695,9 +701,10 @@ export class NaverBlogImportModal extends Modal {
 				`Import complete: ${successCount} successful`;
 
 			if (errorLogCount > 0) summary += `, ${errorLogCount} error logs`;
+			if (skippedCount > 0) summary += `, ${skippedCount} skipped`;
 			if (errorCount > 0) summary += `, ${errorCount} errors`;
 
-			const processed = successCount + errorLogCount + errorCount;
+			const processed = successCount + errorLogCount + skippedCount + errorCount;
 			summary += ` (${processed}/${totalPosts})`;
 
 			if (!importCancelled && errorCount === 0) summary += ' ✅';

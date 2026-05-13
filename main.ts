@@ -66,7 +66,7 @@ export default class NaverBlogPlugin extends Plugin {
 		this.aiService = new AIService(this.settings);
 
 		// Initialize Blog service
-		this.blogService = new BlogService(this.app, this.settings, this.createMarkdownFile.bind(this) as (post: ProcessedBlogPost) => Promise<void>);
+		this.blogService = new BlogService(this.app, this.settings, this.createMarkdownFile.bind(this) as (post: ProcessedBlogPost) => Promise<unknown>);
 
 		// Initialize Image service
 		this.imageService = new ImageService(this.app, this.settings);
@@ -264,9 +264,28 @@ export default class NaverBlogPlugin extends Plugin {
 		return await this.blogService.fetchNaverBlogPosts(blogId, maxPosts);
 	}
 
+	private async ensureFolderExists(folderPath: string): Promise<void> {
+		const normalizedPath = normalizePath(folderPath);
+		if (!normalizedPath) return;
+
+		const parts = normalizedPath.split('/').filter(Boolean);
+		let currentPath = '';
+
+		for (const part of parts) {
+			currentPath = currentPath ? `${currentPath}/${part}` : part;
+			const existing = this.app.vault.getAbstractFileByPath(currentPath);
+
+			if (!existing) {
+				await this.app.vault.createFolder(currentPath);
+			} else if (existing instanceof TFile) {
+				throw new Error(`Cannot create folder "${currentPath}" because a file exists at that path`);
+			}
+		}
+	}
+
 	async callAI(messages: Array<{role: string, content: string}>, maxTokens: number = 150): Promise<string> {
 		const apiKey = APIClientFactory.getApiKey(this.settings);
-		if (!apiKey) {
+		if (!apiKey && this.settings.aiProvider !== 'ollama') {
 			throw new Error('No API key configured for selected AI provider');
 		}
 
@@ -274,6 +293,10 @@ export default class NaverBlogPlugin extends Plugin {
 		const client = APIClientFactory.createClient(this.settings);
 		
 		return await client.chat(messages, maxTokens, model);
+	}
+
+	private isAIAvailable(): boolean {
+		return this.settings.aiProvider === 'ollama' || APIClientFactory.getApiKey(this.settings).trim().length > 0;
 	}
 
 	getModelName(): string {
@@ -343,7 +366,7 @@ export default class NaverBlogPlugin extends Plugin {
 
 
 	async generateAITags(title: string, content: string): Promise<string[]> {
-		if (!this.settings.enableAiTags) {
+		if (!this.settings.enableAiTags || !this.isAIAvailable()) {
 			return [];
 		}
 
@@ -404,7 +427,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 	}
 
 	async generateAIExcerpt(title: string, content: string): Promise<string> {
-		if (!this.settings.enableAiExcerpt) {
+		if (!this.settings.enableAiExcerpt || !this.isAIAvailable()) {
 			return '';
 		}
 
@@ -437,7 +460,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 	async createMarkdownFile(post: ProcessedBlogPost): Promise<TFile | null> {
 		try {
 			// Generate AI tags and append to original tags (avoid duplicates)
-			if (this.settings.enableAiTags) {
+			const shouldUseAI = this.isAIAvailable();
+			if (this.settings.enableAiTags && shouldUseAI) {
 				const aiTags = await this.generateAITags(post.title, post.content);
 				if (aiTags && aiTags.length > 0) {
 					const existingTags = new Set(post.tags.map(t => t.toLowerCase()));
@@ -446,7 +470,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 				}
 			}
 
-			if (this.settings.enableAiExcerpt) {
+			if (this.settings.enableAiExcerpt && shouldUseAI) {
 				// Add small delay between AI calls to avoid rate limiting
 				if (this.settings.enableAiTags) {
 					await new Promise(resolve => window.setTimeout(resolve, API_DELAYS.betweenPosts));
@@ -461,6 +485,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const folder = normalizePath(`${baseFolder}/${post.blogId}`);
 			// Blog images/videos go to attachments subfolder inside the blog folder
 			const blogImageFolder = normalizePath(`${folder}/attachments`);
+
+			await this.ensureFolderExists(folder);
 
 			// Process images if enabled
 			let processedContent = post.content;
@@ -477,18 +503,6 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 					blogImageFolder, // Videos stored in same folder as images
 					folder
 				);
-			}
-
-			// Ensure base folder exists
-			const baseFolderExists = this.app.vault.getAbstractFileByPath(baseFolder);
-			if (!baseFolderExists) {
-				await this.app.vault.createFolder(baseFolder);
-			}
-
-			// Ensure blogId subfolder exists
-			const folderExists = this.app.vault.getAbstractFileByPath(folder);
-			if (!folderExists) {
-				await this.app.vault.createFolder(folder);
 			}
 
 			const filepath = normalizePath(`${folder}/${filename}`);
@@ -511,20 +525,22 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			new Notice(`Created: ${filename}`);
 			return createdFile;
-		} catch {
+		} catch (error) {
+			console.error(`Failed to create file for: ${post.title}`, error);
 			new Notice(`Failed to create file for: ${post.title}`);
-			return null;
+			throw error;
 		}
 	}
 
 	async createCafeMarkdownFile(post: ProcessedCafePost): Promise<TFile | null> {
 		try {
 			// Generate AI tags and excerpt if enabled
-			if (this.settings.enableAiTags) {
+			const shouldUseAI = this.isAIAvailable();
+			if (this.settings.enableAiTags && shouldUseAI) {
 				post.tags = await this.generateAITags(post.title, post.content);
 			}
 
-			if (this.settings.enableAiExcerpt) {
+			if (this.settings.enableAiExcerpt && shouldUseAI) {
 				if (this.settings.enableAiTags) {
 					await new Promise(resolve => window.setTimeout(resolve, API_DELAYS.betweenPosts));
 				}
@@ -539,6 +555,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const folder = normalizePath(`${baseFolder}/${subfolderName}`);
 			// Cafe images go to attachments subfolder inside the cafe folder
 			const cafeImageFolder = normalizePath(`${folder}/attachments`);
+
+			await this.ensureFolderExists(folder);
 
 			// Process images if enabled (use cafeSettings if available, otherwise use blog's enableImageDownload)
 			let processedContent = post.content;
@@ -557,18 +575,6 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 					cafeImageFolder, // Videos stored in same folder as images
 					folder
 				);
-			}
-
-			// Ensure base folder exists
-			const baseFolderExists = this.app.vault.getAbstractFileByPath(baseFolder);
-			if (!baseFolderExists) {
-				await this.app.vault.createFolder(baseFolder);
-			}
-
-			// Ensure cafeName subfolder exists
-			const folderExists = this.app.vault.getAbstractFileByPath(folder);
-			if (!folderExists) {
-				await this.app.vault.createFolder(folder);
 			}
 
 			const filepath = normalizePath(`${folder}/${filename}`);
@@ -597,9 +603,10 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			new Notice(`Created: ${filename}`);
 			return createdFile;
-		} catch {
+		} catch (error) {
+			console.error(`Failed to create file for: ${post.title}`, error);
 			new Notice(`Failed to create file for: ${post.title}`);
-			return null;
+			throw error;
 		}
 	}
 
@@ -644,7 +651,7 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 	async createBrunchMarkdownFile(post: ProcessedBrunchPost): Promise<TFile | null> {
 		try {
 			// Generate AI tags if enabled and no original tags
-			if (this.settings.enableAiTags && (!post.originalTags || post.originalTags.length === 0)) {
+			if (this.settings.enableAiTags && this.isAIAvailable() && (!post.originalTags || post.originalTags.length === 0)) {
 				post.originalTags = await this.generateAITags(post.title, post.content);
 			}
 
@@ -658,6 +665,8 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 			const folder = normalizePath(`${baseFolder}/${subfolderName}`);
 			// Brunch images go to attachments subfolder
 			const brunchImageFolder = normalizePath(`${folder}/attachments`);
+
+			await this.ensureFolderExists(folder);
 
 			// Process images if enabled
 			let processedContent = post.content;
@@ -687,18 +696,6 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 				}
 			}
 
-			// Ensure base folder exists
-			const baseFolderExists = this.app.vault.getAbstractFileByPath(baseFolder);
-			if (!baseFolderExists) {
-				await this.app.vault.createFolder(baseFolder);
-			}
-
-			// Ensure username subfolder exists
-			const folderExists = this.app.vault.getAbstractFileByPath(folder);
-			if (!folderExists) {
-				await this.app.vault.createFolder(folder);
-			}
-
 			const filepath = normalizePath(`${folder}/${filename}`);
 
 			// Create frontmatter
@@ -718,9 +715,10 @@ JSON 배열로만 응답하세요. 예: ["리뷰", "기술", "일상"]`
 
 			new Notice(`Created: ${filename}`);
 			return createdFile;
-		} catch {
+		} catch (error) {
+			console.error(`Failed to create file for: ${post.title}`, error);
 			new Notice(`Failed to create file for: ${post.title}`);
-			return null;
+			throw error;
 		}
 	}
 

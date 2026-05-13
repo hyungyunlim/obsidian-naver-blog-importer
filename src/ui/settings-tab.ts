@@ -551,12 +551,20 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					const posts = await this.plugin.fetchNaverBlogPosts(blogId, currentCount);
 
 					let successCount = 0;
+					let skippedCount = 0;
+					let errorCount = 0;
 					for (const post of posts) {
 						try {
-							await this.plugin.createMarkdownFile(post);
-							successCount++;
-						} catch {
+							const createdFile = await this.plugin.createMarkdownFile(post);
+							if (createdFile) {
+								successCount++;
+							} else {
+								skippedCount++;
+							}
+						} catch (error) {
+							console.error(`Failed to sync post ${post.logNo}:`, error);
 							// Skip failed post
+							errorCount++;
 						}
 					}
 
@@ -570,7 +578,10 @@ export class NaverBlogSettingTab extends PluginSettingTab {
 					// Refresh display to show updated metadata
 					this.displaySubscriptions(containerEl);
 
-					new Notice(`Synced ${successCount} posts from ${subscription?.blogName || blogId}`);
+					let summary = `Synced ${successCount} posts from ${subscription?.blogName || blogId}`;
+					if (skippedCount > 0) summary += `, ${skippedCount} skipped`;
+					if (errorCount > 0) summary += `, ${errorCount} errors`;
+					new Notice(summary);
 				} catch (error) {
 					const message = error instanceof Error ? error.message : String(error);
 					new Notice(`Failed to sync ${blogId}: ${message}`);

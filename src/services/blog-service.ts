@@ -16,7 +16,7 @@ export class BlogService {
 	constructor(
 		private app: App,
 		private settings: NaverBlogSettings,
-		private createMarkdownFile: (post: ProcessedBlogPost) => Promise<void>
+		private createMarkdownFile: (post: ProcessedBlogPost) => Promise<unknown>
 	) {}
 
 	async fetchNaverBlogPosts(blogId: string, maxPosts?: number, options?: SyncOptions): Promise<ProcessedBlogPost[]> {
@@ -31,8 +31,16 @@ export class BlogService {
 			// Use settings value if maxPosts is not provided and settings value is > 0
 			const effectiveMaxPosts = maxPosts || (this.settings.postImportLimit > 0 ? this.settings.postImportLimit : undefined);
 
+			const existingLogNos = this.settings.enableDuplicateCheck ? this.getExistingLogNos() : undefined;
 			const fetcher = new NaverBlogFetcher(blogId);
-			const posts = await fetcher.fetchPosts(effectiveMaxPosts);
+			const posts = await fetcher.fetchPosts(effectiveMaxPosts, {
+				excludeLogNos: existingLogNos,
+				onProgress: silent ? undefined : (current, total, post) => {
+					if (total > 1) {
+						new Notice(`Fetching post content (${current}/${total}): ${post.title || post.logNo}`, 2500);
+					}
+				}
+			});
 
 			// Hide the persistent notice
 			if (fetchNotice) {
@@ -40,24 +48,20 @@ export class BlogService {
 				fetchNotice = null;
 			}
 
-			// Filter out duplicates if enabled
-			let filteredPosts = posts;
 			if (this.settings.enableDuplicateCheck) {
-				const existingLogNos = this.getExistingLogNos();
-				filteredPosts = posts.filter(post => !existingLogNos.has(post.logNo));
 				if (!silent) {
-					new Notice(`Found ${posts.length} posts, ${filteredPosts.length} new posts after duplicate check`, 4000);
+					new Notice(`Found ${posts.length} new posts after duplicate check`, 4000);
 				}
 			} else if (!silent) {
 				new Notice(`Found ${posts.length} posts`, 4000);
 			}
 
 			if (!silent) {
-				new Notice(`Processing ${filteredPosts.length} posts...`, 3000);
+				new Notice(`Processing ${posts.length} posts...`, 3000);
 			}
 
 			// Convert to ProcessedBlogPost - use original tags from blog
-			const processedPosts: ProcessedBlogPost[] = filteredPosts.map(post => ({
+			const processedPosts: ProcessedBlogPost[] = posts.map(post => ({
 				...post,
 				title: post.title.replace(/^\[.*?\]\s*/, '').replace(/\s*\[.*?\]$/, '').trim(), // Remove [] brackets from title start/end
 				tags: post.originalTags || [],
@@ -134,8 +138,10 @@ export class BlogService {
 								const postProgress = `(${i + 1}/${totalBlogs}) post (${j + 1}/${posts.length})`;
 								new Notice(`Creating ${postProgress}: ${post.title}`, 3000);
 							}
-							await this.createMarkdownFile(post);
-							result.newPosts++;
+							const createdFile = await this.createMarkdownFile(post);
+							if (createdFile) {
+								result.newPosts++;
+							}
 						} catch {
 							result.errors++;
 						}
