@@ -17,11 +17,13 @@ export class NaverBlogImportModal extends Modal {
 	constructor(app: App, plugin: NaverBlogPlugin) {
 		super(app);
 		this.plugin = plugin;
+		this.shouldSubscribe = plugin.settings.subscribeToNewPostsByDefault ?? false;
 	}
 
 	onOpen() {
 		const { contentEl, modalEl } = this;
 		contentEl.empty();
+		this.shouldSubscribe = this.plugin.settings.subscribeToNewPostsByDefault ?? false;
 
 		// Add modal class for styling
 		modalEl.addClass('naver-import-modal');
@@ -69,6 +71,8 @@ export class NaverBlogImportModal extends Modal {
 				.setValue(this.shouldSubscribe)
 				.onChange(value => {
 					this.shouldSubscribe = value;
+					this.plugin.settings.subscribeToNewPostsByDefault = value;
+					void this.plugin.saveSettings();
 				}));
 
 		// Cache for resolved short URLs to avoid redundant network calls

@@ -1,7 +1,7 @@
 {
 	"id": "naver-blog-importer",
 	"name": "Naver Blog Importer",
-	"version": "1.10.3",
+	"version": "1.10.4",
 	"minAppVersion": "1.8.7",
 	"description": "Import posts from Naver Blog, Cafe, News, and Kakao Brunch with AI-powered features, subscription management, and comprehensive content parsing.",
 	"author": "hyungyunlim",

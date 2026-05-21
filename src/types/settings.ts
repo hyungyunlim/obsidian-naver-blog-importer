@@ -43,6 +43,7 @@ export interface NaverBlogSettings {
 	enableAiExcerpt: boolean;
 	enableDuplicateCheck: boolean;
 	enableImageDownload: boolean;
+	subscribeToNewPostsByDefault: boolean;
 	subscribedBlogs: string[];
 	subscriptionCount: number;
 	blogSubscriptions: BlogSubscription[];
@@ -82,6 +83,7 @@ export const DEFAULT_SETTINGS: NaverBlogSettings = {
 	enableAiExcerpt: true,
 	enableDuplicateCheck: true,
 	enableImageDownload: false,
+	subscribeToNewPostsByDefault: false,
 	subscribedBlogs: [],
 	subscriptionCount: 10,
 	blogSubscriptions: [],

@@ -35,6 +35,9 @@ export class SettingsUtils {
 		if (!normalizedSettings.blogSubscriptions) {
 			normalizedSettings.blogSubscriptions = DEFAULT_SETTINGS.blogSubscriptions;
 		}
+		if (typeof normalizedSettings.subscribeToNewPostsByDefault !== 'boolean') {
+			normalizedSettings.subscribeToNewPostsByDefault = DEFAULT_SETTINGS.subscribeToNewPostsByDefault;
+		}
 
 		return normalizedSettings;
 	}
