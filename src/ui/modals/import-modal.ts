@@ -599,7 +599,7 @@ export class NaverBlogImportModal extends Modal {
 			const createdFile = await this.plugin.createMarkdownFile({
 				...post,
 				tags: post.originalTags.length > 0 ? post.originalTags : [],
-				excerpt: post.content.substring(0, 150) + '...'
+				excerpt: post.content.substring(0, 150).replace(/\n/g, ' ') + '...'
 			});
 
 			if (!createdFile) {

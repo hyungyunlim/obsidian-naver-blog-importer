@@ -10,20 +10,21 @@ export class ContentUtils {
 	 * @returns Formatted YAML frontmatter string
 	 */
 	static createFrontmatter(post: ProcessedBlogPost, sanitizeFilename: (filename: string) => string): string {
-		const tags = post.tags.length > 0 ? post.tags.map(tag => `"${tag}"`).join(', ') : '';
-		const excerpt = post.excerpt ? `"${post.excerpt.replace(/"/g, '\\"')}"` : '""';
+		// JSON strings are valid YAML double-quoted scalars: escapes quotes, backslashes and newlines
+		const q = (value: string) => JSON.stringify(value ?? '');
+		const tags = post.tags.map(q).join(', ');
 
 		return `---
-title: "${post.title}"
-filename: "${post.date}-${sanitizeFilename(post.title)}"
+title: ${q(post.title)}
+filename: ${q(`${post.date}-${sanitizeFilename(post.title)}`)}
 date: ${post.date}
 share: true
 tags: [${tags}]
-excerpt: ${excerpt}
+excerpt: ${q(post.excerpt)}
 source: "네이버 블로그"
-blogId: "${post.blogId}"
-url: "${post.url}"
-logNo: "${post.logNo}"
+blogId: ${q(post.blogId)}
+url: ${q(post.url)}
+logNo: ${q(post.logNo)}
 ---`;
 	}
 
