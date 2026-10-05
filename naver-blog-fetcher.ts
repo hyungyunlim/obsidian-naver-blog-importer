@@ -1012,9 +1012,9 @@ export class NaverBlogFetcher {
                             content += caption ? `[이미지: ${caption}]\n` : `[이미지]\n`;
                         }
                     }
-                } else if ($el.hasClass('se-imageGroup')) {
-                    // Image Group (slideshow/carousel) component
-                    const imageItems = $el.find('.se-imageGroup-item');
+                } else if ($el.hasClass('se-imageGroup') || $el.hasClass('se-imageStrip')) {
+                    // Image Group (slideshow/carousel) or Image Strip (side-by-side) component
+                    const imageItems = $el.find($el.hasClass('se-imageStrip') ? '.se-module-image' : '.se-imageGroup-item');
                     const groupCaption = $el.find('.se-caption').text().trim();
 
                     imageItems.each((_: number, item: Element) => {

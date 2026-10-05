@@ -1211,9 +1211,9 @@ export class NaverCafeFetcher {
 					}
 					content += '\n';
 				}
-				// Image Group (slideshow/carousel) - like blog parser
-				else if ($component.hasClass('se-imageGroup')) {
-					const imageItems = $component.find('.se-imageGroup-item');
+				// Image Group (slideshow/carousel) or Image Strip (side-by-side) - like blog parser
+				else if ($component.hasClass('se-imageGroup') || $component.hasClass('se-imageStrip')) {
+					const imageItems = $component.find($component.hasClass('se-imageStrip') ? '.se-module-image' : '.se-imageGroup-item');
 					const groupCaption = $component.find('.se-caption').text().trim();
 
 					imageItems.each((_, item) => {
