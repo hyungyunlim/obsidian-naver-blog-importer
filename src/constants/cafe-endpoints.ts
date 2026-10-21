@@ -75,7 +75,7 @@ export const CAFE_URL_PATTERNS = {
 	// https://cafe.naver.com/cafename/12345
 	directUrl: /cafe\.naver\.com\/([^/]+)\/(\d+)/,
 	// https://cafe.naver.com/ArticleRead.nhn?clubid=123&articleid=456
-	articleReadUrl: /ArticleRead\.nhn\?.*clubid=(\d+).*articleid=(\d+)/,
+	articleReadUrl: /ArticleRead\.nhn\?(?=.*clubid=(\d+))(?=.*articleid=(\d+))/i,
 	// https://cafe.naver.com/cafename?articleid=12345
 	queryUrl: /cafe\.naver\.com\/([^/?]+)\?.*articleid=(\d+)/,
 	// Mobile URL: https://m.cafe.naver.com/cafename/12345

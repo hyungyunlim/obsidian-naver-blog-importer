@@ -32,6 +32,8 @@ const CANONICAL_URL_PATTERNS = [
 	/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i,
 	/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i,
 	/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:url["']/i,
+	// Cafe shell page has no canonical; the article (with art token) is loaded into the cafe_main iframe
+	/\$\(["']cafe_main["']\)\.src\s*=\s*["']([^"']*ArticleRead\.nhn\?[^"']+)["']/,
 ] as const;
 
 /**
@@ -71,7 +73,7 @@ async function resolveRedirectWithRequestUrl(url: string): Promise<string | null
 			for (const pattern of CANONICAL_URL_PATTERNS) {
 				const match = resp.text.match(pattern);
 				if (match?.[1]) {
-					return match[1];
+					return match[1].startsWith('//') ? `https:${match[1]}` : match[1];
 				}
 			}
 		}
